@@ -35,6 +35,7 @@ dotnet build Notesnook.API/Notesnook.API.csproj
 
 **Note: Self-hosting the Notesnook Sync Server is not yet possible. We are working to enable full on-premise self hosting so stay tuned!**
 
+- [x] Open source the Sync server
 - [ ] Open source the Identity server
 - [ ] Open source the SSE Messaging infrastructure
 - [ ] Fully Dockerize all services
