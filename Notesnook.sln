@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Notesnook.API", "Notesnook.API\Notesnook.API.csproj", "{05F79941-F8EF-4C56-A763-CDDFCA6645A3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Streetwriters.Common", "Streetwriters.Common\Streetwriters.Common.csproj", "{0606F6B6-118F-42C0-A1E2-EBEF406F7DD9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Streetwriters.Data", "Streetwriters.Data\Streetwriters.Data.csproj", "{CBBA4BD8-B348-4CF0-A72A-0D3DE0E6001D}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{05F79941-F8EF-4C56-A763-CDDFCA6645A3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{05F79941-F8EF-4C56-A763-CDDFCA6645A3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{05F79941-F8EF-4C56-A763-CDDFCA6645A3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{05F79941-F8EF-4C56-A763-CDDFCA6645A3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0606F6B6-118F-42C0-A1E2-EBEF406F7DD9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0606F6B6-118F-42C0-A1E2-EBEF406F7DD9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0606F6B6-118F-42C0-A1E2-EBEF406F7DD9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0606F6B6-118F-42C0-A1E2-EBEF406F7DD9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CBBA4BD8-B348-4CF0-A72A-0D3DE0E6001D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CBBA4BD8-B348-4CF0-A72A-0D3DE0E6001D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CBBA4BD8-B348-4CF0-A72A-0D3DE0E6001D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CBBA4BD8-B348-4CF0-A72A-0D3DE0E6001D}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net7.0</TargetFramework>
+    <StartupObject>Notesnook.API.Program</StartupObject>
+    <LangVersion>10.0</LangVersion>
+    <RuntimeIdentifier>linux-x64</RuntimeIdentifier>
+    <TargetLatestRuntimePatch>true</TargetLatestRuntimePatch>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AWSSDK.Core" Version="3.7.12.5" />
+    <PackageReference Include="IdentityServer4.AccessTokenValidation" Version="3.0.1" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="6.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="6.0.0" />
+    <PackageReference Include="AspNetCore.HealthChecks.MongoDb" Version="6.0.1-rc2.2" />
+    <PackageReference Include="AWSSDK.S3" Version="3.7.9.21" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" Version="6.0.3" />
+    <PackageReference Include="Microsoft.AspNetCore.Server.Kestrel.Https" Version="2.2.0" />
+ </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Streetwriters.Common\Streetwriters.Common.csproj" />
+    <ProjectReference Include="..\Streetwriters.Data\Streetwriters.Data.csproj" />
+  </ItemGroup>
+
+
+</Project>
