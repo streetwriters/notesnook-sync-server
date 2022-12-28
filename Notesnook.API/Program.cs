@@ -17,20 +17,9 @@ You should have received a copy of the Affero GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Net;
 using System.Threading.Tasks;
-using Amazon.S3;
-using Amazon.S3.Model;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Server.Kestrel.Https;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using Streetwriters.Common;
 
 namespace Notesnook.API
@@ -39,6 +28,8 @@ namespace Notesnook.API
     {
         public static async Task Main(string[] args)
         {
+            DotNetEnv.Env.TraversePath().Load();
+
             IHost host = CreateHostBuilder(args).Build();
             await host.RunAsync();
         }

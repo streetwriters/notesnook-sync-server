@@ -13,6 +13,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="DotNetEnv" Version="2.3.0" />
     <PackageReference Include="IdentityServer4" Version="4.1.2" />
     <PackageReference Include="MailKit" Version="3.4.3" />
     <PackageReference Include="MessageBird" Version="3.2.0" />
