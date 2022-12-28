@@ -25,16 +25,22 @@ Once you are inside the `./notesnook-sync-server` directory, run:
 dotnet restore Notesnook.sln
 ```
 
-To build the `Notesnook.API` project:
+Then build all projects:
 
 ```bash
-dotnet build Notesnook.API/Notesnook.API.csproj
+dotnet build Notesnook.sln
 ```
 
-To build the `Streetwriters.Messenger` project:
+To run the `Notesnook.API` project:
 
 ```bash
-dotnet build Streetwriters.Messenger/Streetwriters.Messenger.csproj
+dotnet run --project Notesnook.API/Notesnook.API.csproj
+```
+
+To run the `Streetwriters.Messenger` project:
+
+```bash
+dotnet run --project Streetwriters.Messenger/Streetwriters.Messenger.csproj
 ```
 
 ## TODO Self-hosting
