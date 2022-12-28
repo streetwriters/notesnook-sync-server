@@ -1,0 +1,15 @@
+************
+{{app_name}}
+************
+
+We detected a failed login attempt on your {{app_name}} account.
+
+{{device_info}}
+
+If this was not you *please immediately reset your password & 2FA methods*.
+
+-------------
+
+This email has been sent to you because you signed up on *{{app_name}}* - a service by Streetwriters (Private) Ltd.
+1st Floor, Valley Plaza, Mardowal Chowk, Naushera
+Khushab, Punjab 41100 Pakistan

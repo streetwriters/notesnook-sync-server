@@ -1,0 +1,56 @@
+/*
+This file is part of the Notesnook Sync Server project (https://notesnook.com/)
+
+Copyright (C) 2022 Streetwriters (Private) Limited
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the Affero GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+Affero GNU General Public License for more details.
+
+You should have received a copy of the Affero GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+using System.Threading.Tasks;
+using Streetwriters.Common.Messages;
+using Streetwriters.Common.Models;
+using Streetwriters.Common;
+using System.Text.Json;
+using Streetwriters.Data.Repositories;
+using Streetwriters.Data.Interfaces;
+using Streetwriters.Common.Interfaces;
+using System;
+using Microsoft.AspNetCore.Identity;
+using Streetwriters.Common.Enums;
+using System.Security.Claims;
+using System.Linq;
+using Streetwriters.Identity.Interfaces;
+using Streetwriters.Identity.Services;
+
+namespace Streetwriters.Identity.MessageHandlers
+{
+    public class CreateSubscription
+    {
+        public static async Task Process(CreateSubscriptionMessage message, UserManager<User> userManager)
+        {
+            var user = await userManager.FindByIdAsync(message.UserId);
+            var client = Clients.FindClientByAppId(message.AppId);
+            if (client == null || user == null) return;
+
+            IdentityUserClaim<string> statusClaim = user.Claims.FirstOrDefault((c) => c.ClaimType == $"{client.Id}:status");
+            Claim subscriptionClaim = UserService.SubscriptionTypeToClaim(client.Id, message.Type);
+            if (statusClaim?.ClaimValue == subscriptionClaim.Value) return;
+            if (statusClaim != null)
+                await userManager.ReplaceClaimAsync(user, statusClaim.ToClaim(), subscriptionClaim);
+            else
+                await userManager.AddClaimAsync(user, subscriptionClaim);
+        }
+
+    }
+}

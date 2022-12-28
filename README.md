@@ -43,12 +43,18 @@ To run the `Streetwriters.Messenger` project:
 dotnet run --project Streetwriters.Messenger/Streetwriters.Messenger.csproj
 ```
 
+To run the `Streetwriters.Identity` project:
+
+```bash
+dotnet run --project Streetwriters.Identity/Streetwriters.Identity.csproj
+```
+
 ## TODO Self-hosting
 
 **Note: Self-hosting the Notesnook Sync Server is not yet possible. We are working to enable full on-premise self hosting so stay tuned!**
 
 - [x] Open source the Sync server
-- [ ] Open source the Identity server
+- [x] Open source the Identity server
 - [x] Open source the SSE Messaging infrastructure
 - [ ] Fully Dockerize all services
 - [ ] Publish on DockerHub

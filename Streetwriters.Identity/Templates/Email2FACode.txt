@@ -1,0 +1,17 @@
+Your 2FA code for {{app_name}} is: {{code}}
+
+************
+{{app_name}}
+************
+
+Please use the following 2FA code to login to your account:
+
+{{code}}
+
+If you did not request to a 2FA code, please report this to us at support@streetwriters.co
+
+-------------
+
+This email has been sent to you because you signed up on ** - a service by Streetwriters (Private) Ltd.
+1st Floor, Valley Plaza, Mardowal Chowk, Naushera
+Khushab, Punjab 41100 Pakistan

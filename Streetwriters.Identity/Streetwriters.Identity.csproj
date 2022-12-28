@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net7.0</TargetFramework>
+    <StartupObject>Streetwriters.Identity.Program</StartupObject>
+    <LangVersion>10.0</LangVersion>
+    <RuntimeIdentifier>linux-x64</RuntimeIdentifier>
+    <TargetLatestRuntimePatch>true</TargetLatestRuntimePatch>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TargetLatestRuntimePatch>true</TargetLatestRuntimePatch>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="IdentityServer4" Version="4.1.2" />
+    <PackageReference Include="MailKit" Version="3.4.3" />
+    <PackageReference Include="MessageBird" Version="3.2.0" />
+    <PackageReference Include="Ng.UserAgentService" Version="1.1.2" />
+    <PackageReference Include="Scriban" Version="5.5.1" />
+    <PackageReference Include="SendGrid" Version="9.24.4" />
+    <PackageReference Include="Serilog.AspNetCore" Version="3.4.0" />
+    <PackageReference Include="Sodium.Core" Version="1.2.3" />
+    <PackageReference Include="IdentityServer4.Contrib.MongoDB" Version="4.0.0-rc.2" />
+    <PackageReference Include="IdentityServer4.AspNetIdentity" Version="4.1.2" />
+    <PackageReference Include="IdentityServer4.EntityFramework" Version="4.1.2" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="6.0.0" />
+    <PackageReference Include="Usemam.IdentityServer4.KeyRack" Version="0.2.0" />
+    <PackageReference Include="Usemam.IdentityServer4.KeyRack.DataProtection" Version="0.1.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="6.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="6.0.0" />
+    <PackageReference Include="AspNetCore.Identity.Mongo" Version="8.3.3" />
+    <PackageReference Include="WebMarkupMin.Core" Version="2.13.0" />
+    <PackageReference Include="WebMarkupMin.NUglify" Version="2.12.0" />
+ </ItemGroup>
+
+  <ItemGroup> 
+    <Content Include="Templates\**"> 
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory> 
+    </Content> 
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Streetwriters.Common\Streetwriters.Common.csproj" />
+  </ItemGroup>
+</Project>
