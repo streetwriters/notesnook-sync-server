@@ -17,11 +17,12 @@ You should have received a copy of the Affero GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-﻿using System;
-using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+#if !DEBUG
+using System;
 using System.Security.Cryptography.X509Certificates;
+#endif
 
 namespace Streetwriters.Common
 {
@@ -83,7 +84,7 @@ namespace Streetwriters.Common
         };
 #else
         private readonly static string HOST = "localhost";
-        public readonly static X509Certificate2 OriginSSLCertificate = X509Certificate2.CreateFromPemFile("/home/notesnook/.ssl/CF_Origin_Streetwriters.pem", "/home/notesnook/.ssl/CF_Origin_Streetwriters.key");
+        public readonly static X509Certificate2 OriginSSLCertificate = X509Certificate2.CreateFromPemFile(Environment.GetEnvironmentVariable("ORIGIN_CERT_PATH"), Environment.GetEnvironmentVariable("ORIGIN_CERT_KEY_PATH"));
 #endif
         public static Server NotesnookAPI { get; } = new()
         {
