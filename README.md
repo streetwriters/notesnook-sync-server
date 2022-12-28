@@ -40,6 +40,7 @@ dotnet build Notesnook.API/Notesnook.API.csproj
 - [ ] Fully Dockerize all services
 - [ ] Publish on DockerHub
 - [ ] Write self hosting docs
+- [ ] Add settings to change server URLs in Notesnook client apps
 
 ## License
 
