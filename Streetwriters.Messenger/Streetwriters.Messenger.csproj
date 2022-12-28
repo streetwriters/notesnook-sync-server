@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net7.0</TargetFramework>
+    <StartupObject>Streetwriters.Messenger.Program</StartupObject>
+    <LangVersion>10.0</LangVersion>
+    <RuntimeIdentifier>linux-x64</RuntimeIdentifier>
+    <TargetLatestRuntimePatch>true</TargetLatestRuntimePatch>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Lib.AspNetCore.ServerSentEvents" Version="6.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="5.0.0" NoWarn="NU1605" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="5.0.0" NoWarn="NU1605" />
+    <PackageReference Include="IdentityServer4.AccessTokenValidation" Version="3.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Streetwriters.Common\Streetwriters.Common.csproj" />
+  </ItemGroup>
+
+</Project>

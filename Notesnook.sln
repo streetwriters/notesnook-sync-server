@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Streetwriters.Common", "Str
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Streetwriters.Data", "Streetwriters.Data\Streetwriters.Data.csproj", "{CBBA4BD8-B348-4CF0-A72A-0D3DE0E6001D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Streetwriters.Messenger", "Streetwriters.Messenger\Streetwriters.Messenger.csproj", "{BDA80415-6C8D-4481-AC31-E5B4D73E9629}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -30,5 +32,9 @@ Global
 		{CBBA4BD8-B348-4CF0-A72A-0D3DE0E6001D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{CBBA4BD8-B348-4CF0-A72A-0D3DE0E6001D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{CBBA4BD8-B348-4CF0-A72A-0D3DE0E6001D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BDA80415-6C8D-4481-AC31-E5B4D73E9629}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BDA80415-6C8D-4481-AC31-E5B4D73E9629}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BDA80415-6C8D-4481-AC31-E5B4D73E9629}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BDA80415-6C8D-4481-AC31-E5B4D73E9629}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

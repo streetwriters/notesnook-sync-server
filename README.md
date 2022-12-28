@@ -25,10 +25,16 @@ Once you are inside the `./notesnook-sync-server` directory, run:
 dotnet restore Notesnook.sln
 ```
 
-Then build the Notesnook.API project:
+To build the `Notesnook.API` project:
 
 ```bash
 dotnet build Notesnook.API/Notesnook.API.csproj
+```
+
+To build the `Streetwriters.Messenger` project:
+
+```bash
+dotnet build Streetwriters.Messenger/Streetwriters.Messenger.csproj
 ```
 
 ## TODO Self-hosting
@@ -37,7 +43,7 @@ dotnet build Notesnook.API/Notesnook.API.csproj
 
 - [x] Open source the Sync server
 - [ ] Open source the Identity server
-- [ ] Open source the SSE Messaging infrastructure
+- [x] Open source the SSE Messaging infrastructure
 - [ ] Fully Dockerize all services
 - [ ] Publish on DockerHub
 - [ ] Write self hosting docs
