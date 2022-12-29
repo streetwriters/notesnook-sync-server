@@ -127,7 +127,7 @@ namespace Notesnook.API
             .AddOAuth2Introspection("introspection", options =>
             {
                 options.Authority = Servers.IdentityServer.ToString();
-                options.ClientSecret = Environment.GetEnvironmentVariable("NOTESNOOK_API_SECRET");
+                options.ClientSecret = Constants.NOTESNOOK_API_SECRET;
                 options.ClientId = "notesnook";
                 options.DiscoveryPolicy.RequireHttps = false;
                 options.TokenRetriever = new Func<HttpRequest, string>(req =>

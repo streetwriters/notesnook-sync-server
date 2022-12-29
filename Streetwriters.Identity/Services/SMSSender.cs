@@ -23,15 +23,16 @@ using MessageBird;
 using MessageBird.Objects;
 using Microsoft.Extensions.Options;
 using Streetwriters.Identity.Models;
+using Streetwriters.Common;
 
 namespace Streetwriters.Identity.Services
 {
     public class SMSSender : ISMSSender
     {
         private Client client;
-        public SMSSender(IOptions<MessageBirdOptions> messageBirdOptions)
+        public SMSSender()
         {
-            client = Client.CreateDefault(messageBirdOptions.Value.AccessKey);
+            client = Client.CreateDefault(Constants.MESSAGEBIRD_ACCESS_KEY);
         }
 
         public string SendOTP(string number, IClient app)

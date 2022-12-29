@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 using Notesnook.API.Interfaces;
 using Notesnook.API.Models;
 using Notesnook.API.Repositories;
-using Streetwriters.Common.Models;
 using Streetwriters.Data.Repositories;
 
 namespace Notesnook.API.Accessors

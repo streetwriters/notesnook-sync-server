@@ -61,8 +61,6 @@ namespace Streetwriters.Identity
         {
             var connectionString = Configuration["MongoDbSettings:ConnectionString"];
 
-            services.Configure<SmtpOptions>(Configuration.GetSection("SmtpSettings"));
-            services.Configure<MessageBirdOptions>(Configuration.GetSection("MessageBirdSettings"));
             services.AddTransient<IEmailSender, EmailSender>();
             services.AddTransient<ISMSSender, SMSSender>();
             services.AddTransient<IPasswordHasher<User>, Argon2PasswordHasher<User>>();

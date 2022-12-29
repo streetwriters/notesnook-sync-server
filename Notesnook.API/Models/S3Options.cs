@@ -17,10 +17,6 @@ You should have received a copy of the Affero GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-using System.ComponentModel.DataAnnotations;
-using System.Runtime.Serialization;
-using Microsoft.AspNetCore.Mvc;
-
 namespace Notesnook.API.Models
 {
     public class S3Options

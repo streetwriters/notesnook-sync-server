@@ -72,7 +72,7 @@ namespace Streetwriters.Messenger
             .AddOAuth2Introspection("introspection", options =>
             {
                 options.Authority = Servers.IdentityServer.ToString();
-                options.ClientSecret = Environment.GetEnvironmentVariable("NOTESNOOK_API_SECRET");
+                options.ClientSecret = Constants.NOTESNOOK_API_SECRET;
                 options.ClientId = "notesnook";
                 options.SaveToken = true;
                 options.EnableCaching = true;

@@ -19,14 +19,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Amazon.S3;
-using Amazon.Runtime;
 using Amazon.S3.Model;
 using System.Threading.Tasks;
-using System.Text.RegularExpressions;
 using System.Security.Claims;
-using System.Net.Http;
-using System.Linq;
 using Notesnook.API.Interfaces;
 using System;
 

@@ -49,11 +49,9 @@ namespace Streetwriters.Identity.Services
 {
     public class EmailSender : IEmailSender, IAsyncDisposable
     {
-        IOptions<SmtpOptions> SmtpOptions { get; set; }
         NNGnuPGContext NNGnuPGContext { get; set; }
-        public EmailSender(IConfiguration configuration, IOptions<SmtpOptions> smtpOptions)
+        public EmailSender(IConfiguration configuration)
         {
-            SmtpOptions = smtpOptions;
             NNGnuPGContext = new NNGnuPGContext(configuration.GetSection("PgpKeySettings"));
         }
 
@@ -112,19 +110,6 @@ namespace Streetwriters.Identity.Services
                 }
             };
             await SendEmailAsync(email, template, client);
-        }
-
-
-        public Task SendWelcomeEmailAsync(string email, IClient client)
-        {
-            // EmailTemplate template = new EmailTemplate
-            // {
-            //     Id = client.WelcomeEmailTemplateId,
-            //     Data = new { },
-            //     SendAt = DateTimeOffset.UtcNow.AddHours(2).ToUnixTimeSeconds()
-            // };
-            // return SendEmailAsync(email, template, client);
-            return Task.CompletedTask;
         }
 
         public async Task SendConfirmationEmailAsync(string email, string callbackUrl, IClient client)
@@ -197,17 +182,28 @@ namespace Streetwriters.Identity.Services
             try
             {
                 if (!mailClient.IsConnected)
-                    await mailClient.ConnectAsync(SmtpOptions.Value.Host, SmtpOptions.Value.Port, MailKit.Security.SecureSocketOptions.StartTls);
+                {
+                    if (int.TryParse(Constants.SMTP_PORT, out int port))
+                    {
+                        await mailClient.ConnectAsync(Constants.SMTP_HOST, port, MailKit.Security.SecureSocketOptions.StartTls);
+                    }
+                    else
+                    {
+                        throw new InvalidDataException("SMTP_PORT is not a valid integer value.");
+                    }
+                }
 
                 if (!mailClient.IsAuthenticated)
-                    await mailClient.AuthenticateAsync(SmtpOptions.Value.Username, SmtpOptions.Value.Password);
+                    await mailClient.AuthenticateAsync(Constants.SMTP_USERNAME, Constants.SMTP_PASSWORD);
 
                 var message = new MimeMessage();
                 var sender = new MailboxAddress(client.SenderName, client.SenderEmail);
                 message.From.Add(sender);
                 message.To.Add(new MailboxAddress("", email));
-                message.ReplyTo.Add(new MailboxAddress("Streetwriters", "support@streetwriters.co"));
                 message.Subject = await Template.Parse(template.Subject).RenderAsync(template.Data);
+
+                if (!string.IsNullOrEmpty(Constants.SMTP_REPLYTO_NAME) && !string.IsNullOrEmpty(Constants.SMTP_REPLYTO_EMAIL))
+                    message.ReplyTo.Add(new MailboxAddress(Constants.SMTP_REPLYTO_NAME, Constants.SMTP_REPLYTO_EMAIL));
 
                 var builder = new BodyBuilder();
 
@@ -226,9 +222,12 @@ namespace Streetwriters.Identity.Services
                         outputStream.Seek(0, SeekOrigin.Begin);
                         builder.Attachments.Add($"{client.Id}_pub.asc", Encoding.ASCII.GetBytes(Encoding.ASCII.GetString(outputStream.ToArray())));
                     }
+                    message.Body = MultipartSigned.Create(NNGnuPGContext, sender, DigestAlgorithm.Sha256, builder.ToMessageBody());
                 }
-
-                message.Body = MultipartSigned.Create(NNGnuPGContext, sender, DigestAlgorithm.Sha256, builder.ToMessageBody());
+                else
+                {
+                    message.Body = builder.ToMessageBody();
+                }
                 await mailClient.SendAsync(message);
             }
             catch (Exception ex)

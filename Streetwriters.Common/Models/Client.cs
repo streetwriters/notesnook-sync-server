@@ -31,11 +31,9 @@ namespace Streetwriters.Common.Models
     {
         public string Id { get; set; }
         public string Name { get; set; }
-        public string[] ProductIds { get; set; }
         public ApplicationType Type { get; set; }
         public ApplicationType AppId { get; set; }
         public string SenderEmail { get; set; }
         public string SenderName { get; set; }
-        public string WelcomeEmailTemplateId { get; set; }
     }
 }

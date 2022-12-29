@@ -39,15 +39,16 @@ namespace Notesnook.API.Services
         private AmazonS3Client S3Client { get; }
         private HttpClient httpClient = new HttpClient();
 
-        public S3Service(IOptions<S3Options> s3Options)
+        public S3Service()
         {
+
             var config = new AmazonS3Config
             {
 #if DEBUG
                 ServiceURL = Servers.S3Server.ToString(),
 #else
-                ServiceURL = s3Options.Value.ServiceUrl,
-                AuthenticationRegion = s3Options.Value.Region,
+                ServiceURL = Constants.S3_SERVICE_URL,
+                AuthenticationRegion = Constants.S3_REGION,
 #endif
                 ForcePathStyle = true,
                 SignatureMethod = SigningAlgorithm.HmacSHA256,
@@ -56,7 +57,7 @@ namespace Notesnook.API.Services
 #if DEBUG
             S3Client = new AmazonS3Client("S3RVER", "S3RVER", config);
 #else
-            S3Client = new AmazonS3Client(s3Options.Value.AccessKeyId, s3Options.Value.SecretAccessKey, config);
+            S3Client = new AmazonS3Client(Constants.S3_ACCESS_KEY_ID, Constants.S3_ACCESS_KEY, config);
 #endif
             AWSConfigsS3.UseSignatureVersion4 = true;
         }

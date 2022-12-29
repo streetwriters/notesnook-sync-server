@@ -24,7 +24,6 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Notesnook.API.Models;
-using Streetwriters.Common.Models;
 using Streetwriters.Data.Interfaces;
 using Streetwriters.Data.Repositories;
 

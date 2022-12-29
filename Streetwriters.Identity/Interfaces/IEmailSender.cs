@@ -24,7 +24,6 @@ namespace Streetwriters.Identity.Interfaces
 {
     public interface IEmailSender
     {
-        Task SendWelcomeEmailAsync(string email, IClient client);
         Task SendConfirmationEmailAsync(string email, string callbackUrl, IClient client);
         Task SendChangeEmailConfirmationAsync(string email, string code, IClient client);
         Task SendPasswordResetEmailAsync(string email, string callbackUrl, IClient client);

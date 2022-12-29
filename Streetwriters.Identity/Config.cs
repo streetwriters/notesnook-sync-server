@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using IdentityServer4;
 using IdentityServer4.Models;
+using Streetwriters.Common;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -44,7 +45,7 @@ namespace Streetwriters.Identity
             {
                 new ApiResource("notesnook", "Notesnook API", new string[] { "verified" })
                 {
-                    ApiSecrets = { new Secret(Environment.GetEnvironmentVariable("NOTESNOOK_API_SECRET")?.Sha256()) },
+                    ApiSecrets = { new Secret(Constants.NOTESNOOK_API_SECRET?.Sha256()) },
                     Scopes = { "notesnook.sync" }
                 },
                 // local API

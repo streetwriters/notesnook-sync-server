@@ -1,6 +1,4 @@
-using System.Runtime.Serialization;
 using System.Text.Json.Serialization;
-using Notesnook.API.Interfaces;
 using Streetwriters.Common.Interfaces;
 using Streetwriters.Common.Models;
 
