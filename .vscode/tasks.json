@@ -1,0 +1,41 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build-notesnook",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "build",
+        "${workspaceFolder}/Notesnook.API/Notesnook.API.csproj",
+        "/property:GenerateFullPaths=true",
+        "/consoleloggerparameters:NoSummary"
+      ],
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "build-identity",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "build",
+        "${workspaceFolder}/Streetwriters.Identity/Streetwriters.Identity.csproj",
+        "/property:GenerateFullPaths=true",
+        "/consoleloggerparameters:NoSummary"
+      ],
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "build-messenger",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "build",
+        "${workspaceFolder}/Streetwriters.Messenger/Streetwriters.Messenger.csproj",
+        "/property:GenerateFullPaths=true",
+        "/consoleloggerparameters:NoSummary"
+      ],
+      "problemMatcher": "$msCompile"
+    },
+  ]
+}

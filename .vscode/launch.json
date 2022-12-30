@@ -1,0 +1,68 @@
+{
+  // Use IntelliSense to find out which attributes exist for C# debugging
+  // Use hover for the description of the existing attributes
+  // For further information visit https://github.com/OmniSharp/omnisharp-vscode/blob/master/debugger-launchjson.md
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Launch Notesnook.API Server",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build-notesnook",
+      // If you have changed target frameworks, make sure to update the program path.
+      "program": "${workspaceFolder}/Notesnook.API/bin/Debug/net7.0/linux-x64/Notesnook.API.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/Notesnook.API",
+      "stopAtEntry": false,
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    {
+      "name": "Launch Identity Server",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build-identity",
+      // If you have changed target frameworks, make sure to update the program path.
+      "program": "${workspaceFolder}/Streetwriters.Identity/bin/Debug/net7.0/linux-x64/Streetwriters.Identity.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/Streetwriters.Identity",
+      "stopAtEntry": false,
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    {
+      "name": "Launch Messenger Server",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build-messenger",
+      // If you have changed target frameworks, make sure to update the program path.
+      "program": "${workspaceFolder}/Streetwriters.Messenger/bin/Debug/net7.0/linux-x64/Streetwriters.Messenger.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/Streetwriters.Messenger",
+      "stopAtEntry": false,
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    {
+      "name": ".NET Core Attach",
+      "type": "coreclr",
+      "request": "attach",
+      "processId": "${command:pickProcess}"
+    }
+  ],
+  "compounds": [
+    {
+      "stopAll": true,
+      "name": "Notesnook",
+      "configurations": [
+        "Launch Identity Server",
+        "Launch Messenger Server",
+        "Launch Notesnook.API Server",
+      ],
+      "preLaunchTask": ""
+    }
+  ]
+}
