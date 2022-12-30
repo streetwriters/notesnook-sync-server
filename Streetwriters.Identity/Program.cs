@@ -33,6 +33,9 @@ namespace Streetwriters.Identity
     {
         public static async Task Main(string[] args)
         {
+#if DEBUG
+            DotNetEnv.Env.TraversePath().Load(".env.local");
+#endif
             IHost host = CreateHostBuilder(args).Build();
             await host.RunAsync();
         }

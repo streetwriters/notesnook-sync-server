@@ -15,7 +15,9 @@
       "cwd": "${workspaceFolder}/Notesnook.API",
       "stopAtEntry": false,
       "env": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "MONGODB_CONNECTION_STRING": "mongodb://localhost:27017/notesnook",
+        "MONGODB_DATABASE_NAME": "notesnook"
       }
     },
     {
@@ -29,7 +31,9 @@
       "cwd": "${workspaceFolder}/Streetwriters.Identity",
       "stopAtEntry": false,
       "env": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "MONGODB_CONNECTION_STRING": "mongodb://localhost:27017/identity",
+        "MONGODB_DATABASE_NAME": "identity"
       }
     },
     {
@@ -60,7 +64,7 @@
       "configurations": [
         "Launch Identity Server",
         "Launch Messenger Server",
-        "Launch Notesnook.API Server",
+        "Launch Notesnook.API Server"
       ],
       "preLaunchTask": ""
     }

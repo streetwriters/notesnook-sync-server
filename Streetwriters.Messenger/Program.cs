@@ -34,6 +34,9 @@ namespace Streetwriters.Messenger
     {
         public static void Main(string[] args)
         {
+#if DEBUG
+            DotNetEnv.Env.TraversePath().Load(".env.local");
+#endif
             CreateHostBuilder(args).Build().Run();
         }
 

@@ -264,3 +264,4 @@ keys/
 dist/
 appsettings.json
 keystore/
+.env.local
