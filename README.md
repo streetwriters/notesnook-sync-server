@@ -56,7 +56,7 @@ dotnet run --project Streetwriters.Identity/Streetwriters.Identity.csproj
 - [x] Open source the Sync server
 - [x] Open source the Identity server
 - [x] Open source the SSE Messaging infrastructure
-- [ ] Fully Dockerize all services
+- [x] Fully Dockerize all services
 - [ ] Publish on DockerHub
 - [ ] Write self hosting docs
 - [ ] Add settings to change server URLs in Notesnook client apps
