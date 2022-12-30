@@ -92,6 +92,9 @@ namespace Notesnook.API.Hubs
                 var data = transferItem.Items[i];
                 var type = transferItem.Types[i];
 
+                // We intentionally don't await here to speed up the sync. Fire and forget
+                // suits here because we don't really care if the item reaches the other
+                // devices.
                 others.SyncItem(
                         new SyncTransferItem
                         {

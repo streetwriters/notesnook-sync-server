@@ -27,7 +27,7 @@ using Streetwriters.Data.Repositories;
 
 namespace Notesnook.API.Controllers
 {
-
+    // TODO: this should be moved out into its own microservice
     [ApiController]
     [Route("announcements")]
     public class AnnouncementController : ControllerBase
