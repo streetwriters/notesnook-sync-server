@@ -1,0 +1,59 @@
+version: "3.4"
+
+x-server-discovery:
+  &server-discovery
+  NOTESNOOK_SERVER_PORT: 80
+  NOTESNOOK_SERVER_HOST: notesnook-server
+  IDENTITY_SERVER_PORT: 80
+  IDENTITY_SERVER_HOST: identity-server
+  SSE_SERVER_PORT: 80
+  SSE_SERVER_HOST: sse-server
+  SELF_HOSTED: 1
+
+services:
+  notesnook-db:
+    image: mongo
+    networks:
+      - notesnook
+    volumes:
+      - /data/db
+
+  notesnook-server:
+    build:
+      context: .
+      dockerfile: ./Notesnook.API/Dockerfile
+    ports:
+      - "5264:80"
+    networks:
+      - notesnook
+    environment:
+      <<: *server-discovery
+      MONGODB_CONNECTION_STRING: mongodb://notesnook-db:27017/notesnook
+      MONGODB_DATABASE_NAME: notesnook
+
+  identity-server:
+    build:
+      context: .
+      dockerfile: ./Streetwriters.Identity/Dockerfile
+    ports:
+      - "8264:80"
+    networks:
+      - notesnook
+    environment:
+      <<: *server-discovery
+      MONGODB_CONNECTION_STRING: mongodb://notesnook-db:27017/identity
+      MONGODB_DATABASE_NAME: identity
+
+  sse-server:
+    build:
+      context: .
+      dockerfile: ./Streetwriters.Messenger/Dockerfile
+    ports:
+      - "7264:80"
+    networks:
+      - notesnook
+    environment:
+      <<: *server-discovery
+
+networks:
+  notesnook:
