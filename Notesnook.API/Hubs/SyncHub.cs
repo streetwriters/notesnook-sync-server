@@ -87,10 +87,11 @@ namespace Notesnook.API.Hubs
 
             long dateSynced = transferItem.LastSynced > userSettings.LastSynced ? transferItem.LastSynced : userSettings.LastSynced;
 
-            for (int i = 0; i < transferItem.Items.Length; ++i)
+            Parallel.For(0, transferItem.Items.Length, async (i) =>
             {
                 var data = transferItem.Items[i];
                 var type = transferItem.Types[i];
+                var id = transferItem.Ids[i];
 
                 // We intentionally don't await here to speed up the sync. Fire and forget
                 // suits here because we don't really care if the item reaches the other
@@ -108,44 +109,39 @@ namespace Notesnook.API.Hubs
                 switch (type)
                 {
                     case "content":
-                        Repositories.Contents.Upsert(JsonSerializer.Deserialize<Content>(data), userId, dateSynced);
+                        await Repositories.Contents.UpsertAsync(id, data, userId, dateSynced);
                         break;
                     case "attachment":
-                        Repositories.Attachments.Upsert(JsonSerializer.Deserialize<Attachment>(data), userId, dateSynced);
+                        await Repositories.Attachments.UpsertAsync(id, data, userId, dateSynced);
                         break;
                     case "note":
-                        Repositories.Notes.Upsert(JsonSerializer.Deserialize<Note>(data), userId, dateSynced);
+                        await Repositories.Notes.UpsertAsync(id, data, userId, dateSynced);
                         break;
                     case "notebook":
-                        Repositories.Notebooks.Upsert(JsonSerializer.Deserialize<Notebook>(data), userId, dateSynced);
+                        await Repositories.Notebooks.UpsertAsync(id, data, userId, dateSynced);
                         break;
                     case "shortcut":
-                        Repositories.Shortcuts.Upsert(JsonSerializer.Deserialize<Shortcut>(data), userId, dateSynced);
+                        await Repositories.Shortcuts.UpsertAsync(id, data, userId, dateSynced);
                         break;
                     case "reminder":
-                        Repositories.Reminders.Upsert(JsonSerializer.Deserialize<Reminder>(data), userId, dateSynced);
+                        await Repositories.Reminders.UpsertAsync(id, data, userId, dateSynced);
                         break;
                     case "relation":
-                        Repositories.Relations.Upsert(JsonSerializer.Deserialize<Relation>(data), userId, dateSynced);
+                        await Repositories.Relations.UpsertAsync(id, data, userId, dateSynced);
                         break;
                     case "settings":
-                        var settings = JsonSerializer.Deserialize<Setting>(data);
-                        settings.Id = MongoDB.Bson.ObjectId.Parse(userId);
-                        settings.ItemId = userId;
-                        Repositories.Settings.Upsert(settings, userId, dateSynced);
+                        await Repositories.Settings.UpsertAsync(userId, data, userId, dateSynced);
                         break;
                     case "vaultKey":
                         userSettings.VaultKey = JsonSerializer.Deserialize<EncryptedData>(data);
-                        Repositories.UsersSettings.Upsert(userSettings, (u) => u.UserId == userId);
+                        await Repositories.UsersSettings.UpsertAsync(userSettings, (u) => u.UserId == userId);
                         break;
                     default:
                         throw new HubException("Invalid item type.");
                 }
+            });
 
-            }
-
-            return await unit.Commit() ? 1 : 0;
-
+            return 1;
         }
 
         public async Task<bool> SyncCompleted(long dateSynced)
@@ -262,6 +258,8 @@ namespace Notesnook.API.Hubs
 
         [MessagePack.Key("types")]
         public string[] Types { get; set; }
+        [MessagePack.Key("ids")]
+        public string[] Ids { get; set; }
 
         [MessagePack.Key("total")]
         public int Total { get; set; }
