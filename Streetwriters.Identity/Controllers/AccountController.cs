@@ -17,7 +17,6 @@ You should have received a copy of the Affero GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
@@ -29,13 +28,10 @@ using IdentityServer4.Stores;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using MongoDB.Bson;
 using Streetwriters.Common;
-using Streetwriters.Common.Enums;
 using Streetwriters.Common.Messages;
 using Streetwriters.Common.Models;
 using Streetwriters.Identity.Enums;
-using Streetwriters.Identity.Handlers;
 using Streetwriters.Identity.Interfaces;
 using Streetwriters.Identity.Models;
 using static IdentityServer4.IdentityServerConstants;
@@ -80,16 +76,15 @@ namespace Streetwriters.Identity.Controllers
                         var result = await UserManager.ConfirmEmailAsync(user, code);
                         if (!result.Succeeded) return BadRequest(result.Errors.ToErrors());
 
-                        foreach (var handler in ClientHandlers.Handlers)
+
+                        if (await UserManager.IsInRoleAsync(user, client.Id))
                         {
-                            if (await UserManager.IsInRoleAsync(user, client.Id))
-                            {
-                                await handler.Value.OnEmailConfirmed(userId);
-                                // if (client.WelcomeEmailTemplateId != null)
-                                //     await EmailSender.SendWelcomeEmailAsync(user.Email, client);
-                            }
+                            await client.OnEmailConfirmed(userId);
+                            // if (client.WelcomeEmailTemplateId != null)
+                            //     await EmailSender.SendWelcomeEmailAsync(user.Email, client);
                         }
-                        var redirectUrl = $"{ClientHandlers.GetClientHandler(client.Type)?.EmailConfirmedRedirectURL}?userId={userId}";
+
+                        var redirectUrl = $"{client.EmailConfirmedRedirectURL}?userId={userId}";
                         return RedirectPermanent(redirectUrl);
                     }
                 // case TokenType.CHANGE_EMAIL:
@@ -111,7 +106,7 @@ namespace Streetwriters.Identity.Controllers
                             return BadRequest("Invalid token.");
 
                         var authorizationCode = await UserManager.GenerateUserTokenAsync(user, TokenOptions.DefaultProvider, "PasswordResetAuthorizationCode");
-                        var redirectUrl = $"{ClientHandlers.GetClientHandler(client.Type)?.AccountRecoveryRedirectURL}?userId={userId}&code={authorizationCode}";
+                        var redirectUrl = $"{client.AccountRecoveryRedirectURL}?userId={userId}&code={authorizationCode}";
                         return RedirectPermanent(redirectUrl);
                     }
                 default:

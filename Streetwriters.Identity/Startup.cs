@@ -59,7 +59,7 @@ namespace Streetwriters.Identity
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            var connectionString = Configuration["MongoDbSettings:ConnectionString"];
+            var connectionString = Constants.MONGODB_CONNECTION_STRING;
 
             services.AddTransient<IEmailSender, EmailSender>();
             services.AddTransient<ISMSSender, SMSSender>();

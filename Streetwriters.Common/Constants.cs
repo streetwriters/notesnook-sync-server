@@ -23,25 +23,47 @@ namespace Streetwriters.Common
 {
     public class Constants
     {
+        public static bool IS_SELF_HOSTED => Environment.GetEnvironmentVariable("SELF_HOSTED") == "1";
+
         // S3 related
-        public static string S3_ACCESS_KEY = Environment.GetEnvironmentVariable("S3_ACCESS_KEY");
-        public static string S3_ACCESS_KEY_ID = Environment.GetEnvironmentVariable("S3_ACCESS_KEY_ID");
-        public static string S3_SERVICE_URL = Environment.GetEnvironmentVariable("S3_HOST");
-        public static string S3_REGION = Environment.GetEnvironmentVariable("S3_HOST");
+        public static string S3_ACCESS_KEY => Environment.GetEnvironmentVariable("S3_ACCESS_KEY");
+        public static string S3_ACCESS_KEY_ID => Environment.GetEnvironmentVariable("S3_ACCESS_KEY_ID");
+        public static string S3_SERVICE_URL => Environment.GetEnvironmentVariable("S3_SERVICE_URL");
+        public static string S3_REGION => Environment.GetEnvironmentVariable("S3_REGION");
 
         // SMTP settings
-        public static string SMTP_USERNAME = Environment.GetEnvironmentVariable("SMTP_USERNAME");
-        public static string SMTP_PASSWORD = Environment.GetEnvironmentVariable("SMTP_PASSWORD");
-        public static string SMTP_HOST = Environment.GetEnvironmentVariable("SMTP_HOST");
-        public static string SMTP_PORT = Environment.GetEnvironmentVariable("SMTP_PORT");
-        public static string SMTP_REPLYTO_NAME = Environment.GetEnvironmentVariable("SMTP_REPLYTO_NAME");
-        public static string SMTP_REPLYTO_EMAIL = Environment.GetEnvironmentVariable("SMTP_REPLYTO_EMAIL");
-        public static string NOTESNOOK_SENDER_EMAIL = Environment.GetEnvironmentVariable("NOTESNOOK_SENDER_EMAIL");
-        public static string NOTESNOOK_SENDER_NAME = Environment.GetEnvironmentVariable("NOTESNOOK_SENDER_NAME");
+        public static string SMTP_USERNAME => Environment.GetEnvironmentVariable("SMTP_USERNAME");
+        public static string SMTP_PASSWORD => Environment.GetEnvironmentVariable("SMTP_PASSWORD");
+        public static string SMTP_HOST => Environment.GetEnvironmentVariable("SMTP_HOST");
+        public static string SMTP_PORT => Environment.GetEnvironmentVariable("SMTP_PORT");
+        public static string SMTP_REPLYTO_NAME => Environment.GetEnvironmentVariable("SMTP_REPLYTO_NAME");
+        public static string SMTP_REPLYTO_EMAIL => Environment.GetEnvironmentVariable("SMTP_REPLYTO_EMAIL");
+        public static string NOTESNOOK_SENDER_EMAIL => Environment.GetEnvironmentVariable("NOTESNOOK_SENDER_EMAIL");
+        public static string NOTESNOOK_SENDER_NAME => Environment.GetEnvironmentVariable("NOTESNOOK_SENDER_NAME");
 
-        public static string NOTESNOOK_API_SECRET = Environment.GetEnvironmentVariable("NOTESNOOK_API_SECRET");
+        public static string NOTESNOOK_APP_HOST => Environment.GetEnvironmentVariable("NOTESNOOK_APP_HOST");
+        public static string NOTESNOOK_API_SECRET => Environment.GetEnvironmentVariable("NOTESNOOK_API_SECRET");
 
         // MessageBird is used for SMS sending
-        public static string MESSAGEBIRD_ACCESS_KEY = Environment.GetEnvironmentVariable("MESSAGEBIRD_ACCESS_KEY");
+        public static string MESSAGEBIRD_ACCESS_KEY => Environment.GetEnvironmentVariable("MESSAGEBIRD_ACCESS_KEY");
+
+        // internal
+        public static string ORIGIN_CERT_PATH => Environment.GetEnvironmentVariable("ORIGIN_CERT_PATH");
+        public static string ORIGIN_CERT_KEY_PATH => Environment.GetEnvironmentVariable("ORIGIN_CERT_KEY_PATH");
+        public static string MONGODB_CONNECTION_STRING => Environment.GetEnvironmentVariable("MONGODB_CONNECTION_STRING");
+        public static string MONGODB_DATABASE_NAME => Environment.GetEnvironmentVariable("MONGODB_DATABASE_NAME");
+
+        // Server discovery
+        public static int NOTESNOOK_SERVER_PORT => int.Parse(Environment.GetEnvironmentVariable("NOTESNOOK_SERVER_PORT"));
+        public static string NOTESNOOK_SERVER_HOST => Environment.GetEnvironmentVariable("NOTESNOOK_SERVER_HOST");
+        public static string NOTESNOOK_SERVER_DOMAIN => Environment.GetEnvironmentVariable("NOTESNOOK_SERVER_DOMAIN");
+
+        public static int IDENTITY_SERVER_PORT => int.Parse(Environment.GetEnvironmentVariable("IDENTITY_SERVER_PORT"));
+        public static string IDENTITY_SERVER_HOST => Environment.GetEnvironmentVariable("IDENTITY_SERVER_HOST");
+        public static string IDENTITY_SERVER_DOMAIN => Environment.GetEnvironmentVariable("IDENTITY_SERVER_DOMAIN");
+
+        public static int SSE_SERVER_PORT => int.Parse(Environment.GetEnvironmentVariable("SSE_SERVER_PORT"));
+        public static string SSE_SERVER_HOST => Environment.GetEnvironmentVariable("SSE_SERVER_HOST");
+        public static string SSE_SERVER_DOMAIN => Environment.GetEnvironmentVariable("SSE_SERVER_DOMAIN");
     }
 }

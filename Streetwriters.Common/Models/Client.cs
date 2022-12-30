@@ -17,9 +17,11 @@ You should have received a copy of the Affero GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+using System;
 using System.ComponentModel.DataAnnotations;
 using System.Runtime.Serialization;
 using System.Text.Json.Serialization;
+using System.Threading.Tasks;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 using Streetwriters.Common.Enums;
@@ -35,5 +37,9 @@ namespace Streetwriters.Common.Models
         public ApplicationType AppId { get; set; }
         public string SenderEmail { get; set; }
         public string SenderName { get; set; }
+        public string EmailConfirmedRedirectURL { get; set; }
+        public string AccountRecoveryRedirectURL { get; set; }
+
+        public Func<string, Task> OnEmailConfirmed { get; set; }
     }
 }

@@ -22,13 +22,14 @@ using System.Collections.Generic;
 using System.Linq;
 using Streetwriters.Common.Enums;
 using Streetwriters.Common.Interfaces;
+using Streetwriters.Common.Messages;
 using Streetwriters.Common.Models;
 
 namespace Streetwriters.Common
 {
     public class Clients
     {
-        private static IClient Notesnook = new Client
+        private static Client Notesnook = new Client
         {
             Id = "notesnook",
             Name = "Notesnook",
@@ -36,20 +37,34 @@ namespace Streetwriters.Common
             SenderName = Constants.NOTESNOOK_SENDER_NAME,
             Type = ApplicationType.NOTESNOOK,
             AppId = ApplicationType.NOTESNOOK,
+            AccountRecoveryRedirectURL = $"{Constants.NOTESNOOK_APP_HOST}/account/verified",
+            EmailConfirmedRedirectURL = $"{Constants.NOTESNOOK_APP_HOST}/account/recovery",
+            OnEmailConfirmed = async (userId) =>
+            {
+                await WampServers.MessengerServer.PublishMessageAsync(WampServers.MessengerServer.Topics.SendSSETopic, new SendSSEMessage
+                {
+                    UserId = userId,
+                    Message = new Message
+                    {
+                        Type = "emailConfirmed",
+                        Data = null
+                    }
+                });
+            }
         };
 
-        public static Dictionary<string, IClient> ClientsMap = new Dictionary<string, IClient>
+        public static Dictionary<string, Client> ClientsMap = new Dictionary<string, Client>
         {
             { "notesnook", Notesnook }
         };
 
-        public static IClient FindClientById(string id)
+        public static Client FindClientById(string id)
         {
             if (!IsValidClient(id)) return null;
             return ClientsMap[id];
         }
 
-        public static IClient FindClientByAppId(ApplicationType appId)
+        public static Client FindClientByAppId(ApplicationType appId)
         {
             switch (appId)
             {

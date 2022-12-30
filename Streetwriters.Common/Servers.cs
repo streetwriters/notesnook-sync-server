@@ -28,7 +28,7 @@ namespace Streetwriters.Common
 {
     public class Server
     {
-        public string Port { get; set; }
+        public int Port { get; set; }
         public bool IsSecure { get; set; }
         public string Hostname { get; set; }
         public string Domain { get; set; }
@@ -38,7 +38,7 @@ namespace Streetwriters.Common
             var url = "";
             url += IsSecure ? "https" : "http";
             url += $"://{Hostname}";
-            url += IsSecure ? "" : $":{Port}";
+            url += IsSecure || Port == 80 ? "" : $":{Port}";
             return url;
         }
 
@@ -47,7 +47,7 @@ namespace Streetwriters.Common
             var url = "";
             url += IsSecure ? "ws" : "ws";
             url += $"://{Hostname}";
-            url += $":{Port}";
+            url += Port == 80 ? "" : $":{Port}";
             return url;
         }
     }
@@ -77,74 +77,39 @@ namespace Streetwriters.Common
         public readonly static string HOST = GetLocalIPv4(NetworkInterfaceType.Ethernet);
         public static Server S3Server { get; } = new()
         {
-            Port = "4568",
+            Port = 4568,
             Hostname = HOST,
             IsSecure = false,
             Domain = HOST
         };
 #else
         private readonly static string HOST = "localhost";
-        public readonly static X509Certificate2 OriginSSLCertificate = X509Certificate2.CreateFromPemFile(Environment.GetEnvironmentVariable("ORIGIN_CERT_PATH"), Environment.GetEnvironmentVariable("ORIGIN_CERT_KEY_PATH"));
+        public readonly static X509Certificate2 OriginSSLCertificate = string.IsNullOrEmpty(Constants.ORIGIN_CERT_PATH) || string.IsNullOrEmpty(Constants.ORIGIN_CERT_KEY_PATH) ? null : X509Certificate2.CreateFromPemFile(Constants.ORIGIN_CERT_PATH, Environment.GetEnvironmentVariable(Constants.ORIGIN_CERT_KEY_PATH));
 #endif
         public static Server NotesnookAPI { get; } = new()
         {
-            Domain = "api.notesnook.com",
-            Port = "5264",
-#if DEBUG
-            IsSecure = false,
-            Hostname = HOST,
-#else
-            IsSecure = true,
-            Hostname = "10.0.0.5",
-#endif
+            Domain = Constants.NOTESNOOK_SERVER_DOMAIN,
+            Port = Constants.NOTESNOOK_SERVER_PORT,
+            Hostname = Constants.NOTESNOOK_SERVER_HOST,
         };
 
         public static Server MessengerServer { get; } = new()
         {
-            Domain = "events.streetwriters.co",
-            Port = "7264",
-#if DEBUG
-            IsSecure = false,
-            Hostname = HOST,
-#else
-            IsSecure = true,
-            Hostname = "10.0.0.6",
-#endif
+            Domain = Constants.SSE_SERVER_DOMAIN,
+            Port = Constants.SSE_SERVER_PORT,
+            Hostname = Constants.SSE_SERVER_HOST,
         };
 
         public static Server IdentityServer { get; } = new()
         {
-            Domain = "auth.streetwriters.co",
-            IsSecure = false,
-            Port = "8264",
-#if DEBUG
-            Hostname = HOST,
-#else
-            Hostname = "10.0.0.4",
-#endif
+            Domain = Constants.IDENTITY_SERVER_DOMAIN,
+            Port = Constants.IDENTITY_SERVER_PORT,
+            Hostname = Constants.IDENTITY_SERVER_HOST,
         };
 
         public static Server SubscriptionServer { get; } = new()
         {
             Domain = "subscriptions.streetwriters.co",
-            IsSecure = false,
-            Port = "9264",
-#if DEBUG
-            Hostname = HOST,
-#else
-            Hostname = "10.0.0.4",
-#endif
-        };
-        public static Server PaymentsServer { get; } = new()
-        {
-            Domain = "payments.streetwriters.co",
-            IsSecure = false,
-            Port = "6264",
-#if DEBUG
-            Hostname = HOST,
-#else
-            Hostname = "10.0.0.4",
-#endif
         };
     }
 }

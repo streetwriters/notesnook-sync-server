@@ -32,7 +32,8 @@ namespace Streetwriters.Identity.Services
         private Client client;
         public SMSSender()
         {
-            client = Client.CreateDefault(Constants.MESSAGEBIRD_ACCESS_KEY);
+            if (!string.IsNullOrEmpty(Constants.MESSAGEBIRD_ACCESS_KEY))
+                client = Client.CreateDefault(Constants.MESSAGEBIRD_ACCESS_KEY);
         }
 
         public string SendOTP(string number, IClient app)

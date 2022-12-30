@@ -33,8 +33,6 @@ namespace Streetwriters.Identity
     {
         public static async Task Main(string[] args)
         {
-            DotNetEnv.Env.TraversePath().Load();
-
             IHost host = CreateHostBuilder(args).Build();
             await host.RunAsync();
         }
@@ -48,7 +46,13 @@ namespace Streetwriters.Identity
             })
             .ConfigureWebHostDefaults(webBuilder =>
             {
-                webBuilder.UseStartup<Startup>().UseUrls(Servers.IdentityServer.ToString());
+                webBuilder
+                    .UseStartup<Startup>()
+                    .UseKestrel((options) =>
+                    {
+                        options.Limits.MaxRequestBodySize = long.MaxValue;
+                        options.ListenAnyIP(Servers.IdentityServer.Port);
+                    });
             });
     }
 }

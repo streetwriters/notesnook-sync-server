@@ -50,9 +50,11 @@ namespace Streetwriters.Identity.Services
     public class EmailSender : IEmailSender, IAsyncDisposable
     {
         NNGnuPGContext NNGnuPGContext { get; set; }
+        SmtpClient mailClient;
         public EmailSender(IConfiguration configuration)
         {
             NNGnuPGContext = new NNGnuPGContext(configuration.GetSection("PgpKeySettings"));
+            mailClient = new SmtpClient();
         }
 
         EmailTemplate Email2FATemplate = new EmailTemplate
@@ -89,12 +91,6 @@ namespace Streetwriters.Identity.Services
             Text = File.ReadAllText("Templates/FailedLoginAlert.txt"),
             Subject = "Failed login attempt on your {{app_name}} account",
         };
-
-        SmtpClient mailClient;
-        public EmailSender()
-        {
-            mailClient = new SmtpClient();
-        }
 
         public async Task Send2FACodeEmailAsync(string email, string code, IClient client)
         {
@@ -179,34 +175,40 @@ namespace Streetwriters.Identity.Services
 
         private async Task SendEmailAsync(string email, IEmailTemplate template, IClient client)
         {
+            if (!mailClient.IsConnected)
+            {
+                if (int.TryParse(Constants.SMTP_PORT, out int port))
+                {
+                    await mailClient.ConnectAsync(Constants.SMTP_HOST, port, MailKit.Security.SecureSocketOptions.StartTls);
+                }
+                else
+                {
+                    throw new InvalidDataException("SMTP_PORT is not a valid integer value.");
+                }
+            }
+
+            if (!mailClient.IsAuthenticated)
+                await mailClient.AuthenticateAsync(Constants.SMTP_USERNAME, Constants.SMTP_PASSWORD);
+
+            var message = new MimeMessage();
+            var sender = new MailboxAddress(client.SenderName, client.SenderEmail);
+            message.From.Add(sender);
+            message.To.Add(new MailboxAddress("", email));
+            message.Subject = await Template.Parse(template.Subject).RenderAsync(template.Data);
+
+            if (!string.IsNullOrEmpty(Constants.SMTP_REPLYTO_NAME) && !string.IsNullOrEmpty(Constants.SMTP_REPLYTO_EMAIL))
+                message.ReplyTo.Add(new MailboxAddress(Constants.SMTP_REPLYTO_NAME, Constants.SMTP_REPLYTO_EMAIL));
+
+            message.Body = await GetEmailBodyAsync(template, client, sender);
+
+            await mailClient.SendAsync(message);
+        }
+
+        private async Task<MimeEntity> GetEmailBodyAsync(IEmailTemplate template, IClient client, MailboxAddress sender)
+        {
+            var builder = new BodyBuilder();
             try
             {
-                if (!mailClient.IsConnected)
-                {
-                    if (int.TryParse(Constants.SMTP_PORT, out int port))
-                    {
-                        await mailClient.ConnectAsync(Constants.SMTP_HOST, port, MailKit.Security.SecureSocketOptions.StartTls);
-                    }
-                    else
-                    {
-                        throw new InvalidDataException("SMTP_PORT is not a valid integer value.");
-                    }
-                }
-
-                if (!mailClient.IsAuthenticated)
-                    await mailClient.AuthenticateAsync(Constants.SMTP_USERNAME, Constants.SMTP_PASSWORD);
-
-                var message = new MimeMessage();
-                var sender = new MailboxAddress(client.SenderName, client.SenderEmail);
-                message.From.Add(sender);
-                message.To.Add(new MailboxAddress("", email));
-                message.Subject = await Template.Parse(template.Subject).RenderAsync(template.Data);
-
-                if (!string.IsNullOrEmpty(Constants.SMTP_REPLYTO_NAME) && !string.IsNullOrEmpty(Constants.SMTP_REPLYTO_EMAIL))
-                    message.ReplyTo.Add(new MailboxAddress(Constants.SMTP_REPLYTO_NAME, Constants.SMTP_REPLYTO_EMAIL));
-
-                var builder = new BodyBuilder();
-
                 builder.TextBody = await Template.Parse(template.Text).RenderAsync(template.Data);
                 builder.HtmlBody = await Template.Parse(template.Html).RenderAsync(template.Data);
 
@@ -222,17 +224,16 @@ namespace Streetwriters.Identity.Services
                         outputStream.Seek(0, SeekOrigin.Begin);
                         builder.Attachments.Add($"{client.Id}_pub.asc", Encoding.ASCII.GetBytes(Encoding.ASCII.GetString(outputStream.ToArray())));
                     }
-                    message.Body = MultipartSigned.Create(NNGnuPGContext, sender, DigestAlgorithm.Sha256, builder.ToMessageBody());
+                    return MultipartSigned.Create(NNGnuPGContext, sender, DigestAlgorithm.Sha256, builder.ToMessageBody());
                 }
                 else
                 {
-                    message.Body = builder.ToMessageBody();
+                    return builder.ToMessageBody();
                 }
-                await mailClient.SendAsync(message);
             }
-            catch (Exception ex)
+            catch (PrivateKeyNotFoundException)
             {
-                Console.Error.WriteLine(ex.Message);
+                return builder.ToMessageBody();
             }
         }
 

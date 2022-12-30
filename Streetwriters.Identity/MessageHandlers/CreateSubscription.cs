@@ -21,16 +21,9 @@ using System.Threading.Tasks;
 using Streetwriters.Common.Messages;
 using Streetwriters.Common.Models;
 using Streetwriters.Common;
-using System.Text.Json;
-using Streetwriters.Data.Repositories;
-using Streetwriters.Data.Interfaces;
-using Streetwriters.Common.Interfaces;
-using System;
 using Microsoft.AspNetCore.Identity;
-using Streetwriters.Common.Enums;
 using System.Security.Claims;
 using System.Linq;
-using Streetwriters.Identity.Interfaces;
 using Streetwriters.Identity.Services;
 
 namespace Streetwriters.Identity.MessageHandlers

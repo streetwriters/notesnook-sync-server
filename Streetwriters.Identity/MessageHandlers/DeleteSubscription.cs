@@ -17,21 +17,12 @@ You should have received a copy of the Affero GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-using System;
 using System.Threading.Tasks;
-using Streetwriters.Common.Enums;
 using Streetwriters.Common.Messages;
-using Streetwriters.Common.Interfaces;
 using Streetwriters.Common.Models;
 using Streetwriters.Common;
-using System.Text.Json;
-using System.IO;
-using Streetwriters.Data.Repositories;
-using Streetwriters.Data.Interfaces;
 using Microsoft.AspNetCore.Identity;
 using System.Linq;
-using IdentityServer4.Stores;
-using Streetwriters.Identity.Interfaces;
 
 namespace Streetwriters.Identity.MessageHandlers
 {

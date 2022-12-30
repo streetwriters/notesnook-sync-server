@@ -45,16 +45,7 @@ namespace Streetwriters.Messenger
                     .UseKestrel((options) =>
                     {
                         options.Limits.MaxRequestBodySize = long.MaxValue;
-#if DEBUG
-                        options.ListenAnyIP(int.Parse(Servers.MessengerServer.Port));
-#else
-                        options.ListenAnyIP(443, listenerOptions =>
-                        {
-                            listenerOptions.UseHttps(Servers.OriginSSLCertificate);
-                        });
-                        options.ListenAnyIP(80);
-                        options.Listen(IPAddress.Parse(Servers.MessengerServer.Hostname), int.Parse(Servers.MessengerServer.Port));
-#endif
+                        options.ListenAnyIP(Servers.MessengerServer.Port);
                     });
                 });
     }

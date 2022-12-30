@@ -17,6 +17,8 @@ You should have received a copy of the Affero GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+using System;
+using System.Threading.Tasks;
 using Streetwriters.Common.Enums;
 
 namespace Streetwriters.Common.Interfaces
@@ -29,5 +31,8 @@ namespace Streetwriters.Common.Interfaces
         ApplicationType AppId { get; set; }
         string SenderEmail { get; set; }
         string SenderName { get; set; }
+        string EmailConfirmedRedirectURL { get; }
+        string AccountRecoveryRedirectURL { get; }
+        Func<string, Task> OnEmailConfirmed { get; set; }
     }
 }

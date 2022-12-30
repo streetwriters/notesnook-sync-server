@@ -17,10 +17,15 @@ You should have received a copy of the Affero GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#if !DEBUG
+using System.Net;
+#endif
+using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Hosting;
 using Streetwriters.Common;
+using System.Linq;
 
 namespace Notesnook.API
 {
@@ -28,8 +33,6 @@ namespace Notesnook.API
     {
         public static async Task Main(string[] args)
         {
-            DotNetEnv.Env.TraversePath().Load();
-
             IHost host = CreateHostBuilder(args).Build();
             await host.RunAsync();
         }
@@ -43,16 +46,7 @@ namespace Notesnook.API
                     .UseKestrel((options) =>
                     {
                         options.Limits.MaxRequestBodySize = long.MaxValue;
-#if DEBUG
-                        options.ListenAnyIP(int.Parse(Servers.NotesnookAPI.Port));
-#else
-                        options.ListenAnyIP(443, listenerOptions =>
-                        {
-                            listenerOptions.UseHttps(Servers.OriginSSLCertificate);
-                        });
-                        options.ListenAnyIP(80);
-                        options.Listen(IPAddress.Parse(Servers.NotesnookAPI.Hostname), int.Parse(Servers.NotesnookAPI.Port));
-#endif
+                        options.ListenAnyIP(Servers.NotesnookAPI.Port);
                     });
                 });
     }

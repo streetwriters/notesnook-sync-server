@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -41,7 +42,6 @@ namespace Notesnook.API.Services
 
         public S3Service()
         {
-
             var config = new AmazonS3Config
             {
 #if DEBUG

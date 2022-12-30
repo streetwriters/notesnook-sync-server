@@ -29,6 +29,7 @@ using Notesnook.API.Models.Responses;
 using Streetwriters.Common;
 using Streetwriters.Common.Enums;
 using Streetwriters.Common.Extensions;
+using Streetwriters.Common.Interfaces;
 using Streetwriters.Common.Messages;
 using Streetwriters.Common.Models;
 using Streetwriters.Data.Interfaces;
@@ -73,14 +74,17 @@ namespace Notesnook.API.Services
                 Salt = GetSalt()
             });
 
-            await WampServers.SubscriptionServer.PublishMessageAsync(WampServers.SubscriptionServer.Topics.CreateSubscriptionTopic, new CreateSubscriptionMessage
+            if (!Constants.IS_SELF_HOSTED)
             {
-                AppId = ApplicationType.NOTESNOOK,
-                Provider = SubscriptionProvider.STREETWRITERS,
-                Type = SubscriptionType.BASIC,
-                UserId = response.UserId,
-                StartTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-            });
+                await WampServers.SubscriptionServer.PublishMessageAsync(WampServers.SubscriptionServer.Topics.CreateSubscriptionTopic, new CreateSubscriptionMessage
+                {
+                    AppId = ApplicationType.NOTESNOOK,
+                    Provider = SubscriptionProvider.STREETWRITERS,
+                    Type = SubscriptionType.BASIC,
+                    UserId = response.UserId,
+                    StartTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                });
+            }
 
             await Slogger<UserService>.Info(nameof(CreateUserAsync), "New user created.", JsonSerializer.Serialize(response));
         }
@@ -90,30 +94,48 @@ namespace Notesnook.API.Services
             UserResponse response = await httpClient.ForwardAsync<UserResponse>(this.HttpContextAccessor, $"{Servers.IdentityServer.ToString()}/account", HttpMethod.Get);
             if (!response.Success) return response;
 
-            SubscriptionResponse subscriptionResponse = await httpClient.ForwardAsync<SubscriptionResponse>(this.HttpContextAccessor, $"{Servers.SubscriptionServer}/subscriptions", HttpMethod.Get);
-            if (repair && subscriptionResponse.StatusCode == 404)
+            ISubscription subscription = null;
+            if (Constants.IS_SELF_HOSTED)
             {
-                await Slogger<UserService>.Error(nameof(GetUserAsync), "Repairing user subscription.", JsonSerializer.Serialize(response));
-                // user was partially created. We should continue the process here.
-                await WampServers.SubscriptionServer.PublishMessageAsync(WampServers.SubscriptionServer.Topics.CreateSubscriptionTopic, new CreateSubscriptionMessage
+                subscription = new Subscription
                 {
                     AppId = ApplicationType.NOTESNOOK,
                     Provider = SubscriptionProvider.STREETWRITERS,
-                    Type = SubscriptionType.TRIAL,
-                    UserId = response.UserId,
-                    StartTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                    ExpiryTime = DateTimeOffset.UtcNow.AddDays(7).ToUnixTimeMilliseconds()
-                });
-                // just a dummy object
-                subscriptionResponse.Subscription = new Subscription
-                {
-                    AppId = ApplicationType.NOTESNOOK,
-                    Provider = SubscriptionProvider.STREETWRITERS,
-                    Type = SubscriptionType.TRIAL,
+                    Type = SubscriptionType.PREMIUM,
                     UserId = response.UserId,
                     StartDate = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                    ExpiryDate = DateTimeOffset.UtcNow.AddDays(7).ToUnixTimeMilliseconds()
+                    // this date doesn't matter as the subscription is static.
+                    ExpiryDate = DateTimeOffset.UtcNow.AddYears(1).ToUnixTimeMilliseconds()
                 };
+            }
+            else
+            {
+                SubscriptionResponse subscriptionResponse = await httpClient.ForwardAsync<SubscriptionResponse>(this.HttpContextAccessor, $"{Servers.SubscriptionServer}/subscriptions", HttpMethod.Get);
+                if (repair && subscriptionResponse.StatusCode == 404)
+                {
+                    await Slogger<UserService>.Error(nameof(GetUserAsync), "Repairing user subscription.", JsonSerializer.Serialize(response));
+                    // user was partially created. We should continue the process here.
+                    await WampServers.SubscriptionServer.PublishMessageAsync(WampServers.SubscriptionServer.Topics.CreateSubscriptionTopic, new CreateSubscriptionMessage
+                    {
+                        AppId = ApplicationType.NOTESNOOK,
+                        Provider = SubscriptionProvider.STREETWRITERS,
+                        Type = SubscriptionType.TRIAL,
+                        UserId = response.UserId,
+                        StartTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                        ExpiryTime = DateTimeOffset.UtcNow.AddDays(7).ToUnixTimeMilliseconds()
+                    });
+                    // just a dummy object
+                    subscriptionResponse.Subscription = new Subscription
+                    {
+                        AppId = ApplicationType.NOTESNOOK,
+                        Provider = SubscriptionProvider.STREETWRITERS,
+                        Type = SubscriptionType.TRIAL,
+                        UserId = response.UserId,
+                        StartDate = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                        ExpiryDate = DateTimeOffset.UtcNow.AddDays(7).ToUnixTimeMilliseconds()
+                    };
+                }
+                subscription = subscriptionResponse.Subscription;
             }
 
             var userSettings = await Repositories.UsersSettings.FindOneAsync((u) => u.UserId == response.UserId);
@@ -130,7 +152,7 @@ namespace Notesnook.API.Services
             }
             response.AttachmentsKey = userSettings.AttachmentsKey;
             response.Salt = userSettings.Salt;
-            response.Subscription = subscriptionResponse.Subscription;
+            response.Subscription = subscription;
             return response;
         }
 
@@ -153,11 +175,14 @@ namespace Notesnook.API.Services
             Repositories.Attachments.DeleteByUserId(userId);
             Repositories.UsersSettings.Delete((u) => u.UserId == userId);
 
-            await WampServers.SubscriptionServer.PublishMessageAsync(WampServers.SubscriptionServer.Topics.DeleteSubscriptionTopic, new DeleteSubscriptionMessage
+            if (!Constants.IS_SELF_HOSTED)
             {
-                AppId = ApplicationType.NOTESNOOK,
-                UserId = userId
-            });
+                await WampServers.SubscriptionServer.PublishMessageAsync(WampServers.SubscriptionServer.Topics.DeleteSubscriptionTopic, new DeleteSubscriptionMessage
+                {
+                    AppId = ApplicationType.NOTESNOOK,
+                    UserId = userId
+                });
+            }
 
             await WampServers.MessengerServer.PublishMessageAsync(WampServers.MessengerServer.Topics.SendSSETopic, new SendSSEMessage
             {

@@ -73,7 +73,11 @@ namespace Notesnook.API
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            var dbSettings = Configuration.GetSection("MongoDbSettings").Get<DbSettings>();
+            var dbSettings = new DbSettings
+            {
+                ConnectionString = Constants.MONGODB_CONNECTION_STRING,
+                DatabaseName = Constants.MONGODB_DATABASE_NAME
+            };
             services.AddSingleton<IDbSettings>(dbSettings);
 
             services.TryAddSingleton<IHttpContextAccessor, HttpContextAccessor>();

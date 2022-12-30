@@ -17,6 +17,7 @@ You should have received a copy of the Affero GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
@@ -30,6 +31,7 @@ using Streetwriters.Common.Models;
 using Streetwriters.Identity.Enums;
 using Streetwriters.Identity.Interfaces;
 using Streetwriters.Identity.Models;
+using Streetwriters.Identity.Services;
 
 namespace Streetwriters.Identity.Controllers
 {
@@ -97,7 +99,8 @@ namespace Streetwriters.Identity.Controllers
                 var user = await UserManager.FindByEmailAsync(form.Email);
 
                 await UserManager.AddToRoleAsync(user, client.Id);
-                // await UserManager.AddClaimAsync(user, new Claim("verified", "false"));
+                if (Constants.IS_SELF_HOSTED)
+                    await UserManager.AddClaimAsync(user, UserService.SubscriptionTypeToClaim(client.Id, Common.Enums.SubscriptionType.PREMIUM));
 
                 var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
                 var callbackUrl = Url.TokenLink(user.Id.ToString(), code, client.Id, TokenType.CONFRIM_EMAIL, Request.Scheme);
