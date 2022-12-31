@@ -4,6 +4,8 @@ This repo contains the full source code of the Notesnook Sync Server licensed un
 
 ## Building
 
+### From source
+
 Requirements:
 
 1. [.NET 7](https://dotnet.microsoft.com/en-us/download/dotnet/7.0)
@@ -49,6 +51,27 @@ To run the `Streetwriters.Identity` project:
 dotnet run --project Streetwriters.Identity/Streetwriters.Identity.csproj
 ```
 
+### Using docker
+
+The sync server can easily be started using Docker.
+
+The first step is to `clone` the repository:
+
+```bash
+git clone https://github.com/streetwriters/notesnook-sync-server.git
+
+# change directory
+cd notesnook-sync-server
+```
+
+And then use Docker Compose to start the servers:
+
+```bash
+docker-compose up
+```
+
+This takes care of setting up everything including MongoDB, Minio etc.
+
 ## TODO Self-hosting
 
 **Note: Self-hosting the Notesnook Sync Server is not yet possible. We are working to enable full on-premise self hosting so stay tuned!**
@@ -57,6 +80,7 @@ dotnet run --project Streetwriters.Identity/Streetwriters.Identity.csproj
 - [x] Open source the Identity server
 - [x] Open source the SSE Messaging infrastructure
 - [x] Fully Dockerize all services
+- [x] Use self-hosted Minio for S3 storage
 - [ ] Publish on DockerHub
 - [ ] Write self hosting docs
 - [ ] Add settings to change server URLs in Notesnook client apps
