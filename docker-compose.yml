@@ -10,26 +10,38 @@ x-server-discovery:
   SSE_SERVER_HOST: sse-server
   SELF_HOSTED: 1
 
+x-env-files:
+  &env-files
+  - .env
+
 services:
   notesnook-db:
     image: mongo
     networks:
       - notesnook
-    volumes:
-      - /data/db
+    command: --replSet rs0 --bind_ip_all
 
-  notesnook-server:
-    build:
-      context: .
-      dockerfile: ./Notesnook.API/Dockerfile
-    ports:
-      - "5264:80"
+  # the notesnook sync server requires transactions which only work
+  # with a MongoDB replica set.
+  # This job just runs `rs.initiate()` on our mongodb instance
+  # upgrading it to a replica set. This is only required once but we running
+  # it multiple times is no issue.
+  initiate-rs0:
+    image: mongo
     networks:
       - notesnook
-    environment:
-      <<: *server-discovery
-      MONGODB_CONNECTION_STRING: mongodb://notesnook-db:27017/notesnook
-      MONGODB_DATABASE_NAME: notesnook
+    depends_on:
+      - notesnook-db
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        mongosh mongodb://notesnook-db:27017 <<EOF
+          rs.initiate();
+          rs.status();
+        EOF
+    volumes:
+      - /data/db
 
   identity-server:
     build:
@@ -39,10 +51,25 @@ services:
       - "8264:80"
     networks:
       - notesnook
+    env_file: *env-files
     environment:
       <<: *server-discovery
-      MONGODB_CONNECTION_STRING: mongodb://notesnook-db:27017/identity
+      MONGODB_CONNECTION_STRING: mongodb://notesnook-db:27017/identity?replSet=rs0
       MONGODB_DATABASE_NAME: identity
+
+  notesnook-server:
+    build:
+      context: .
+      dockerfile: ./Notesnook.API/Dockerfile
+    ports:
+      - "5264:80"
+    networks:
+      - notesnook
+    env_file: *env-files
+    environment:
+      <<: *server-discovery
+      MONGODB_CONNECTION_STRING: mongodb://notesnook-db:27017/notesnook?replSet=rs0
+      MONGODB_DATABASE_NAME: notesnook
 
   sse-server:
     build:
@@ -50,6 +77,7 @@ services:
       dockerfile: ./Streetwriters.Messenger/Dockerfile
     ports:
       - "7264:80"
+    env_file: *env-files
     networks:
       - notesnook
     environment:
