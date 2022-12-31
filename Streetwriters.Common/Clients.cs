@@ -37,8 +37,8 @@ namespace Streetwriters.Common
             SenderName = Constants.NOTESNOOK_SENDER_NAME,
             Type = ApplicationType.NOTESNOOK,
             AppId = ApplicationType.NOTESNOOK,
-            AccountRecoveryRedirectURL = $"{Constants.NOTESNOOK_APP_HOST}/account/verified",
-            EmailConfirmedRedirectURL = $"{Constants.NOTESNOOK_APP_HOST}/account/recovery",
+            AccountRecoveryRedirectURL = $"{Constants.NOTESNOOK_APP_HOST}/account/recovery",
+            EmailConfirmedRedirectURL = $"{Constants.NOTESNOOK_APP_HOST}/account/verified",
             OnEmailConfirmed = async (userId) =>
             {
                 await WampServers.MessengerServer.PublishMessageAsync(WampServers.MessengerServer.Topics.SendSSETopic, new SendSSEMessage
