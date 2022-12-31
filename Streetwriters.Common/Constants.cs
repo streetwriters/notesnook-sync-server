@@ -52,6 +52,7 @@ namespace Streetwriters.Common
         public static string ORIGIN_CERT_KEY_PATH => Environment.GetEnvironmentVariable("ORIGIN_CERT_KEY_PATH");
         public static string MONGODB_CONNECTION_STRING => Environment.GetEnvironmentVariable("MONGODB_CONNECTION_STRING");
         public static string MONGODB_DATABASE_NAME => Environment.GetEnvironmentVariable("MONGODB_DATABASE_NAME");
+        public static string S3_INTERNAL_SERVICE_URL => Environment.GetEnvironmentVariable("S3_INTERNAL_SERVICE_URL");
 
         // Server discovery
         public static int NOTESNOOK_SERVER_PORT => int.Parse(Environment.GetEnvironmentVariable("NOTESNOOK_SERVER_PORT"));

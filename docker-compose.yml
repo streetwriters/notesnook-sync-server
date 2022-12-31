@@ -40,8 +40,39 @@ services:
           rs.initiate();
           rs.status();
         EOF
+
+  notesnook-s3:
+    image: minio/minio
+    ports:
+      - 9000:9000
+      - 9090:9090
+    networks:
+      - notesnook
     volumes:
-      - /data/db
+      - ${HOME}/.notesnook/s3:/data/s3
+    environment:
+      MINIO_BROWSER: "on"
+    env_file:
+      - ./.env.local
+    command: server /data/s3 --console-address :9090
+
+  # There's no way to specify a default bucket in Minio so we have to
+  # set it up ourselves.
+  setup-s3:
+    image: minio/mc
+    depends_on:
+      - notesnook-s3
+    networks:
+      - notesnook
+    entrypoint: /bin/sh
+    env_file: *env-files
+    command:
+      - -c
+      - |
+        until mc config host add minio http://notesnook-s3:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD; do
+          sleep 1;
+        done;
+        mc mb minio/nn-attachments -p
 
   identity-server:
     build:
@@ -52,6 +83,8 @@ services:
     networks:
       - notesnook
     env_file: *env-files
+    depends_on:
+      - notesnook-db
     environment:
       <<: *server-discovery
       MONGODB_CONNECTION_STRING: mongodb://notesnook-db:27017/identity?replSet=rs0
@@ -66,10 +99,19 @@ services:
     networks:
       - notesnook
     env_file: *env-files
+    depends_on:
+      - notesnook-s3
+      - setup-s3
+      - identity-server
     environment:
       <<: *server-discovery
       MONGODB_CONNECTION_STRING: mongodb://notesnook-db:27017/notesnook?replSet=rs0
       MONGODB_DATABASE_NAME: notesnook
+      S3_INTERNAL_SERVICE_URL: http://notesnook-s3:9000
+      S3_ACCESS_KEY_ID: "${MINIO_ROOT_USER:-minioadmin}"
+      S3_ACCESS_KEY: "${MINIO_ROOT_PASSWORD:-minioadmin}"
+      S3_SERVICE_URL: http://localhost:9000
+      S3_REGION: us-east-1
 
   sse-server:
     build:
@@ -78,6 +120,9 @@ services:
     ports:
       - "7264:80"
     env_file: *env-files
+    depends_on:
+      - identity-server
+      - notesnook-server
     networks:
       - notesnook
     environment:
