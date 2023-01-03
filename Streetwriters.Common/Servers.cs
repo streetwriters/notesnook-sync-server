@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Security.Cryptography.X509Certificates;
 #if !DEBUG
 using System;
 using System.Security.Cryptography.X509Certificates;
@@ -28,10 +29,17 @@ namespace Streetwriters.Common
 {
     public class Server
     {
+        public Server(string originCertPath = null, string originCertKeyPath = null)
+        {
+            if (!string.IsNullOrEmpty(originCertPath) && !string.IsNullOrEmpty(originCertKeyPath))
+                this.SSLCertificate = X509Certificate2.CreateFromPemFile(originCertPath, originCertKeyPath);
+        }
+
         public int Port { get; set; }
-        public bool IsSecure { get; set; }
         public string Hostname { get; set; }
         public string Domain { get; set; }
+        public X509Certificate2 SSLCertificate { get; }
+        public bool IsSecure { get => this.SSLCertificate != null; }
 
         public override string ToString()
         {
@@ -79,28 +87,24 @@ namespace Streetwriters.Common
         {
             Port = 4568,
             Hostname = HOST,
-            IsSecure = false,
             Domain = HOST
         };
-#else
-        private readonly static string HOST = "localhost";
-        public readonly static X509Certificate2 OriginSSLCertificate = string.IsNullOrEmpty(Constants.ORIGIN_CERT_PATH) || string.IsNullOrEmpty(Constants.ORIGIN_CERT_KEY_PATH) ? null : X509Certificate2.CreateFromPemFile(Constants.ORIGIN_CERT_PATH, Environment.GetEnvironmentVariable(Constants.ORIGIN_CERT_KEY_PATH));
 #endif
-        public static Server NotesnookAPI { get; } = new()
+        public static Server NotesnookAPI { get; } = new(Constants.NOTESNOOK_CERT_PATH, Constants.NOTESNOOK_CERT_KEY_PATH)
         {
             Domain = Constants.NOTESNOOK_SERVER_DOMAIN,
             Port = Constants.NOTESNOOK_SERVER_PORT,
             Hostname = Constants.NOTESNOOK_SERVER_HOST,
         };
 
-        public static Server MessengerServer { get; } = new()
+        public static Server MessengerServer { get; } = new(Constants.SSE_CERT_PATH, Constants.SSE_CERT_KEY_PATH)
         {
             Domain = Constants.SSE_SERVER_DOMAIN,
             Port = Constants.SSE_SERVER_PORT,
             Hostname = Constants.SSE_SERVER_HOST,
         };
 
-        public static Server IdentityServer { get; } = new()
+        public static Server IdentityServer { get; } = new(Constants.IDENTITY_CERT_PATH, Constants.IDENTITY_CERT_KEY_PATH)
         {
             Domain = Constants.IDENTITY_SERVER_DOMAIN,
             Port = Constants.IDENTITY_SERVER_PORT,

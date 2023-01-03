@@ -55,6 +55,13 @@ namespace Streetwriters.Identity
                     {
                         options.Limits.MaxRequestBodySize = long.MaxValue;
                         options.ListenAnyIP(Servers.IdentityServer.Port);
+                        if (Servers.IdentityServer.IsSecure)
+                        {
+                            options.ListenAnyIP(443, listenerOptions =>
+                            {
+                                listenerOptions.UseHttps(Servers.IdentityServer.SSLCertificate);
+                            });
+                        }
                     });
             });
     }

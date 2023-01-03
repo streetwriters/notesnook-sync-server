@@ -50,6 +50,13 @@ namespace Notesnook.API
                     {
                         options.Limits.MaxRequestBodySize = long.MaxValue;
                         options.ListenAnyIP(Servers.NotesnookAPI.Port);
+                        if (Servers.NotesnookAPI.IsSecure)
+                        {
+                            options.ListenAnyIP(443, listenerOptions =>
+                            {
+                                listenerOptions.UseHttps(Servers.NotesnookAPI.SSLCertificate);
+                            });
+                        }
                     });
                 });
     }

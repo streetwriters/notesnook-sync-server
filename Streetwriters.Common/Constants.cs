@@ -48,8 +48,6 @@ namespace Streetwriters.Common
         public static string MESSAGEBIRD_ACCESS_KEY => Environment.GetEnvironmentVariable("MESSAGEBIRD_ACCESS_KEY");
 
         // internal
-        public static string ORIGIN_CERT_PATH => Environment.GetEnvironmentVariable("ORIGIN_CERT_PATH");
-        public static string ORIGIN_CERT_KEY_PATH => Environment.GetEnvironmentVariable("ORIGIN_CERT_KEY_PATH");
         public static string MONGODB_CONNECTION_STRING => Environment.GetEnvironmentVariable("MONGODB_CONNECTION_STRING");
         public static string MONGODB_DATABASE_NAME => Environment.GetEnvironmentVariable("MONGODB_DATABASE_NAME");
         public static string S3_INTERNAL_SERVICE_URL => Environment.GetEnvironmentVariable("S3_INTERNAL_SERVICE_URL");
@@ -58,13 +56,19 @@ namespace Streetwriters.Common
         public static int NOTESNOOK_SERVER_PORT => int.Parse(Environment.GetEnvironmentVariable("NOTESNOOK_SERVER_PORT"));
         public static string NOTESNOOK_SERVER_HOST => Environment.GetEnvironmentVariable("NOTESNOOK_SERVER_HOST");
         public static string NOTESNOOK_SERVER_DOMAIN => Environment.GetEnvironmentVariable("NOTESNOOK_SERVER_DOMAIN");
+        public static string NOTESNOOK_CERT_PATH => Environment.GetEnvironmentVariable("NOTESNOOK_CERT_PATH");
+        public static string NOTESNOOK_CERT_KEY_PATH => Environment.GetEnvironmentVariable("NOTESNOOK_CERT_PATH");
 
         public static int IDENTITY_SERVER_PORT => int.Parse(Environment.GetEnvironmentVariable("IDENTITY_SERVER_PORT"));
         public static string IDENTITY_SERVER_HOST => Environment.GetEnvironmentVariable("IDENTITY_SERVER_HOST");
         public static string IDENTITY_SERVER_DOMAIN => Environment.GetEnvironmentVariable("IDENTITY_SERVER_DOMAIN");
+        public static string IDENTITY_CERT_PATH => Environment.GetEnvironmentVariable("IDENTITY_CERT_PATH");
+        public static string IDENTITY_CERT_KEY_PATH => Environment.GetEnvironmentVariable("IDENTITY_CERT_KEY_PATH");
 
         public static int SSE_SERVER_PORT => int.Parse(Environment.GetEnvironmentVariable("SSE_SERVER_PORT"));
         public static string SSE_SERVER_HOST => Environment.GetEnvironmentVariable("SSE_SERVER_HOST");
         public static string SSE_SERVER_DOMAIN => Environment.GetEnvironmentVariable("SSE_SERVER_DOMAIN");
+        public static string SSE_CERT_PATH => Environment.GetEnvironmentVariable("SSE_CERT_PATH");
+        public static string SSE_CERT_KEY_PATH => Environment.GetEnvironmentVariable("SSE_CERT_KEY_PATH");
     }
 }

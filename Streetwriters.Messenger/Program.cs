@@ -49,6 +49,13 @@ namespace Streetwriters.Messenger
                     {
                         options.Limits.MaxRequestBodySize = long.MaxValue;
                         options.ListenAnyIP(Servers.MessengerServer.Port);
+                        if (Servers.MessengerServer.IsSecure)
+                        {
+                            options.ListenAnyIP(443, listenerOptions =>
+                            {
+                                listenerOptions.UseHttps(Servers.MessengerServer.SSLCertificate);
+                            });
+                        }
                     });
                 });
     }
