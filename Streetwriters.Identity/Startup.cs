@@ -65,7 +65,7 @@ namespace Streetwriters.Identity
             services.AddTransient<ISMSSender, SMSSender>();
             services.AddTransient<IPasswordHasher<User>, Argon2PasswordHasher<User>>();
 
-            services.AddCors();
+            services.AddDefaultCors();
 
             //services.AddSingleton<IProfileService, UserService>();
             services.AddIdentityMongoDbProvider<User>(options =>

@@ -70,5 +70,6 @@ namespace Streetwriters.Common
         public static string SSE_SERVER_DOMAIN => Environment.GetEnvironmentVariable("SSE_SERVER_DOMAIN");
         public static string SSE_CERT_PATH => Environment.GetEnvironmentVariable("SSE_CERT_PATH");
         public static string SSE_CERT_KEY_PATH => Environment.GetEnvironmentVariable("SSE_CERT_KEY_PATH");
+        public static string[] NOTESNOOK_CORS_ORIGINS => Environment.GetEnvironmentVariable("NOTESNOOK_CORS")?.Split(",");
     }
 }

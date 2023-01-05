@@ -62,7 +62,7 @@ namespace Streetwriters.Messenger
             JwtSecurityTokenHandler.DefaultMapInboundClaims = false;
             JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
 
-            services.AddCors();
+            services.AddDefaultCors();
             services.AddDistributedMemoryCache(delegate (MemoryDistributedCacheOptions cacheOptions)
             {
                 cacheOptions.SizeLimit = 262144000L;

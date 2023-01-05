@@ -17,24 +17,25 @@ You should have received a copy of the Affero GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-namespace Microsoft.Extensions.DependencyInjection.CorsServiceCollectionExtensions
+using Microsoft.Extensions.DependencyInjection;
+
+namespace Streetwriters.Common.Extensions
 {
     public static class ServiceCollectionServiceExtensions
     {
-        public static IServiceCollection AddCors(this IServiceCollection services)
+        public static IServiceCollection AddDefaultCors(this IServiceCollection services)
         {
             services.AddCors(options =>
             {
                 options.AddPolicy("notesnook", (b) =>
                 {
-#if DEBUG
-                    b.AllowAnyOrigin();
-#else
-                    b.WithOrigins("http://localhost:3000", "http://192.168.10.29:3000", "https://app.notesnook.com", "https://beta.notesnook.com", "https://budi.streetwriters.co", "http://localhost:9876");
-#endif
+                    if (Constants.NOTESNOOK_CORS_ORIGINS.Length <= 0)
+                        b.AllowAnyOrigin();
+                    else
+                        b.WithOrigins(Constants.NOTESNOOK_CORS_ORIGINS);
+
                     b.AllowAnyMethod()
-                    .AllowAnyHeader()
-                    .AllowCredentials();
+                    .AllowAnyHeader();
                 });
             });
             return services;
