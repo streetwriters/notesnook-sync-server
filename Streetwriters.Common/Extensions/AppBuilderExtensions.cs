@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using WampSharp.AspNetCore.WebSockets.Server;
 using WampSharp.Binding;
@@ -29,6 +30,18 @@ namespace Streetwriters.Common.Extensions
 {
     public static class AppBuilderExtensions
     {
+        public static IApplicationBuilder UseVersion(this IApplicationBuilder app)
+        {
+            app.Map("/version", (app) =>
+            {
+                app.Run(async context =>
+                {
+                    await context.Response.WriteAsync(Version.AsString());
+                });
+            });
+            return app;
+        }
+
         public static IApplicationBuilder UseWamp<T>(this IApplicationBuilder app, WampServer<T> server, Action<IWampHostedRealm, WampServer<T>> action) where T : new()
         {
             WampHost host = new WampHost();

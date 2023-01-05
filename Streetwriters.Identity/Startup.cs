@@ -177,6 +177,7 @@ namespace Streetwriters.Identity
             }
 
             app.UseCors("notesnook");
+            app.UseVersion();
 
             app.UseRouting();
 

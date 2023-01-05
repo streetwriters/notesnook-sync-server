@@ -1,4 +1,4 @@
-/*
+ /*
 This file is part of the Notesnook Sync Server project (https://notesnook.com/)
 
 Copyright (C) 2022 Streetwriters (Private) Limited
@@ -102,6 +102,7 @@ namespace Streetwriters.Messenger
             }
 
             app.UseCors("notesnook");
+            app.UseVersion();
 
             app.UseRouting();
 
