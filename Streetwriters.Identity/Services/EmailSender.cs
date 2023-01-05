@@ -224,7 +224,7 @@ namespace Streetwriters.Identity.Services
                         outputStream.Seek(0, SeekOrigin.Begin);
                         builder.Attachments.Add($"{client.Id}_pub.asc", Encoding.ASCII.GetBytes(Encoding.ASCII.GetString(outputStream.ToArray())));
                     }
-                    return MultipartSigned.Create(NNGnuPGContext, sender, DigestAlgorithm.Sha256, builder.ToMessageBody());
+                    return await MultipartSigned.CreateAsync(NNGnuPGContext, sender, DigestAlgorithm.Sha256, builder.ToMessageBody());
                 }
                 else
                 {
