@@ -111,9 +111,11 @@ namespace Streetwriters.Common
             Hostname = Constants.IDENTITY_SERVER_HOST,
         };
 
-        public static Server SubscriptionServer { get; } = new()
+        public static Server SubscriptionServer { get; } = new(Constants.SUBSCRIPTIONS_CERT_PATH, Constants.SUBSCRIPTIONS_CERT_KEY_PATH)
         {
-            Domain = "subscriptions.streetwriters.co",
+            Domain = Constants.SUBSCRIPTIONS_SERVER_DOMAIN,
+            Port = Constants.SUBSCRIPTIONS_SERVER_PORT,
+            Hostname = Constants.SUBSCRIPTIONS_SERVER_HOST,
         };
     }
 }
