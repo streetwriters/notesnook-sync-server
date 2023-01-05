@@ -35,6 +35,8 @@ namespace Notesnook.API
         {
 #if DEBUG
             DotNetEnv.Env.TraversePath().Load(".env.local");
+#else
+            DotNetEnv.Env.TraversePath().Load(".env");
 #endif
             IHost host = CreateHostBuilder(args).Build();
             await host.RunAsync();
