@@ -1,3 +1,5 @@
 **/Dockerfile
 **/bin
 **/obj
+**/.env
+**/.env.local
