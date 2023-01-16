@@ -63,7 +63,8 @@ namespace Streetwriters.Identity.Validation
         public async Task ValidateAsync(ExtensionGrantValidationContext context)
         {
             var email = context.Request.Raw["email"];
-            var user = await UserManager.FindByEmailAsync(email);
+            var clientId = context.Request.ClientId;
+            var user = await UserManager.FindRegisteredUserAsync(email, clientId);
             if (user == null)
             {
                 user = new User
