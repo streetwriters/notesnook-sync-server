@@ -39,8 +39,9 @@ namespace Notesnook.API.Repositories
     {
         public SyncItemsRepository(IDbContext dbContext) : base(dbContext)
         {
-            Collection.Indexes.CreateOne(new CreateIndexModel<T>(Builders<T>.IndexKeys.Descending(i => i.DateSynced).Ascending(i => i.UserId)));
-            Collection.Indexes.CreateOne(new CreateIndexModel<T>(Builders<T>.IndexKeys.Ascending((i) => i.ItemId).Ascending(i => i.UserId)));
+            Collection.Indexes.CreateOne(new CreateIndexModel<T>(Builders<T>.IndexKeys.Ascending(i => i.UserId).Descending(i => i.DateSynced)));
+            Collection.Indexes.CreateOne(new CreateIndexModel<T>(Builders<T>.IndexKeys.Ascending(i => i.UserId).Ascending((i) => i.ItemId)));
+            Collection.Indexes.CreateOne(new CreateIndexModel<T>(Builders<T>.IndexKeys.Ascending(i => i.UserId)));
         }
 
         private readonly List<string> ALGORITHMS = new List<string> { Algorithms.Default };

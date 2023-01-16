@@ -100,17 +100,18 @@ namespace Notesnook.API.Controllers
             {
                 var userId = this.User.FindFirstValue("sub");
 
-                Response response = await this.httpClient.ForwardAsync<Response>(this.HttpContextAccessor, $"{Servers.IdentityServer.ToString()}/account/unregister", HttpMethod.Post);
-                if (!response.Success) return BadRequest();
-
                 if (await UserService.DeleteUserAsync(userId, User.FindFirstValue("jti")))
-                    return Ok();
+                {
+                    Response response = await this.httpClient.ForwardAsync<Response>(this.HttpContextAccessor, $"{Servers.IdentityServer.ToString()}/account/unregister", HttpMethod.Post);
+                    if (!response.Success) return BadRequest();
 
+                    return Ok();
+                }
                 return BadRequest();
             }
-            catch
+            catch (Exception ex)
             {
-                return BadRequest();
+                return BadRequest(ex.Message);
             }
         }
     }

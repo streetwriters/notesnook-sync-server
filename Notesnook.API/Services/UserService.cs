@@ -173,7 +173,10 @@ namespace Notesnook.API.Services
             Repositories.Contents.DeleteByUserId(userId);
             Repositories.Settings.DeleteByUserId(userId);
             Repositories.Attachments.DeleteByUserId(userId);
+            Repositories.Reminders.DeleteByUserId(userId);
+            Repositories.Relations.DeleteByUserId(userId);
             Repositories.UsersSettings.Delete((u) => u.UserId == userId);
+            Repositories.Monographs.DeleteMany((m) => m.UserId == userId);
 
             if (!Constants.IS_SELF_HOSTED)
             {
@@ -211,6 +214,8 @@ namespace Notesnook.API.Services
             Repositories.Contents.DeleteByUserId(userId);
             Repositories.Settings.DeleteByUserId(userId);
             Repositories.Attachments.DeleteByUserId(userId);
+            Repositories.Reminders.DeleteByUserId(userId);
+            Repositories.Relations.DeleteByUserId(userId);
             Repositories.Monographs.DeleteMany((m) => m.UserId == userId);
             if (!await unit.Commit()) return false;
 
