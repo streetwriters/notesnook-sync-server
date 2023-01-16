@@ -55,7 +55,7 @@ namespace Notesnook.API.Hubs
             unit = unitOfWork;
         }
 
-        public override Task OnConnectedAsync()
+        public override async Task OnConnectedAsync()
         {
             var result = new SyncRequirement().IsAuthorized(Context.User, new PathString("/hubs/sync"));
             if (!result.Succeeded)
@@ -64,15 +64,15 @@ namespace Notesnook.API.Hubs
                 throw new HubException(reason?.Message ?? "Unauthorized");
             }
             var id = Context.User.FindFirstValue("sub");
-            Groups.AddToGroupAsync(Context.ConnectionId, id);
-            return base.OnConnectedAsync();
+            await Groups.AddToGroupAsync(Context.ConnectionId, id);
+            await base.OnConnectedAsync();
         }
 
-        public override Task OnDisconnectedAsync(Exception exception)
+        public override async Task OnDisconnectedAsync(Exception exception)
         {
             var id = Context.User.FindFirstValue("sub");
-            Groups.RemoveFromGroupAsync(Context.ConnectionId, id);
-            return base.OnDisconnectedAsync(exception);
+            await Groups.RemoveFromGroupAsync(Context.ConnectionId, id);
+            await base.OnDisconnectedAsync(exception);
         }
 
         public async Task<int> SyncItem(BatchedSyncTransferItem transferItem)
