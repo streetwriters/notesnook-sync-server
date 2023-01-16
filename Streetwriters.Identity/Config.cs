@@ -75,9 +75,12 @@ namespace Streetwriters.Identity
                     AccessTokenType = AccessTokenType.Reference,
                     AllowOfflineAccess = true,
                     UpdateAccessTokenClaimsOnRefresh = true,
-                    RefreshTokenUsage = TokenUsage.OneTimeOnly,
-                    RefreshTokenExpiration = TokenExpiration.Absolute,
-                    AccessTokenLifetime = 3600,
+                    RefreshTokenUsage = TokenUsage.ReUse,
+                    RefreshTokenExpiration = TokenExpiration.Sliding,
+
+                    AccessTokenLifetime = 3600, // 1 hour
+                    SlidingRefreshTokenLifetime = 15 * 60 * 60 * 24, // 15 days
+                    AbsoluteRefreshTokenLifetime = 0, // 0 means infinite sliding lifetime
                     
                     // scopes that client has access to
                     AllowedScopes = { "notesnook.sync", "offline_access", "openid", IdentityServerConstants.LocalApi.ScopeName, "mfa" },
