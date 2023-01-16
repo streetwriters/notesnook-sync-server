@@ -173,7 +173,7 @@ namespace Streetwriters.Identity
             {
                 app.UseForwardedHeaders(new ForwardedHeadersOptions
                 {
-                    ForwardedForHeaderName = "CF_CONNECTING_IP",
+                    ForwardedForHeaderName = "CF-Connecting-IP",
                     ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
                 });
             }
