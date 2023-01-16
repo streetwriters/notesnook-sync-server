@@ -44,8 +44,22 @@ namespace Streetwriters.Identity.Models
             get; set;
         }
 
+
+        [BindProperty(Name = "password")]
+        public string Password
+        {
+            get; set;
+        }
+
         [BindProperty(Name = "new_email")]
         public string NewEmail
+        {
+            get; set;
+        }
+
+
+        [BindProperty(Name = "verification_code")]
+        public string VerificationCode
         {
             get; set;
         }

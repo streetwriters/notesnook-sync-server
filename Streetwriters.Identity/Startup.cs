@@ -86,6 +86,8 @@ namespace Streetwriters.Identity
                 // User settings.
                 //options.User.AllowedUserNameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._";
                 options.User.RequireUniqueEmail = true;
+
+                options.Tokens.ChangeEmailTokenProvider = TokenOptions.DefaultPhoneProvider;
             }, (options) =>
             {
                 options.RolesCollection = "roles";

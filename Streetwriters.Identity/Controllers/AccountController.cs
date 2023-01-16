@@ -116,7 +116,7 @@ namespace Streetwriters.Identity.Controllers
         }
 
         [HttpPost("verify")]
-        public async Task<IActionResult> SendVerificationEmail()
+        public async Task<IActionResult> SendVerificationEmail([FromForm] string newEmail)
         {
             var client = Clients.FindClientById(User.FindFirstValue("client_id"));
             if (client == null) return BadRequest("Invalid client_id.");
@@ -124,9 +124,17 @@ namespace Streetwriters.Identity.Controllers
             var user = await UserManager.GetUserAsync(User);
             if (!await IsUserValidAsync(user, client.Id)) return BadRequest($"Unable to find user with ID '{UserManager.GetUserId(User)}'.");
 
-            var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
-            var callbackUrl = Url.TokenLink(user.Id.ToString(), code, client.Id, TokenType.CONFRIM_EMAIL, Request.Scheme);
-            await EmailSender.SendConfirmationEmailAsync(user.Email, callbackUrl, client);
+            if (string.IsNullOrEmpty(newEmail))
+            {
+                var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
+                var callbackUrl = Url.TokenLink(user.Id.ToString(), code, client.Id, TokenType.CONFRIM_EMAIL, Request.Scheme);
+                await EmailSender.SendConfirmationEmailAsync(user.Email, callbackUrl, client);
+            }
+            else
+            {
+                var code = await UserManager.GenerateChangeEmailTokenAsync(user, newEmail);
+                await EmailSender.SendChangeEmailConfirmationAsync(newEmail, code, client);
+            }
             return Ok();
         }
 
@@ -145,6 +153,9 @@ namespace Streetwriters.Identity.Controllers
             }
 
             await UserManager.RemoveFromRoleAsync(user, client.Id);
+
+            IdentityUserClaim<string> statusClaim = user.Claims.FirstOrDefault((c) => c.ClaimType == $"{client.Id}:status");
+            await UserManager.RemoveClaimAsync(user, statusClaim.ToClaim());
             return Ok();
         }
 
@@ -256,11 +267,22 @@ namespace Streetwriters.Identity.Controllers
             {
                 case "change_email":
                     {
-                        var code = await UserManager.GenerateChangeEmailTokenAsync(user, form.NewEmail);
-                        // var callbackUrl = Url.TokenLink(user.Id.ToString(), code, client.Id, TokenType.CHANGE_EMAIL, Request.Scheme);
-                        await EmailSender.SendChangeEmailConfirmationAsync(user.Email, code, client);
-                        await UserManager.AddClaimAsync(user, new Claim("new_email", form.NewEmail));
-                        return Ok();
+                        var result = await UserManager.ChangeEmailAsync(user, form.NewEmail, form.VerificationCode);
+                        if (result.Succeeded)
+                        {
+                            result = await UserManager.RemovePasswordAsync(user);
+                            if (result.Succeeded)
+                            {
+                                result = await UserManager.AddPasswordAsync(user, form.Password);
+                                if (result.Succeeded)
+                                {
+                                    await UserManager.SetUserNameAsync(user, form.NewEmail);
+                                    await SendEmailChangedMessageAsync(user.Id.ToString());
+                                    return Ok();
+                                }
+                            }
+                        }
+                        return BadRequest(result.Errors.ToErrors());
                     }
                 case "change_password":
                     {
@@ -323,6 +345,19 @@ namespace Streetwriters.Identity.Controllers
                 Message = new Message
                 {
                     Type = "userPasswordChanged"
+                }
+            });
+        }
+
+        private async Task SendEmailChangedMessageAsync(string userId)
+        {
+            await WampServers.MessengerServer.PublishMessageAsync(WampServers.MessengerServer.Topics.SendSSETopic, new SendSSEMessage
+            {
+                UserId = userId,
+                OriginTokenId = User.FindFirstValue("jti"),
+                Message = new Message
+                {
+                    Type = "userEmailChanged"
                 }
             });
         }

@@ -4,9 +4,11 @@ Confirm your new email to change it for your {{app_name}} account.
 {{app_name}}
 ************
 
-Hey there!
+Please use the following verification code to change to your account email:
 
-Please confirm your new email by going to this link: {{confirm_link}}
+{{code}}
+
+If you did not request a verification code, please report this to us at support@streetwriters.co
 
 ------------
 

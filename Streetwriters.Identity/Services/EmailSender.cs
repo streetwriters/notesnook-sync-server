@@ -124,7 +124,7 @@ namespace Streetwriters.Identity.Services
             await SendEmailAsync(email, template, client);
         }
 
-        public async Task SendChangeEmailConfirmationAsync(string email, string callbackUrl, IClient client)
+        public async Task SendChangeEmailConfirmationAsync(string email, string code, IClient client)
         {
             var template = new EmailTemplate
             {
@@ -134,7 +134,7 @@ namespace Streetwriters.Identity.Services
                 Data = new
                 {
                     app_name = client.Name,
-                    confirm_link = callbackUrl
+                    code = code
                 }
             };
             await SendEmailAsync(email, template, client);
