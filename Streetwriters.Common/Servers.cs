@@ -44,9 +44,9 @@ namespace Streetwriters.Common
         public override string ToString()
         {
             var url = "";
-            url += IsSecure ? "https" : "http";
+            url += "http";
             url += $"://{Hostname}";
-            url += IsSecure || Port == 80 ? "" : $":{Port}";
+            url += Port == 80 || Port == 443 ? "" : $":{Port}";
             return url;
         }
 
