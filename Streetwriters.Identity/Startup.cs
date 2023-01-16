@@ -110,6 +110,12 @@ namespace Streetwriters.Identity
             .AddOperationalStore(options =>
             {
                 options.ConnectionString = connectionString;
+            }, (options) =>
+            {
+#if !DEBUG
+                options.Enable = true;
+                options.Interval = 3600;
+#endif
             })
             .AddConfigurationStore(options =>
             {
