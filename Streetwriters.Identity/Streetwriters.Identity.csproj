@@ -18,6 +18,8 @@
     <PackageReference Include="MailKit" Version="3.4.3" />
     <PackageReference Include="MessageBird" Version="3.2.0" />
     <PackageReference Include="Ng.UserAgentService" Version="1.1.2" />
+    <PackageReference Include="Quartz" Version="3.5.0" />
+    <PackageReference Include="Quartz.AspNetCore" Version="3.5.0" />
     <PackageReference Include="Scriban" Version="5.5.1" />
     <PackageReference Include="SendGrid" Version="9.24.4" />
     <PackageReference Include="Serilog.AspNetCore" Version="3.4.0" />

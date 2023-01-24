@@ -20,8 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 using System;
 using System.IO;
 using AspNetCore.Identity.Mongo;
+using IdentityServer4.MongoDB.Entities;
+using IdentityServer4.MongoDB.Interfaces;
+using IdentityServer4.MongoDB.Options;
+using IdentityServer4.MongoDB.Stores;
 using IdentityServer4.ResponseHandling;
 using IdentityServer4.Services;
+using IdentityServer4.Stores;
 using IdentityServer4.Validation;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -32,12 +37,15 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Logging;
 using Microsoft.IdentityModel.Tokens;
+using MongoDB.Bson.Serialization;
+using Quartz;
 using Streetwriters.Common;
 using Streetwriters.Common.Extensions;
 using Streetwriters.Common.Messages;
 using Streetwriters.Common.Models;
 using Streetwriters.Identity.Helpers;
 using Streetwriters.Identity.Interfaces;
+using Streetwriters.Identity.Jobs;
 using Streetwriters.Identity.Models;
 using Streetwriters.Identity.Services;
 using Streetwriters.Identity.Validation;
@@ -96,7 +104,7 @@ namespace Streetwriters.Identity
                 options.ConnectionString = connectionString;
             }).AddDefaultTokenProviders();
 
-            var builder = services.AddIdentityServer(
+            services.AddIdentityServer(
             options =>
             {
                 options.Events.RaiseSuccessEvents = true;
@@ -107,16 +115,6 @@ namespace Streetwriters.Identity
             .AddExtensionGrantValidator<EmailGrantValidator>()
             .AddExtensionGrantValidator<MFAGrantValidator>()
             .AddExtensionGrantValidator<MFAPasswordGrantValidator>()
-            .AddOperationalStore(options =>
-            {
-                options.ConnectionString = connectionString;
-            }, (options) =>
-            {
-#if !DEBUG
-                options.Enable = true;
-                options.Interval = 3600;
-#endif
-            })
             .AddConfigurationStore(options =>
             {
                 options.ConnectionString = connectionString;
@@ -159,6 +157,15 @@ namespace Streetwriters.Identity
                     ValidateIssuer = true,
                 };
             });
+
+            services.AddQuartzHostedService(q =>
+            {
+                q.WaitForJobsToComplete = true;
+                q.AwaitApplicationStarted = true;
+                q.StartDelay = TimeSpan.FromMinutes(1);
+            });
+
+            AddOperationalStore(services, new TokenCleanupOptions { Enable = true, Interval = 3600 * 12 });
 
             services.AddTransient<IMFAService, MFAService>();
             services.AddControllers();
@@ -220,6 +227,34 @@ namespace Streetwriters.Identity
             {
                 endpoints.MapControllers();
                 endpoints.MapHealthChecks("/health");
+            });
+        }
+
+        private void AddOperationalStore(IServiceCollection services, TokenCleanupOptions tokenCleanUpOptions = null)
+        {
+            BsonClassMap.RegisterClassMap<PersistedGrant>(cm =>
+            {
+                cm.AutoMap();
+                cm.SetIgnoreExtraElements(true);
+            });
+
+            services.AddScoped<IPersistedGrantDbContext, CustomPersistedGrantDbContext>();
+            services.AddTransient<IPersistedGrantStore, PersistedGrantStore>();
+            services.AddTransient<TokenCleanup>();
+
+            services.AddQuartz(q =>
+            {
+                q.UseMicrosoftDependencyInjectionJobFactory();
+
+                if (tokenCleanUpOptions.Enable)
+                {
+                    var jobKey = new JobKey("TokenCleanupJob");
+                    q.AddJob<TokenCleanupJob>(opts => opts.WithIdentity(jobKey));
+                    q.AddTrigger(opts => opts
+                        .ForJob(jobKey)
+                        .WithIdentity("TokenCleanup-trigger")
+                        .WithSimpleSchedule((s) => s.RepeatForever().WithIntervalInSeconds(tokenCleanUpOptions.Interval)));
+                }
             });
         }
     }
