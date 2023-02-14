@@ -118,14 +118,16 @@ namespace Streetwriters.Identity.Validation
                     return;
                 }
             }
-
-            var provider = mfaMethod == MFAMethods.Email || mfaMethod == MFAMethods.SMS ? TokenOptions.DefaultPhoneProvider : UserManager.Options.Tokens.AuthenticatorTokenProvider;
-            var isMFACodeValid = await MFAService.VerifyOTPAsync(user, mfaCode, mfaMethod);
-            if (!isMFACodeValid)
+            else
             {
-                await UserManager.AccessFailedAsync(user);
-                await EmailSender.SendFailedLoginAlertAsync(user.Email, httpContext.GetClientInfo(), client).ConfigureAwait(false);
-                return;
+                var provider = mfaMethod == MFAMethods.Email || mfaMethod == MFAMethods.SMS ? TokenOptions.DefaultPhoneProvider : UserManager.Options.Tokens.AuthenticatorTokenProvider;
+                var isMFACodeValid = await MFAService.VerifyOTPAsync(user, mfaCode, mfaMethod);
+                if (!isMFACodeValid)
+                {
+                    await UserManager.AccessFailedAsync(user);
+                    await EmailSender.SendFailedLoginAlertAsync(user.Email, httpContext.GetClientInfo(), client).ConfigureAwait(false);
+                    return;
+                }
             }
 
             context.Result.IsError = false;
