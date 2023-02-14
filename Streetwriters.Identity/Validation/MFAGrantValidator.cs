@@ -109,11 +109,21 @@ namespace Streetwriters.Identity.Validation
 
             if (mfaMethod == MFAMethods.RecoveryCode)
             {
+                context.Result.ErrorDescription = "Please provide a valid multi-factor authentication recovery code.";
+
+                // This happens for new users who haven't set up 2FA yet; in which case
+                // we default to email. However, there are no recovery codes for that user
+                // yet.
+                // Without this, RedeemTwoFactorRecoveryCodeAsync succeeds with any recovery
+                // code (valid or invalid).
+                var isTwoFactorEnabled = await UserManager.GetTwoFactorEnabledAsync(user);
+                if (!isTwoFactorEnabled)
+                    return;
+
                 var result = await UserManager.RedeemTwoFactorRecoveryCodeAsync(user, mfaCode);
                 if (!result.Succeeded)
                 {
                     await UserManager.AccessFailedAsync(user);
-                    context.Result.ErrorDescription = "Please provide a valid multi-factor authentication recovery code.";
                     await EmailSender.SendFailedLoginAlertAsync(user.Email, httpContext.GetClientInfo(), client).ConfigureAwait(false);
                     return;
                 }
