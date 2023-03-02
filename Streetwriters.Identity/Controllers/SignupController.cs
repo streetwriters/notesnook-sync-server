@@ -54,13 +54,15 @@ namespace Streetwriters.Identity.Controllers
         public async Task<IActionResult> Signup([FromForm] SignupForm form)
         {
             var client = Clients.FindClientById(form.ClientId);
-            if (client == null) return BadRequest("Invalid client_id.");
+            if (client == null) return BadRequest(new string[] { "Invalid client id." });
 
             await AddClientRoleAsync(client.Id);
 
             // email addresses must be case-insensitive
             form.Email = form.Email.ToLowerInvariant();
             form.Username = form.Username?.ToLowerInvariant();
+
+            if (!await EmailAddressValidator.IsEmailAddressValidAsync(form.Email)) return BadRequest(new string[] { "Invalid email address." });
 
             var result = await UserManager.CreateAsync(new User
             {
@@ -85,7 +87,7 @@ namespace Streetwriters.Identity.Controllers
                 }
                 else
                 {
-                    return BadRequest(new string[] { "Email is invalid or already taken." });
+                    return BadRequest(new string[] { "Invalid email address." });
                 }
 
                 return Ok(new
