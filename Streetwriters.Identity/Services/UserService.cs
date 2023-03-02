@@ -52,9 +52,7 @@ namespace Streetwriters.Identity.Services
         public static bool IsUserPremium(string clientId, User user)
         {
             var status = GetUserSubscriptionStatus(clientId, user);
-            string[] allowedClaims = { "trial", "premium", "premium_canceled" };
-
-            return status == SubscriptionType.TRIAL || status == SubscriptionType.PREMIUM || status == SubscriptionType.PREMIUM_CANCELED;
+            return status == SubscriptionType.PREMIUM || status == SubscriptionType.PREMIUM_CANCELED;
         }
 
         public static Claim SubscriptionTypeToClaim(string clientId, SubscriptionType type)
