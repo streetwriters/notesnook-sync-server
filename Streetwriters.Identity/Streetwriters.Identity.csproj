@@ -28,19 +28,19 @@
     <PackageReference Include="IdentityServer4.AspNetIdentity" Version="4.1.2" />
     <PackageReference Include="IdentityServer4.EntityFramework" Version="4.1.2" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="6.0.0" />
-    <PackageReference Include="Usemam.IdentityServer4.KeyRack" Version="0.2.0" />
-    <PackageReference Include="Usemam.IdentityServer4.KeyRack.DataProtection" Version="0.1.0" />
+    <PackageReference Include="Streetwriters.IdentityServer4.KeyRack" Version="0.2.0" />
+    <PackageReference Include="Streetwriters.IdentityServer4.KeyRack.DataProtection" Version="0.1.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="6.0.0" />
-    <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="6.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="7.0.4" />
     <PackageReference Include="AspNetCore.Identity.Mongo" Version="8.3.3" />
     <PackageReference Include="WebMarkupMin.Core" Version="2.13.0" />
     <PackageReference Include="WebMarkupMin.NUglify" Version="2.12.0" />
- </ItemGroup>
+  </ItemGroup>
 
-  <ItemGroup> 
-    <Content Include="Templates\**"> 
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory> 
-    </Content> 
+  <ItemGroup>
+    <Content Include="Templates\**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>

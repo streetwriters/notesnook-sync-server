@@ -35,7 +35,6 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.IdentityModel.Logging;
 using Microsoft.IdentityModel.Tokens;
 using MongoDB.Bson.Serialization;
 using Quartz;
@@ -46,7 +45,6 @@ using Streetwriters.Common.Models;
 using Streetwriters.Identity.Helpers;
 using Streetwriters.Identity.Interfaces;
 using Streetwriters.Identity.Jobs;
-using Streetwriters.Identity.Models;
 using Streetwriters.Identity.Services;
 using Streetwriters.Identity.Validation;
 
