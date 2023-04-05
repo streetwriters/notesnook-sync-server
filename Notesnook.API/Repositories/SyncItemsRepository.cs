@@ -19,90 +19,82 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
-using System.Security.Cryptography;
-using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.VisualBasic;
-using MongoDB.Bson;
 using MongoDB.Driver;
-using Notesnook.API.Interfaces;
 using Notesnook.API.Models;
-using Streetwriters.Common;
-using Streetwriters.Data.Interfaces;
-using Streetwriters.Data.Repositories;
+using Streetwriters.Data.Attributes;
 
 namespace Notesnook.API.Repositories
 {
-    public class SyncItemsRepository<T> : Repository<T> where T : SyncItem
+    public class SyncItemsRepository<T> where T : SyncItem
     {
-        public SyncItemsRepository(IDbContext dbContext) : base(dbContext)
+        const string BASE_DATA_DIR = "data";
+        private string GetCollectionName()
         {
-            Collection.Indexes.CreateOne(new CreateIndexModel<T>(Builders<T>.IndexKeys.Ascending(i => i.UserId).Descending(i => i.DateSynced)));
-            Collection.Indexes.CreateOne(new CreateIndexModel<T>(Builders<T>.IndexKeys.Ascending(i => i.UserId).Ascending((i) => i.ItemId)));
-            Collection.Indexes.CreateOne(new CreateIndexModel<T>(Builders<T>.IndexKeys.Ascending(i => i.UserId)));
+            var attribute = (BsonCollectionAttribute)typeof(T).GetCustomAttributes(
+                    typeof(BsonCollectionAttribute),
+                    true).FirstOrDefault();
+            if (string.IsNullOrEmpty(attribute.CollectionName) || string.IsNullOrEmpty(attribute.DatabaseName)) throw new Exception("Could not get a valid collection or database name.");
+            return attribute.CollectionName;
         }
 
-        private readonly List<string> ALGORITHMS = new List<string> { Algorithms.Default };
-        private bool IsValidAlgorithm(string algorithm)
+        private string GetUserDirectoryPath(string userId)
         {
-            return ALGORITHMS.Contains(algorithm);
+            return System.IO.Path.Join(BASE_DATA_DIR, userId, GetCollectionName());
         }
 
-        public async Task<IEnumerable<T>> GetItemsSyncedAfterAsync(string userId, long timestamp)
+        private IEnumerable<string> EnumerateItems(string userId, string searchPattern = "*")
         {
-            var cursor = await Collection.FindAsync(n => (n.DateSynced > timestamp) && n.UserId.Equals(userId));
-            return cursor.ToList();
+            try
+            {
+                return System.IO.Directory.EnumerateFiles(GetUserDirectoryPath(userId), searchPattern, System.IO.SearchOption.TopDirectoryOnly);
+            }
+            catch
+            {
+                return new string[] { };
+            }
         }
 
-        // public async Task DeleteIdsAsync(string[] ids, string userId, CancellationToken token = default(CancellationToken))
-        // {
-        //     await Collection.DeleteManyAsync<T>((i) => ids.Contains(i.Id) && i.UserId == userId, token);
-        // }
+        private string FindItemById(string userId, string id)
+        {
+            try
+            {
+                var files = Directory.GetFiles(GetUserDirectoryPath(userId), $"{id}-*", System.IO.SearchOption.TopDirectoryOnly);
+                return files.Length > 0 ? files[0] : null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        public async Task<IEnumerable<string>> GetItemsSyncedAfterAsync(string userId, long timestamp)
+        {
+            var items = new List<string>();
+            await Parallel.ForEachAsync(EnumerateItems(userId), async (file, ct) =>
+            {
+                var parts = file.Split("-");
+                var id = parts[0];
+                var dateSynced = long.Parse(parts[1]);
+                if (dateSynced > timestamp) items.Add(await File.ReadAllTextAsync(file));
+            });
+            return items;
+        }
 
         public void DeleteByUserId(string userId)
         {
-            dbContext.AddCommand((handle, ct) => Collection.DeleteManyAsync<T>(handle, (i) => i.UserId == userId, cancellationToken: ct));
+            Directory.Delete(GetUserDirectoryPath(userId), true);
         }
 
-        public async Task UpsertAsync(T item, string userId, long dateSynced)
+        public async Task UpsertAsync(string id, string item, string userId, long dateSynced)
         {
-
-            if (item.Length > 15 * 1024 * 1024)
-            {
-                throw new Exception($"Size of item \"{item.ItemId}\" is too large. Maximum allowed size is 15 MB.");
-            }
-
-            if (!IsValidAlgorithm(item.Algorithm))
-            {
-                throw new Exception($"Invalid alg identifier {item.Algorithm}");
-            }
-
-            item.DateSynced = dateSynced;
-            item.UserId = userId;
-
-            await base.UpsertAsync(item, (x) => (x.ItemId == item.ItemId) && x.UserId == userId);
-        }
-
-        public void Upsert(T item, string userId, long dateSynced)
-        {
-
-            if (item.Length > 15 * 1024 * 1024)
-            {
-                throw new Exception($"Size of item \"{item.ItemId}\" is too large. Maximum allowed size is 15 MB.");
-            }
-
-            if (!IsValidAlgorithm(item.Algorithm))
-            {
-                throw new Exception($"Invalid alg identifier {item.Algorithm}");
-            }
-
-            item.DateSynced = dateSynced;
-            item.UserId = userId;
-
-            // await base.UpsertAsync(item, (x) => (x.ItemId == item.ItemId) && x.UserId == userId);
-            base.Upsert(item, (x) => (x.ItemId == item.ItemId) && x.UserId == userId);
+            Directory.CreateDirectory(GetUserDirectoryPath(userId));
+            var oldPath = FindItemById(userId, id);
+            var newPath = Path.Join(GetUserDirectoryPath(userId), $"{id}-{dateSynced}");
+            await File.WriteAllTextAsync(newPath, item);
+            if (oldPath != null) File.Delete(oldPath);
         }
     }
 }

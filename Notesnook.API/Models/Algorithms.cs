@@ -17,10 +17,17 @@ You should have received a copy of the Affero GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+using System.Collections.Generic;
+
 namespace Notesnook.API.Models
 {
     public class Algorithms
     {
-        public static string Default => "xcha-argon2i13-7";
+        public const string Default = "xcha-argon2i13-7";
+        static readonly List<string> ALGORITHMS = new List<string> { Algorithms.Default };
+        public static bool IsValidAlgorithm(string algorithm)
+        {
+            return ALGORITHMS.Contains(algorithm);
+        }
     }
 }
