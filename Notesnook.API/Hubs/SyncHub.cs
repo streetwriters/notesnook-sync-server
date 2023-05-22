@@ -111,7 +111,9 @@ namespace Notesnook.API.Hubs
             var userId = Context.User.FindFirstValue("sub");
             if (string.IsNullOrEmpty(userId)) return 0;
 
-            var others = Clients.OthersInGroup(userId);
+            // Only allow a single sync to run per connection. This prevents a bunch of issues like sync loops
+            // and wasted bandwidth
+            if (GlobalSync.IsSyncRunning(userId, Context.ConnectionId)) return 0;
 
             if (!GlobalSync.RunningSyncs.ContainsKey(userId))
                 GlobalSync.RunningSyncs[userId] = new List<RunningSync>();
