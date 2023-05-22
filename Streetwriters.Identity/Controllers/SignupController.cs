@@ -103,6 +103,7 @@ namespace Streetwriters.Identity.Controllers
                 await UserManager.AddToRoleAsync(user, client.Id);
                 if (Constants.IS_SELF_HOSTED)
                     await UserManager.AddClaimAsync(user, UserService.SubscriptionTypeToClaim(client.Id, Common.Enums.SubscriptionType.PREMIUM));
+                await UserManager.AddClaimAsync(user, new Claim("platform", PlatformFromUserAgent(base.HttpContext.Request.Headers.UserAgent)));
 
                 var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
                 var callbackUrl = Url.TokenLink(user.Id.ToString(), code, client.Id, TokenType.CONFRIM_EMAIL, Request.Scheme);
@@ -115,6 +116,11 @@ namespace Streetwriters.Identity.Controllers
             }
 
             return BadRequest(result.Errors.ToErrors());
+        }
+
+        string PlatformFromUserAgent(string userAgent)
+        {
+            return userAgent.Contains("okhttp/") ? "android" : userAgent.Contains("Darwin/") || userAgent.Contains("CFNetwork/") ? "ios" : "web";
         }
     }
 }
