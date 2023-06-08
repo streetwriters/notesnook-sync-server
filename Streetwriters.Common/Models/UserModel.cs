@@ -35,6 +35,9 @@ namespace Streetwriters.Common.Models
         [JsonPropertyName("isEmailConfirmed")]
         public bool IsEmailConfirmed { get; set; }
 
+        [JsonPropertyName("marketingConsent")]
+        public bool MarketingConsent { get; set; }
+
         [JsonPropertyName("mfa")]
         public MFAConfig MFA { get; set; }
     }

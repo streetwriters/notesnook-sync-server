@@ -32,6 +32,12 @@ namespace Streetwriters.Identity.Models
             get; set;
         }
 
+        [BindProperty(Name = "enabled")]
+        public bool Enabled
+        {
+            get; set;
+        }
+
         [BindProperty(Name = "old_password")]
         public string OldPassword
         {

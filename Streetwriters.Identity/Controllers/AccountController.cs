@@ -169,12 +169,15 @@ namespace Streetwriters.Identity.Controllers
             if (!await IsUserValidAsync(user, client.Id))
                 return BadRequest($"Unable to find user with ID '{UserManager.GetUserId(User)}'.");
 
+            var claims = await UserManager.GetClaimsAsync(user);
+            var marketingConsentClaim = claims.FirstOrDefault((claim) => claim.Type == $"{client.Id}:marketing_consent");
+
             return Ok(new UserModel
             {
                 UserId = user.Id.ToString(),
                 Email = user.Email,
                 IsEmailConfirmed = user.EmailConfirmed,
-                // PhoneNumber = user.PhoneNumberConfirmed ? user.PhoneNumber : null,
+                MarketingConsent = marketingConsentClaim == null,
                 MFA = new MFAConfig
                 {
                     IsEnabled = user.TwoFactorEnabled,
@@ -308,6 +311,17 @@ namespace Streetwriters.Identity.Controllers
                         }
                         return BadRequest(result.Errors.ToErrors());
                     }
+                case "change_marketing_consent":
+                    {
+                        var claimType = $"{client.Id}:marketing_consent";
+                        var claims = await UserManager.GetClaimsAsync(user);
+                        var marketingConsentClaim = claims.FirstOrDefault((claim) => claim.Type == claimType);
+                        if (marketingConsentClaim != null) await UserManager.RemoveClaimAsync(user, marketingConsentClaim);
+                        if (!form.Enabled)
+                            await UserManager.AddClaimAsync(user, new Claim(claimType, "false"));
+                        return Ok();
+                    }
+
             }
             return BadRequest("Invalid type.");
         }
