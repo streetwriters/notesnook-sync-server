@@ -27,6 +27,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Streetwriters.Common;
+using Streetwriters.Common.Enums;
 using Streetwriters.Common.Models;
 using Streetwriters.Identity.Enums;
 using Streetwriters.Identity.Interfaces;
@@ -108,6 +109,8 @@ namespace Streetwriters.Identity.Controllers
                 var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
                 var callbackUrl = Url.TokenLink(user.Id.ToString(), code, client.Id, TokenType.CONFRIM_EMAIL, Request.Scheme);
                 await EmailSender.SendConfirmationEmailAsync(user.Email, callbackUrl, client);
+
+                await MFAService.EnableMFAAsync(user, MFAMethods.Email);
 
                 return Ok(new
                 {

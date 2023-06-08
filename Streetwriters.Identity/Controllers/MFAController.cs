@@ -74,21 +74,9 @@ namespace Streetwriters.Identity.Controllers
         }
 
         [HttpDelete]
-        public async Task<IActionResult> Disable2FA()
+        public IActionResult Disable2FA()
         {
-            var user = await UserManager.GetUserAsync(User);
-
-            if (!await UserManager.GetTwoFactorEnabledAsync(user))
-            {
-                return BadRequest("Cannot disable 2FA as it's not currently enabled");
-            }
-
-            if (await MFAService.DisableMFAAsync(user))
-            {
-                return Ok();
-            }
-
-            return BadRequest("Failed to disable 2FA.");
+            return BadRequest("2FA is mandatory and cannot be disabled.");
         }
 
         [HttpGet("codes")]

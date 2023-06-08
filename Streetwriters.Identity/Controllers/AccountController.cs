@@ -29,6 +29,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Streetwriters.Common;
+using Streetwriters.Common.Enums;
 using Streetwriters.Common.Messages;
 using Streetwriters.Common.Models;
 using Streetwriters.Identity.Enums;
@@ -171,6 +172,12 @@ namespace Streetwriters.Identity.Controllers
 
             var claims = await UserManager.GetClaimsAsync(user);
             var marketingConsentClaim = claims.FirstOrDefault((claim) => claim.Type == $"{client.Id}:marketing_consent");
+
+            if (!await UserManager.GetTwoFactorEnabledAsync(user))
+            {
+                await MFAService.EnableMFAAsync(user, MFAMethods.Email);
+                user = await UserManager.GetUserAsync(User);
+            }
 
             return Ok(new UserModel
             {

@@ -82,7 +82,7 @@ namespace Streetwriters.Identity.Services
 
         public string GetPrimaryMethod(User user)
         {
-            return this.GetClaimValue(user, MFAService.PRIMARY_METHOD_CLAIM);
+            return this.GetClaimValue(user, MFAService.PRIMARY_METHOD_CLAIM, MFAMethods.Email);
         }
 
         public string GetSecondaryMethod(User user)
@@ -90,10 +90,10 @@ namespace Streetwriters.Identity.Services
             return this.GetClaimValue(user, MFAService.SECONDARY_METHOD_CLAIM);
         }
 
-        public string GetClaimValue(User user, string claimType)
+        public string GetClaimValue(User user, string claimType, string defaultValue = null)
         {
             var claim = user.Claims.FirstOrDefault((c) => c.ClaimType == claimType);
-            return claim != null ? claim.ClaimValue : null;
+            return claim != null ? claim.ClaimValue : defaultValue;
         }
 
         public Task<int> GetRemainingValidCodesAsync(User user)
