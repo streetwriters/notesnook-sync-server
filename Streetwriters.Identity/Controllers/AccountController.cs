@@ -77,30 +77,20 @@ namespace Streetwriters.Identity.Controllers
                         var result = await UserManager.ConfirmEmailAsync(user, code);
                         if (!result.Succeeded) return BadRequest(result.Errors.ToErrors());
 
-
                         if (await UserManager.IsInRoleAsync(user, client.Id))
                         {
                             await client.OnEmailConfirmed(userId);
-                            // if (client.WelcomeEmailTemplateId != null)
-                            //     await EmailSender.SendWelcomeEmailAsync(user.Email, client);
+                        }
+
+                        if (!await UserManager.GetTwoFactorEnabledAsync(user))
+                        {
+                            await MFAService.EnableMFAAsync(user, MFAMethods.Email);
+                            user = await UserManager.GetUserAsync(User);
                         }
 
                         var redirectUrl = $"{client.EmailConfirmedRedirectURL}?userId={userId}";
                         return RedirectPermanent(redirectUrl);
                     }
-                // case TokenType.CHANGE_EMAIL:
-                //     {
-                //         var newEmail = user.Claims.Find((c) => c.ClaimType == "new_email");
-                //         if (newEmail == null) return BadRequest("Email change was not requested.");
-
-                //         var result = await UserManager.ChangeEmailAsync(user, newEmail.ClaimValue.ToString(), code);
-                //         if (result.Succeeded)
-                //         {
-                //             await UserManager.RemoveClaimAsync(user, newEmail.ToClaim());
-                //             return Ok("Email changed.");
-                //         }
-                //         return BadRequest("Could not change email.");
-                //     }
                 case TokenType.RESET_PASSWORD:
                     {
                         if (!await UserManager.VerifyUserTokenAsync(user, TokenOptions.DefaultProvider, "ResetPassword", code))
@@ -173,7 +163,7 @@ namespace Streetwriters.Identity.Controllers
             var claims = await UserManager.GetClaimsAsync(user);
             var marketingConsentClaim = claims.FirstOrDefault((claim) => claim.Type == $"{client.Id}:marketing_consent");
 
-            if (!await UserManager.GetTwoFactorEnabledAsync(user))
+            if (await UserManager.IsEmailConfirmedAsync(user) && !await UserManager.GetTwoFactorEnabledAsync(user))
             {
                 await MFAService.EnableMFAAsync(user, MFAMethods.Email);
                 user = await UserManager.GetUserAsync(User);
