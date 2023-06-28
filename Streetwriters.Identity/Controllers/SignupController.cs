@@ -17,7 +17,6 @@ You should have received a copy of the Affero GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
@@ -27,7 +26,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Streetwriters.Common;
-using Streetwriters.Common.Enums;
 using Streetwriters.Common.Models;
 using Streetwriters.Identity.Enums;
 using Streetwriters.Identity.Interfaces;
@@ -84,6 +82,7 @@ namespace Streetwriters.Identity.Controllers
                         await UserManager.RemovePasswordAsync(user);
                         await UserManager.AddPasswordAsync(user, form.Password);
                     }
+                    await MFAService.DisableMFAAsync(user);
                     await UserManager.AddToRoleAsync(user, client.Id);
                 }
                 else
@@ -109,9 +108,6 @@ namespace Streetwriters.Identity.Controllers
                 var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
                 var callbackUrl = Url.TokenLink(user.Id.ToString(), code, client.Id, TokenType.CONFRIM_EMAIL, Request.Scheme);
                 await EmailSender.SendConfirmationEmailAsync(user.Email, callbackUrl, client);
-
-                await MFAService.EnableMFAAsync(user, MFAMethods.Email);
-
                 return Ok(new
                 {
                     userId = user.Id.ToString()
