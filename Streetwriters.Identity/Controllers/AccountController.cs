@@ -143,10 +143,13 @@ namespace Streetwriters.Identity.Controllers
                 return Unauthorized();
             }
 
-            await UserManager.RemoveFromRoleAsync(user, client.Id);
+            await UserManager.DeleteAsync(user);
 
-            IdentityUserClaim<string> statusClaim = user.Claims.FirstOrDefault((c) => c.ClaimType == $"{client.Id}:status");
-            await UserManager.RemoveClaimAsync(user, statusClaim.ToClaim());
+            // await UserManager.RemoveFromRoleAsync(user, client.Id);
+            // await MFAService.DisableMFAAsync(user);
+
+            // IdentityUserClaim<string> statusClaim = user.Claims.FirstOrDefault((c) => c.ClaimType == $"{client.Id}:status");
+            // await UserManager.RemoveClaimAsync(user, statusClaim.ToClaim());
             return Ok();
         }
 
