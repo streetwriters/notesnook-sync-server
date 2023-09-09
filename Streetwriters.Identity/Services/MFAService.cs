@@ -54,6 +54,7 @@ namespace Streetwriters.Identity.Services
             if (!result.Succeeded) return;
 
             await this.RemovePrimaryMethodAsync(user);
+            await this.RemoveSecondaryMethodAsync(user);
             await UserManager.AddClaimAsync(user, new Claim(MFAService.PRIMARY_METHOD_CLAIM, primaryMethod));
         }
 
@@ -64,6 +65,20 @@ namespace Streetwriters.Identity.Services
 
             await this.RemovePrimaryMethodAsync(user);
             await this.RemoveSecondaryMethodAsync(user);
+
+            await UserManager.ResetAuthenticatorKeyAsync(user);
+            return true;
+        }
+
+        public async Task<bool> ResetMFAAsync(User user)
+        {
+            var result = await UserManager.SetTwoFactorEnabledAsync(user, false);
+            var result = await UserManager.SetTwoFactorEnabledAsync(user, true);
+
+            await this.RemovePrimaryMethodAsync(user);
+            await this.RemoveSecondaryMethodAsync(user);
+
+            await UserManager.AddClaimAsync(user, new Claim(MFAService.PRIMARY_METHOD_CLAIM, MFAMethods.Email));
 
             await UserManager.ResetAuthenticatorKeyAsync(user);
             return true;

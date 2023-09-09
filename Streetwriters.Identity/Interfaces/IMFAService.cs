@@ -28,6 +28,7 @@ namespace Streetwriters.Identity.Interfaces
     {
         Task EnableMFAAsync(User user, string primaryMethod);
         Task<bool> DisableMFAAsync(User user);
+        Task<bool> ResetMFAAsync(User user);
         Task SetSecondaryMethodAsync(User user, string secondaryMethod);
         string GetPrimaryMethod(User user);
         string GetSecondaryMethod(User user);

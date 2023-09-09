@@ -302,6 +302,7 @@ namespace Streetwriters.Identity.Controllers
                         var result = await UserManager.RemovePasswordAsync(user);
                         if (result.Succeeded)
                         {
+                            await MFAService.ResetMFAAsync(user);
                             result = await UserManager.AddPasswordAsync(user, form.NewPassword);
                             if (result.Succeeded)
                             {
