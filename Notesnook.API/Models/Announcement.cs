@@ -22,11 +22,9 @@ using System.Runtime.Serialization;
 using System.Text.Json.Serialization;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
-using Streetwriters.Data.Attributes;
 
 namespace Notesnook.API.Models
 {
-    [BsonCollection("notesnook", "announcements")]
     public class Announcement
     {
         public Announcement()

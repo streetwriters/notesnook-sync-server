@@ -24,7 +24,6 @@ using System.Linq.Expressions;
 using System.Threading.Tasks;
 using MongoDB.Bson;
 using MongoDB.Driver;
-using Streetwriters.Data.Attributes;
 using Streetwriters.Data.Interfaces;
 
 namespace Streetwriters.Data.Repositories
@@ -34,19 +33,15 @@ namespace Streetwriters.Data.Repositories
         protected readonly IDbContext dbContext;
         protected IMongoCollection<TEntity> Collection { get; set; }
 
-        public Repository(IDbContext _dbContext)
+        public Repository(IDbContext _dbContext, string databaseName, string collectionName)
         {
             dbContext = _dbContext;
-            Collection = GetCollection();
+            Collection = GetCollection(databaseName, collectionName);
         }
 
-        private protected IMongoCollection<TEntity> GetCollection()
+        private protected IMongoCollection<TEntity> GetCollection(string databaseName, string collectionName)
         {
-            var attribute = (BsonCollectionAttribute)typeof(TEntity).GetCustomAttributes(
-                    typeof(BsonCollectionAttribute),
-                    true).FirstOrDefault();
-            if (string.IsNullOrEmpty(attribute.CollectionName) || string.IsNullOrEmpty(attribute.DatabaseName)) throw new Exception("Could not get a valid collection or database name.");
-            return dbContext.GetCollection<TEntity>(attribute.DatabaseName, attribute.CollectionName);
+            return dbContext.GetCollection<TEntity>(databaseName, collectionName);
         }
 
 

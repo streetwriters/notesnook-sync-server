@@ -35,13 +35,13 @@ using Streetwriters.Data.Repositories;
 
 namespace Notesnook.API.Repositories
 {
-    public class SyncItemsRepository<T> : Repository<T> where T : SyncItem
+    public class SyncItemsRepository<T> : Repository<SyncItem> where T : SyncItem
     {
-        public SyncItemsRepository(IDbContext dbContext) : base(dbContext)
+        public SyncItemsRepository(IDbContext dbContext, string databaseName, string collectionName) : base(dbContext, databaseName, collectionName)
         {
-            Collection.Indexes.CreateOne(new CreateIndexModel<T>(Builders<T>.IndexKeys.Ascending(i => i.UserId).Descending(i => i.DateSynced)));
-            Collection.Indexes.CreateOne(new CreateIndexModel<T>(Builders<T>.IndexKeys.Ascending(i => i.UserId).Ascending((i) => i.ItemId)));
-            Collection.Indexes.CreateOne(new CreateIndexModel<T>(Builders<T>.IndexKeys.Ascending(i => i.UserId)));
+            Collection.Indexes.CreateOne(new CreateIndexModel<SyncItem>(Builders<SyncItem>.IndexKeys.Ascending(i => i.UserId).Descending(i => i.DateSynced)));
+            Collection.Indexes.CreateOne(new CreateIndexModel<SyncItem>(Builders<SyncItem>.IndexKeys.Ascending(i => i.UserId).Ascending((i) => i.ItemId)));
+            Collection.Indexes.CreateOne(new CreateIndexModel<SyncItem>(Builders<SyncItem>.IndexKeys.Ascending(i => i.UserId)));
         }
 
         private readonly List<string> ALGORITHMS = new List<string> { Algorithms.Default };
@@ -85,7 +85,7 @@ namespace Notesnook.API.Repositories
             await base.UpsertAsync(item, (x) => (x.ItemId == item.ItemId) && x.UserId == userId);
         }
 
-        public void Upsert(T item, string userId, long dateSynced)
+        public void Upsert(SyncItem item, string userId, long dateSynced)
         {
 
             if (item.Length > 15 * 1024 * 1024)

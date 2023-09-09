@@ -26,11 +26,9 @@ using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 using Streetwriters.Common.Enums;
 using Streetwriters.Common.Interfaces;
-using Streetwriters.Data.Attributes;
 
 namespace Streetwriters.Common.Models
 {
-    [BsonCollection("subscriptions", "offers")]
     public class Offer : IOffer
     {
         public Offer()

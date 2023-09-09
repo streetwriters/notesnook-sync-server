@@ -23,13 +23,14 @@ using System.Text.Json.Serialization;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 using Notesnook.API.Interfaces;
-using Streetwriters.Data.Attributes;
 
 namespace Notesnook.API.Models
 {
+    [MessagePack.MessagePackObject]
     public class SyncItem : ISyncItem
     {
         [IgnoreDataMember]
+        [MessagePack.IgnoreMember]
         [JsonPropertyName("dateSynced")]
         public long DateSynced
         {
@@ -38,6 +39,7 @@ namespace Notesnook.API.Models
 
         [DataMember(Name = "userId")]
         [JsonPropertyName("userId")]
+        [MessagePack.Key("userId")]
         public string UserId
         {
             get; set;
@@ -45,6 +47,7 @@ namespace Notesnook.API.Models
 
         [JsonPropertyName("iv")]
         [DataMember(Name = "iv")]
+        [MessagePack.Key("iv")]
         [Required]
         public string IV
         {
@@ -54,6 +57,7 @@ namespace Notesnook.API.Models
 
         [JsonPropertyName("cipher")]
         [DataMember(Name = "cipher")]
+        [MessagePack.Key("cipher")]
         [Required]
         public string Cipher
         {
@@ -62,6 +66,7 @@ namespace Notesnook.API.Models
 
         [DataMember(Name = "id")]
         [JsonPropertyName("id")]
+        [MessagePack.Key("id")]
         public string ItemId
         {
             get; set;
@@ -71,6 +76,7 @@ namespace Notesnook.API.Models
         [BsonIgnoreIfDefault]
         [BsonRepresentation(BsonType.ObjectId)]
         [JsonIgnore]
+        [MessagePack.IgnoreMember]
         public ObjectId Id
         {
             get; set;
@@ -78,6 +84,7 @@ namespace Notesnook.API.Models
 
         [JsonPropertyName("length")]
         [DataMember(Name = "length")]
+        [MessagePack.Key("length")]
         [Required]
         public long Length
         {
@@ -86,6 +93,7 @@ namespace Notesnook.API.Models
 
         [JsonPropertyName("v")]
         [DataMember(Name = "v")]
+        [MessagePack.Key("v")]
         [Required]
         public double Version
         {
@@ -94,6 +102,7 @@ namespace Notesnook.API.Models
 
         [JsonPropertyName("alg")]
         [DataMember(Name = "alg")]
+        [MessagePack.Key("alg")]
         [Required]
         public string Algorithm
         {
@@ -101,33 +110,33 @@ namespace Notesnook.API.Models
         } = Algorithms.Default;
     }
 
-    [BsonCollection("notesnook", "attachments")]
+    [MessagePack.MessagePackObject]
     public class Attachment : SyncItem { }
 
-    [BsonCollection("notesnook", "content")]
+    [MessagePack.MessagePackObject]
     public class Content : SyncItem { }
 
-    [BsonCollection("notesnook", "notes")]
+    [MessagePack.MessagePackObject]
     public class Note : SyncItem { }
 
-    [BsonCollection("notesnook", "notebooks")]
+    [MessagePack.MessagePackObject]
     public class Notebook : SyncItem { }
 
-    [BsonCollection("notesnook", "relations")]
+    [MessagePack.MessagePackObject]
     public class Relation : SyncItem { }
 
-    [BsonCollection("notesnook", "reminders")]
+    [MessagePack.MessagePackObject]
     public class Reminder : SyncItem { }
 
-    [BsonCollection("notesnook", "settings")]
+    [MessagePack.MessagePackObject]
     public class Setting : SyncItem { }
 
-    [BsonCollection("notesnook", "shortcuts")]
+    [MessagePack.MessagePackObject]
     public class Shortcut : SyncItem { }
 
-    [BsonCollection("notesnook", "tags")]
+    [MessagePack.MessagePackObject]
     public class Tag : SyncItem { }
 
-    [BsonCollection("notesnook", "colors")]
+    [MessagePack.MessagePackObject]
     public class Color : SyncItem { }
 }

@@ -20,11 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 using Notesnook.API.Interfaces;
-using Streetwriters.Data.Attributes;
 
 namespace Notesnook.API.Models
 {
-    [BsonCollection("notesnook", "user_settings")]
     public class UserSettings : IUserSettings
     {
         public UserSettings()

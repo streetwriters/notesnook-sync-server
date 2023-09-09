@@ -21,11 +21,9 @@ using System.Text.Json.Serialization;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 using Notesnook.API.Interfaces;
-using Streetwriters.Data.Attributes;
 
 namespace Notesnook.API.Models
 {
-    [BsonCollection("notesnook", "monographs")]
     public class Monograph : IMonograph
     {
         public Monograph()

@@ -179,8 +179,20 @@ namespace Notesnook.API
 
             services.AddScoped<IDbContext, MongoDbContext>();
             services.AddScoped<IUnitOfWork, UnitOfWork>();
-            services.AddScoped(typeof(Repository<>));
-            services.AddScoped(typeof(SyncItemsRepository<>));
+
+            services.AddScoped((provider) => new Repository<UserSettings>(provider.GetRequiredService<IDbContext>(), "notesnook", "user_settings"));
+            services.AddScoped((provider) => new Repository<Monograph>(provider.GetRequiredService<IDbContext>(), "notesnook", "monographs"));
+            services.AddScoped((provider) => new Repository<Announcement>(provider.GetRequiredService<IDbContext>(), "notesnook", "announcements"));
+            services.AddScoped((provider) => new SyncItemsRepository<Attachment>(provider.GetRequiredService<IDbContext>(), "notesnook", "attachments"));
+            services.AddScoped((provider) => new SyncItemsRepository<Content>(provider.GetRequiredService<IDbContext>(), "notesnook", "content"));
+            services.AddScoped((provider) => new SyncItemsRepository<Note>(provider.GetRequiredService<IDbContext>(), "notesnook", "notes"));
+            services.AddScoped((provider) => new SyncItemsRepository<Notebook>(provider.GetRequiredService<IDbContext>(), "notesnook", "notebooks"));
+            services.AddScoped((provider) => new SyncItemsRepository<Relation>(provider.GetRequiredService<IDbContext>(), "notesnook", "relations"));
+            services.AddScoped((provider) => new SyncItemsRepository<Reminder>(provider.GetRequiredService<IDbContext>(), "notesnook", "reminders"));
+            services.AddScoped((provider) => new SyncItemsRepository<Setting>(provider.GetRequiredService<IDbContext>(), "notesnook", "settings"));
+            services.AddScoped((provider) => new SyncItemsRepository<Shortcut>(provider.GetRequiredService<IDbContext>(), "notesnook", "shortcuts"));
+            services.AddScoped((provider) => new SyncItemsRepository<Tag>(provider.GetRequiredService<IDbContext>(), "notesnook", "tags"));
+            services.AddScoped((provider) => new SyncItemsRepository<Color>(provider.GetRequiredService<IDbContext>(), "notesnook", "colors"));
 
             services.TryAddTransient<ISyncItemsRepositoryAccessor, SyncItemsRepositoryAccessor>();
             services.TryAddTransient<IUserService, UserService>();
@@ -192,8 +204,9 @@ namespace Notesnook.API
             services.AddSignalR((hub) =>
             {
                 hub.MaximumReceiveMessageSize = 100 * 1024 * 1024;
+                hub.ClientTimeoutInterval = TimeSpan.FromMinutes(10);
                 hub.EnableDetailedErrors = true;
-            }).AddMessagePackProtocol();
+            }).AddMessagePackProtocol().AddJsonProtocol();
 
             services.AddResponseCompression(options =>
             {

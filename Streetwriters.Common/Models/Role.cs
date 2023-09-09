@@ -20,11 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
 using AspNetCore.Identity.Mongo.Model;
-using Streetwriters.Data.Attributes;
 
 namespace Streetwriters.Common.Models
 {
-    [BsonCollection("identity", "roles")]
     public class Role : MongoRole
     {
         //     [DataMember(Name = "email")]
