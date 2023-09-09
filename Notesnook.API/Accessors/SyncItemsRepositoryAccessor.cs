@@ -34,6 +34,8 @@ namespace Notesnook.API.Accessors
         public SyncItemsRepository<Content> Contents { get; }
         public SyncItemsRepository<Setting> Settings { get; }
         public SyncItemsRepository<Attachment> Attachments { get; }
+        public SyncItemsRepository<Color> Colors { get; }
+        public SyncItemsRepository<Tag> Tags { get; }
         public Repository<UserSettings> UsersSettings { get; }
         public Repository<Monograph> Monographs { get; }
 
@@ -45,6 +47,8 @@ namespace Notesnook.API.Accessors
         SyncItemsRepository<Shortcut> _shortcuts,
         SyncItemsRepository<Relation> _relations,
         SyncItemsRepository<Reminder> _reminders,
+        SyncItemsRepository<Color> _colors,
+        SyncItemsRepository<Tag> _tags,
         Repository<UserSettings> _usersSettings,
         Repository<Monograph> _monographs)
         {
@@ -58,6 +62,8 @@ namespace Notesnook.API.Accessors
             Shortcuts = _shortcuts;
             Reminders = _reminders;
             Relations = _relations;
+            Colors = _colors;
+            Tags = _tags;
         }
     }
 }

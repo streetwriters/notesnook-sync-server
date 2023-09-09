@@ -124,4 +124,10 @@ namespace Notesnook.API.Models
 
     [BsonCollection("notesnook", "shortcuts")]
     public class Shortcut : SyncItem { }
+
+    [BsonCollection("notesnook", "tags")]
+    public class Tag : SyncItem { }
+
+    [BsonCollection("notesnook", "colors")]
+    public class Color : SyncItem { }
 }
