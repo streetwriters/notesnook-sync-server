@@ -36,10 +36,6 @@ namespace Streetwriters.Identity.Services
         private Client client;
         public SMSSender()
         {
-            if (!string.IsNullOrEmpty(Constants.MESSAGEBIRD_ACCESS_KEY))
-                client = Client.CreateDefault(Constants.MESSAGEBIRD_ACCESS_KEY);
-
-
             if (!string.IsNullOrEmpty(Constants.TWILIO_ACCOUNT_SID) && !string.IsNullOrEmpty(Constants.TWILIO_AUTH_TOKEN))
             {
                 TwilioClient.Init(Constants.TWILIO_ACCOUNT_SID, Constants.TWILIO_AUTH_TOKEN);
@@ -48,20 +44,12 @@ namespace Streetwriters.Identity.Services
 
         public async Task<string> SendOTPAsync(string number, IClient app)
         {
-            try
-            {
-                var verification = await VerificationResource.CreateAsync(
-                    to: number,
-                    channel: "sms",
-                    pathServiceSid: Constants.TWILIO_SERVICE_SID
-                );
-                return verification.Sid;
-            }
-            catch (Exception ex)
-            {
-
-            }
-            return null;
+            var verification = await VerificationResource.CreateAsync(
+                to: number,
+                channel: "sms",
+                pathServiceSid: Constants.TWILIO_SERVICE_SID
+            );
+            return verification.Sid;
         }
 
         public async Task<bool> VerifyOTPAsync(string id, string code)
