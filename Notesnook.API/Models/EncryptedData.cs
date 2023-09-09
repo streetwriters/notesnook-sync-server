@@ -52,5 +52,14 @@ namespace Notesnook.API.Models
         [BsonElement("salt")]
         [DataMember(Name = "salt")]
         public string Salt { get; set; }
+
+        public override bool Equals(object obj)
+        {
+            if (obj is EncryptedData encryptedData)
+            {
+                return IV == encryptedData.IV && Salt == encryptedData.Salt && Cipher == encryptedData.Cipher && Length == encryptedData.Length;
+            }
+            return base.Equals(obj);
+        }
     }
 }

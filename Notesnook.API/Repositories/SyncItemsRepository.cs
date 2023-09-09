@@ -50,12 +50,21 @@ namespace Notesnook.API.Repositories
             return ALGORITHMS.Contains(algorithm);
         }
 
-        public async Task<IEnumerable<T>> GetItemsSyncedAfterAsync(string userId, long timestamp)
+        public Task<long> CountItemsSyncedAfterAsync(string userId, long timestamp)
         {
-            var cursor = await Collection.FindAsync(n => (n.DateSynced > timestamp) && n.UserId.Equals(userId));
-            return cursor.ToList();
+            return Collection.CountDocumentsAsync(n => (n.DateSynced > timestamp) && n.UserId.Equals(userId));
         }
-
+        public Task<IAsyncCursor<SyncItem>> FindItemsSyncedAfter(string userId, long timestamp, int batchSize)
+        {
+            return Collection.FindAsync(n => (n.DateSynced > timestamp) && n.UserId.Equals(userId), new FindOptions<SyncItem>
+            {
+                BatchSize = batchSize,
+                AllowDiskUse = true,
+                AllowPartialResults = false,
+                NoCursorTimeout = true,
+                Sort = new SortDefinitionBuilder<SyncItem>().Ascending((a) => a.Id)
+            });
+        }
         // public async Task DeleteIdsAsync(string[] ids, string userId, CancellationToken token = default(CancellationToken))
         // {
         //     await Collection.DeleteManyAsync<T>((i) => ids.Contains(i.Id) && i.UserId == userId, token);
@@ -63,10 +72,10 @@ namespace Notesnook.API.Repositories
 
         public void DeleteByUserId(string userId)
         {
-            dbContext.AddCommand((handle, ct) => Collection.DeleteManyAsync<T>(handle, (i) => i.UserId == userId, cancellationToken: ct));
+            dbContext.AddCommand((handle, ct) => Collection.DeleteManyAsync(handle, (i) => i.UserId == userId, cancellationToken: ct));
         }
 
-        public async Task UpsertAsync(T item, string userId, long dateSynced)
+        public async Task UpsertAsync(SyncItem item, string userId, long dateSynced)
         {
 
             if (item.Length > 15 * 1024 * 1024)
