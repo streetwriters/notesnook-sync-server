@@ -104,7 +104,7 @@ namespace Notesnook.API.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> GetMonographAsync([FromRoute] string id)
         {
-            var monograph = await Monographs.FindOneAsync((m) => m.Id == id);
+            var monograph = await Monographs.GetAsync(id);
             if (monograph == null)
             {
                 return NotFound(new

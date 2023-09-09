@@ -42,10 +42,8 @@ namespace Notesnook.API.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> GetActiveAnnouncements([FromQuery] string userId)
         {
-            var announcements = await Announcements.FindAsync((a) => a.IsActive);
-            return Ok(announcements.Where((a) => a.UserIds != null && a.UserIds.Length > 0
-                                                    ? a.UserIds.Contains(userId)
-                                                    : true));
+            var announcements = await Announcements.FindAsync((a) => a.IsActive && (a.UserIds == null || a.UserIds.Length == 0 || a.UserIds.Contains(userId)));
+            return Ok(announcements);
         }
     }
 }
