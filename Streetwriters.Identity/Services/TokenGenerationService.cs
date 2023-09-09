@@ -84,11 +84,13 @@ namespace Streetwriters.Identity.Helpers
         public async Task<ClaimsPrincipal> TransformTokenRequestAsync(ValidatedTokenRequest request, User user, string grantType, string[] scopes, int lifetime = 20 * 60)
         {
             var principal = await PrincipalFactory.CreateAsync(user);
-            var identityUser = new IdentityServerUser(user.Id.ToString());
-            identityUser.DisplayName = user.UserName;
-            identityUser.AuthenticationTime = System.DateTime.UtcNow;
-            identityUser.IdentityProvider = IdentityServerConstants.LocalIdentityProvider;
-            identityUser.AdditionalClaims = principal.Claims.ToArray();
+            var identityUser = new IdentityServerUser(user.Id.ToString())
+            {
+                DisplayName = user.UserName,
+                AuthenticationTime = System.DateTime.UtcNow,
+                IdentityProvider = IdentityServerConstants.LocalIdentityProvider,
+                AdditionalClaims = principal.Claims.ToArray()
+            };
 
             request.AccessTokenType = AccessTokenType.Jwt;
             request.AccessTokenLifetime = lifetime;

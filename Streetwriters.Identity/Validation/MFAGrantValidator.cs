@@ -92,8 +92,11 @@ namespace Streetwriters.Identity.Validation
             context.Result.Error = "invalid_mfa";
             context.Result.ErrorDescription = "Please provide a valid multi-factor authentication code.";
 
+            if (!await UserManager.GetTwoFactorEnabledAsync(user))
+                await MFAService.EnableMFAAsync(user, MFAMethods.Email);
+
             if (string.IsNullOrEmpty(mfaCode)) return;
-            if (string.IsNullOrEmpty(mfaMethod))
+            if (string.IsNullOrEmpty(mfaMethod) || !MFAService.IsValidMFAMethod(mfaMethod))
             {
                 context.Result.ErrorDescription = "Please provide a valid multi-factor authentication method.";
                 return;
@@ -111,15 +114,6 @@ namespace Streetwriters.Identity.Validation
             {
                 context.Result.ErrorDescription = "Please provide a valid multi-factor authentication recovery code.";
 
-                // This happens for new users who haven't set up 2FA yet; in which case
-                // we default to email. However, there are no recovery codes for that user
-                // yet.
-                // Without this, RedeemTwoFactorRecoveryCodeAsync succeeds with any recovery
-                // code (valid or invalid).
-                var isTwoFactorEnabled = await UserManager.GetTwoFactorEnabledAsync(user);
-                if (!isTwoFactorEnabled)
-                    return;
-
                 var result = await UserManager.RedeemTwoFactorRecoveryCodeAsync(user, mfaCode);
                 if (!result.Succeeded)
                 {
@@ -130,9 +124,7 @@ namespace Streetwriters.Identity.Validation
             }
             else
             {
-                var provider = mfaMethod == MFAMethods.Email || mfaMethod == MFAMethods.SMS ? TokenOptions.DefaultPhoneProvider : UserManager.Options.Tokens.AuthenticatorTokenProvider;
-                var isMFACodeValid = await MFAService.VerifyOTPAsync(user, mfaCode, mfaMethod);
-                if (!isMFACodeValid)
+                if (!await MFAService.VerifyOTPAsync(user, mfaCode, mfaMethod))
                 {
                     await UserManager.AccessFailedAsync(user);
                     await EmailSender.SendFailedLoginAlertAsync(user.Email, httpContext.GetClientInfo(), client).ConfigureAwait(false);
