@@ -72,8 +72,8 @@ namespace Streetwriters.Identity.Services
 
         public async Task<bool> ResetMFAAsync(User user)
         {
-            var result = await UserManager.SetTwoFactorEnabledAsync(user, false);
-            var result = await UserManager.SetTwoFactorEnabledAsync(user, true);
+            await UserManager.SetTwoFactorEnabledAsync(user, false);
+            await UserManager.SetTwoFactorEnabledAsync(user, true);
 
             await this.RemovePrimaryMethodAsync(user);
             await this.RemoveSecondaryMethodAsync(user);
