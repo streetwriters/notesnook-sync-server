@@ -161,7 +161,7 @@ namespace Streetwriters.Identity.Services
                     break;
                 case "sms":
                     await UserManager.SetPhoneNumberAsync(user, form.PhoneNumber);
-                    var id = SMSSender.SendOTP(form.PhoneNumber, client);
+                    var id = await SMSSender.SendOTPAsync(form.PhoneNumber, client);
                     await this.ReplaceClaimAsync(user, MFAService.SMS_ID_CLAIM, id);
                     break;
 
@@ -174,7 +174,7 @@ namespace Streetwriters.Identity.Services
             {
                 var id = this.GetClaimValue(user, MFAService.SMS_ID_CLAIM);
                 if (string.IsNullOrEmpty(id)) throw new Exception("Could not find associated SMS verify id. Please try sending the code again.");
-                if (SMSSender.VerifyOTP(id, code))
+                if (await SMSSender.VerifyOTPAsync(id, code))
                 {
                     // Auto confirm user phone number if not confirmed
                     if (!await UserManager.IsPhoneNumberConfirmedAsync(user))

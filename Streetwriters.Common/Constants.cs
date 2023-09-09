@@ -45,8 +45,9 @@ namespace Streetwriters.Common
         public static string NOTESNOOK_API_SECRET => Environment.GetEnvironmentVariable("NOTESNOOK_API_SECRET");
 
         // MessageBird is used for SMS sending
-        public static string MESSAGEBIRD_ACCESS_KEY => Environment.GetEnvironmentVariable("MESSAGEBIRD_ACCESS_KEY");
-
+        public static string TWILIO_ACCOUNT_SID => Environment.GetEnvironmentVariable("TWILIO_ACCOUNT_SID");
+        public static string TWILIO_AUTH_TOKEN => Environment.GetEnvironmentVariable("TWILIO_AUTH_TOKEN");
+        public static string TWILIO_SERVICE_SID => Environment.GetEnvironmentVariable("TWILIO_SERVICE_SID");
         // Server discovery
         public static int NOTESNOOK_SERVER_PORT => int.Parse(Environment.GetEnvironmentVariable("NOTESNOOK_SERVER_PORT"));
         public static string NOTESNOOK_SERVER_HOST => Environment.GetEnvironmentVariable("NOTESNOOK_SERVER_HOST");

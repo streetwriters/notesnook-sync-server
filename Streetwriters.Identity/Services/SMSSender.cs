@@ -24,6 +24,10 @@ using MessageBird.Objects;
 using Microsoft.Extensions.Options;
 using Streetwriters.Identity.Models;
 using Streetwriters.Common;
+using Twilio.Rest.Verify.V2.Service;
+using Twilio;
+using System.Threading.Tasks;
+using System;
 
 namespace Streetwriters.Identity.Services
 {
@@ -34,28 +38,39 @@ namespace Streetwriters.Identity.Services
         {
             if (!string.IsNullOrEmpty(Constants.MESSAGEBIRD_ACCESS_KEY))
                 client = Client.CreateDefault(Constants.MESSAGEBIRD_ACCESS_KEY);
+
+
+            if (!string.IsNullOrEmpty(Constants.TWILIO_ACCOUNT_SID) && !string.IsNullOrEmpty(Constants.TWILIO_AUTH_TOKEN))
+            {
+                TwilioClient.Init(Constants.TWILIO_ACCOUNT_SID, Constants.TWILIO_AUTH_TOKEN);
+            }
         }
 
-        public string SendOTP(string number, IClient app)
+        public async Task<string> SendOTPAsync(string number, IClient app)
         {
-            VerifyOptionalArguments optionalArguments = new VerifyOptionalArguments
+            try
             {
-                Originator = app.Name,
-                Reference = app.Name,
-                Type = MessageType.Sms,
-                Template = $"Your {app.Name} 2FA code is: %token. Valid for 5 minutes.",
-                TokenLength = 6,
-                Timeout = 60 * 5
-            };
-            Verify verify = client.CreateVerify(number, optionalArguments);
-            if (verify.Status == VerifyStatus.Sent) return verify.Id;
+                var verification = await VerificationResource.CreateAsync(
+                    to: number,
+                    channel: "sms",
+                    pathServiceSid: Constants.TWILIO_SERVICE_SID
+                );
+                return verification.Sid;
+            }
+            catch (Exception ex)
+            {
+
+            }
             return null;
         }
 
-        public bool VerifyOTP(string id, string code)
+        public async Task<bool> VerifyOTPAsync(string id, string code)
         {
-            Verify verify = client.SendVerifyToken(id, code);
-            return verify.Status == VerifyStatus.Verified;
+            return (await VerificationCheckResource.CreateAsync(
+                verificationSid: id,
+                pathServiceSid: Constants.TWILIO_SERVICE_SID,
+                code: code
+            )).Status == "approved";
         }
     }
 }

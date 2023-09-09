@@ -33,6 +33,7 @@
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="6.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="7.0.4" />
     <PackageReference Include="AspNetCore.Identity.Mongo" Version="8.3.3" />
+    <PackageReference Include="Twilio" Version="6.13.0" />
     <PackageReference Include="WebMarkupMin.Core" Version="2.13.0" />
     <PackageReference Include="WebMarkupMin.NUglify" Version="2.12.0" />
   </ItemGroup>
