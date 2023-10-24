@@ -78,8 +78,8 @@ namespace Streetwriters.Identity
                     RefreshTokenUsage = TokenUsage.ReUse,
                     RefreshTokenExpiration = TokenExpiration.Sliding,
 
-                    AccessTokenLifetime = 3600, // 1 hour
-                    SlidingRefreshTokenLifetime = 15 * 60 * 60 * 24, // 15 days
+                    AccessTokenLifetime = 6 * 3600, // 6 hours
+                    SlidingRefreshTokenLifetime = 45 * 3600 * 24, // 45 days
                     AbsoluteRefreshTokenLifetime = 0, // 0 means infinite sliding lifetime
                     
                     // scopes that client has access to
