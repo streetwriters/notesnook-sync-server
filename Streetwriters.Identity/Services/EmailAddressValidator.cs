@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Streetwriters.Common;
+using System.Linq;
 
 namespace Streetwriters.Identity.Services
 {
@@ -19,8 +20,9 @@ namespace Streetwriters.Identity.Services
                 if (LAST_FETCH_TIME.AddDays(1) < DateTimeOffset.UtcNow)
                 {
                     var httpClient = new HttpClient();
-                    var domainsList = await httpClient.GetStringAsync("https://disposable.github.io/disposable-email-domains/domains.txt");
-                    BLACKLISTED_DOMAINS = new HashSet<string>(domainsList.Split('\n'));
+                    var domainsList = await httpClient.GetStringAsync("https://raw.githubusercontent.com/disposable-email-domains/disposable-email-domains/master/disposable_email_blocklist.conf");
+                    var domains = domainsList.Split('\n').Where(line => !string.IsNullOrWhiteSpace(line) && !line.TrimStart().StartsWith("//"));
+                    BLACKLISTED_DOMAINS = new HashSet<string>(domains, StringComparer.OrdinalIgnoreCase);
                     LAST_FETCH_TIME = DateTimeOffset.UtcNow;
                 }
 
