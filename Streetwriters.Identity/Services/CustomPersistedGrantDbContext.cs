@@ -67,7 +67,7 @@ namespace Streetwriters.Identity.Services
 
         public Task RemoveExpired()
         {
-            return Remove(x => x.Expiration.HasValue && x.Expiration.Value.AddHours(12) < DateTime.UtcNow);
+            return Remove(x => x.Type == "reference_token" && x.Expiration.HasValue && x.Expiration.Value.ToUniversalTime() < DateTime.UtcNow);
         }
 
         public Task InsertOrUpdate(Expression<Func<PersistedGrant, bool>> filter, PersistedGrant entity)
