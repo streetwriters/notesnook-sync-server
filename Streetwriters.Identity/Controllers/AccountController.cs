@@ -21,9 +21,12 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Security.Claims;
+using System.Text.Json;
 using System.Threading.Tasks;
 using AspNetCore.Identity.Mongo.Model;
+using IdentityServer4;
 using IdentityServer4.Configuration;
+using IdentityServer4.Models;
 using IdentityServer4.Stores;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -280,7 +283,7 @@ namespace Streetwriters.Identity.Controllers
                                 if (result.Succeeded)
                                 {
                                     await UserManager.SetUserNameAsync(user, form.NewEmail);
-                                    await SendEmailChangedMessageAsync(user.Id.ToString());
+                                    await SendLogoutMessageAsync(user.Id.ToString(), "Email changed.");
                                     return Ok();
                                 }
                             }
@@ -292,7 +295,7 @@ namespace Streetwriters.Identity.Controllers
                         var result = await UserManager.ChangePasswordAsync(user, form.OldPassword, form.NewPassword);
                         if (result.Succeeded)
                         {
-                            await SendPasswordChangedMessageAsync(user.Id.ToString());
+                            await SendLogoutMessageAsync(user.Id.ToString(), "Password changed.");
                             return Ok();
                         }
                         return BadRequest(result.Errors.ToErrors());
@@ -306,7 +309,7 @@ namespace Streetwriters.Identity.Controllers
                             result = await UserManager.AddPasswordAsync(user, form.NewPassword);
                             if (result.Succeeded)
                             {
-                                await SendPasswordChangedMessageAsync(user.Id.ToString());
+                                await SendLogoutMessageAsync(user.Id.ToString(), "Password reset.");
                                 return Ok();
                             }
                         }
@@ -334,7 +337,7 @@ namespace Streetwriters.Identity.Controllers
             if (client == null) return BadRequest("Invalid client_id.");
 
             var user = await UserManager.GetUserAsync(User);
-            if (!await IsUserValidAsync(user, client.Id)) return BadRequest($"Unable to find user with ID '{user.Id.ToString()}'.");
+            if (!await IsUserValidAsync(user, client.Id)) return BadRequest($"Unable to find user with ID '{user.Id}'.");
 
             var jti = User.FindFirstValue("jti");
 
@@ -343,37 +346,43 @@ namespace Streetwriters.Identity.Controllers
                 ClientId = client.Id,
                 SubjectId = user.Id.ToString()
             });
+            var refreshTokenKey = GetHashedKey(refresh_token, PersistedGrantTypes.RefreshToken);
+            var removedKeys = new List<string>();
             foreach (var grant in grants)
             {
-                if (!all && (grant.Data.Contains(jti) || grant.Data.Contains(refresh_token))) continue;
+                if (!all && (grant.Data.Contains(jti) || grant.Key == refreshTokenKey)) continue;
                 await PersistedGrantStore.RemoveAsync(grant.Key);
+                removedKeys.Add(grant.Key);
             }
+
+            await WampServers.NotesnookServer.PublishMessageAsync(IdentityServerTopics.ClearCacheTopic, new ClearCacheMessage(removedKeys));
+            await WampServers.MessengerServer.PublishMessageAsync(IdentityServerTopics.ClearCacheTopic, new ClearCacheMessage(removedKeys));
+            await WampServers.SubscriptionServer.PublishMessageAsync(IdentityServerTopics.ClearCacheTopic, new ClearCacheMessage(removedKeys));
+            await SendLogoutMessageAsync(user.Id.ToString(), "Session revoked.");
             return Ok();
         }
 
-        private async Task SendPasswordChangedMessageAsync(string userId)
+        private static string GetHashedKey(string value, string grantType)
         {
-            await WampServers.MessengerServer.PublishMessageAsync(WampServers.MessengerServer.Topics.SendSSETopic, new SendSSEMessage
+            return (value + ":" + grantType).Sha256();
+        }
+
+        private async Task SendLogoutMessageAsync(string userId, string reason)
+        {
+            await SendMessageAsync(userId, new Message
             {
-                UserId = userId,
-                OriginTokenId = User.FindFirstValue("jti"),
-                Message = new Message
-                {
-                    Type = "userPasswordChanged"
-                }
+                Type = "logout",
+                Data = JsonSerializer.Serialize(new { reason })
             });
         }
 
-        private async Task SendEmailChangedMessageAsync(string userId)
+        private async Task SendMessageAsync(string userId, Message message)
         {
-            await WampServers.MessengerServer.PublishMessageAsync(WampServers.MessengerServer.Topics.SendSSETopic, new SendSSEMessage
+            await WampServers.MessengerServer.PublishMessageAsync(MessengerServerTopics.SendSSETopic, new SendSSEMessage
             {
                 UserId = userId,
                 OriginTokenId = User.FindFirstValue("jti"),
-                Message = new Message
-                {
-                    Type = "userEmailChanged"
-                }
+                Message = message
             });
         }
 

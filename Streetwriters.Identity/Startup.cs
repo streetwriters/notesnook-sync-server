@@ -201,7 +201,7 @@ namespace Streetwriters.Identity
 
             app.UseWamp(WampServers.IdentityServer, (realm, server) =>
             {
-                realm.Subscribe(server.Topics.CreateSubscriptionTopic, async (CreateSubscriptionMessage message) =>
+                realm.Subscribe(SubscriptionServerTopics.CreateSubscriptionTopic, async (CreateSubscriptionMessage message) =>
                 {
                     using (var serviceScope = app.ApplicationServices.CreateScope())
                     {
@@ -210,7 +210,7 @@ namespace Streetwriters.Identity
                         await MessageHandlers.CreateSubscription.Process(message, userManager);
                     }
                 });
-                realm.Subscribe(server.Topics.DeleteSubscriptionTopic, async (DeleteSubscriptionMessage message) =>
+                realm.Subscribe(SubscriptionServerTopics.DeleteSubscriptionTopic, async (DeleteSubscriptionMessage message) =>
                 {
                     using (var serviceScope = app.ApplicationServices.CreateScope())
                     {

@@ -76,7 +76,7 @@ namespace Notesnook.API.Services
 
             if (!Constants.IS_SELF_HOSTED)
             {
-                await WampServers.SubscriptionServer.PublishMessageAsync(WampServers.SubscriptionServer.Topics.CreateSubscriptionTopic, new CreateSubscriptionMessage
+                await WampServers.SubscriptionServer.PublishMessageAsync(SubscriptionServerTopics.CreateSubscriptionTopic, new CreateSubscriptionMessage
                 {
                     AppId = ApplicationType.NOTESNOOK,
                     Provider = SubscriptionProvider.STREETWRITERS,
@@ -115,7 +115,7 @@ namespace Notesnook.API.Services
                 {
                     await Slogger<UserService>.Error(nameof(GetUserAsync), "Repairing user subscription.", JsonSerializer.Serialize(response));
                     // user was partially created. We should continue the process here.
-                    await WampServers.SubscriptionServer.PublishMessageAsync(WampServers.SubscriptionServer.Topics.CreateSubscriptionTopic, new CreateSubscriptionMessage
+                    await WampServers.SubscriptionServer.PublishMessageAsync(SubscriptionServerTopics.CreateSubscriptionTopic, new CreateSubscriptionMessage
                     {
                         AppId = ApplicationType.NOTESNOOK,
                         Provider = SubscriptionProvider.STREETWRITERS,
@@ -182,22 +182,22 @@ namespace Notesnook.API.Services
 
             if (!Constants.IS_SELF_HOSTED)
             {
-                await WampServers.SubscriptionServer.PublishMessageAsync(WampServers.SubscriptionServer.Topics.DeleteSubscriptionTopic, new DeleteSubscriptionMessage
+                await WampServers.SubscriptionServer.PublishMessageAsync(SubscriptionServerTopics.DeleteSubscriptionTopic, new DeleteSubscriptionMessage
                 {
                     AppId = ApplicationType.NOTESNOOK,
                     UserId = userId
                 });
             }
 
-            await WampServers.MessengerServer.PublishMessageAsync(WampServers.MessengerServer.Topics.SendSSETopic, new SendSSEMessage
+            await WampServers.MessengerServer.PublishMessageAsync(MessengerServerTopics.SendSSETopic, new SendSSEMessage
             {
                 SendToAll = false,
                 OriginTokenId = jti,
                 UserId = userId,
                 Message = new Message
                 {
-                    Type = "userDeleted",
-                    Data = JsonSerializer.Serialize(new { reason = "accountDeleted" })
+                    Type = "logout",
+                    Data = JsonSerializer.Serialize(new { reason = "Account deleted." })
                 }
             });
 

@@ -34,6 +34,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.ResponseCompression;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -152,6 +153,7 @@ namespace Notesnook.API
                     context.HttpContext.User = context.Principal;
                     return Task.CompletedTask;
                 };
+                options.CacheKeyGenerator = (options, token) => (token + ":" + "reference_token").Sha256();
                 options.SaveToken = true;
                 options.EnableCaching = true;
                 options.CacheDuration = TimeSpan.FromMinutes(30);
@@ -244,10 +246,14 @@ namespace Notesnook.API
             app.UseWamp(WampServers.NotesnookServer, (realm, server) =>
             {
                 IUserService service = app.GetScopedService<IUserService>();
-                realm.Subscribe<DeleteUserMessage>(server.Topics.DeleteUserTopic, async (ev) =>
+
+                realm.Subscribe<DeleteUserMessage>(IdentityServerTopics.DeleteUserTopic, async (ev) =>
                 {
                     await service.DeleteUserAsync(ev.UserId, null);
                 });
+
+                IDistributedCache cache = app.GetScopedService<IDistributedCache>();
+                realm.Subscribe<ClearCacheMessage>(IdentityServerTopics.ClearCacheTopic, (ev) => ev.Keys.ForEach((key) => cache.Remove(key)));
             });
 
             app.UseRouting();

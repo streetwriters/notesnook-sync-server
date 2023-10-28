@@ -41,7 +41,7 @@ namespace Streetwriters.Common
             EmailConfirmedRedirectURL = $"{Constants.NOTESNOOK_APP_HOST}/account/verified",
             OnEmailConfirmed = async (userId) =>
             {
-                await WampServers.MessengerServer.PublishMessageAsync(WampServers.MessengerServer.Topics.SendSSETopic, new SendSSEMessage
+                await WampServers.MessengerServer.PublishMessageAsync(MessengerServerTopics.SendSSETopic, new SendSSEMessage
                 {
                     UserId = userId,
                     Message = new Message

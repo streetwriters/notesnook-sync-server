@@ -28,6 +28,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.ResponseCompression;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -74,11 +75,11 @@ namespace Streetwriters.Messenger
                 options.Authority = Servers.IdentityServer.ToString();
                 options.ClientSecret = Constants.NOTESNOOK_API_SECRET;
                 options.ClientId = "notesnook";
+                options.DiscoveryPolicy.RequireHttps = false;
+                options.CacheKeyGenerator = (options, token) => (token + ":" + "reference_token").Sha256();
                 options.SaveToken = true;
                 options.EnableCaching = true;
                 options.CacheDuration = TimeSpan.FromMinutes(30);
-                // TODO
-                options.DiscoveryPolicy.RequireHttps = false;
             });
 
             services.AddServerSentEvents();
@@ -119,7 +120,7 @@ namespace Streetwriters.Messenger
             app.UseWamp(WampServers.MessengerServer, (realm, server) =>
             {
                 IServerSentEventsService service = app.ApplicationServices.GetRequiredService<IServerSentEventsService>();
-                realm.Subscribe<SendSSEMessage>(server.Topics.SendSSETopic, async (ev) =>
+                realm.Subscribe<SendSSEMessage>(MessengerServerTopics.SendSSETopic, async (ev) =>
                 {
                     var message = JsonSerializer.Serialize(ev.Message);
                     if (ev.SendToAll)
@@ -131,6 +132,9 @@ namespace Streetwriters.Messenger
                         await SSEHelper.SendEventToUserAsync(message, service, ev.UserId, ev.OriginTokenId);
                     }
                 });
+
+                IDistributedCache cache = app.GetScopedService<IDistributedCache>();
+                realm.Subscribe<ClearCacheMessage>(IdentityServerTopics.ClearCacheTopic, (ev) => ev.Keys.ForEach((key) => cache.Remove(key)));
             });
 
             app.UseEndpoints(endpoints =>

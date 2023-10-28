@@ -11,7 +11,7 @@
   <ItemGroup>
     <PackageReference Include="AWSSDK.Core" Version="3.7.12.5" />
     <PackageReference Include="DotNetEnv" Version="2.3.0" />
-    <PackageReference Include="IdentityServer4.AccessTokenValidation" Version="3.0.1" />
+    <PackageReference Include="IdentityModel.AspNetCore.OAuth2Introspection" Version="6.2.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="6.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="6.0.0" />
     <PackageReference Include="AspNetCore.HealthChecks.MongoDb" Version="6.0.1-rc2.2" />

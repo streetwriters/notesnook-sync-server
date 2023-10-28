@@ -26,15 +26,11 @@ namespace System
 {
     public static class StringExtensions
     {
-        public static string ToSha256(this string rawData, int maxLength = 12)
+        public static string Sha256(this string input)
         {
-            // Create a SHA256   
-            using (SHA256 sha256Hash = SHA256.Create())
-            {
-                // ComputeHash - returns byte array  
-                byte[] bytes = sha256Hash.ComputeHash(Encoding.UTF8.GetBytes(rawData));
-                return ToHex(bytes, 0, maxLength);
-            }
+            var bytes = Encoding.UTF8.GetBytes(input);
+            var hash = SHA256.HashData(bytes);
+            return Convert.ToBase64String(hash);
         }
 
         public static byte[] CompressBrotli(this string input)

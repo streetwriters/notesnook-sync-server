@@ -20,9 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 using IdentityServer4;
 using IdentityServer4.Models;
 using Streetwriters.Common;
-using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace Streetwriters.Identity
 {

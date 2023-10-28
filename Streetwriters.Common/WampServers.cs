@@ -97,23 +97,22 @@ namespace Streetwriters.Common
 
     public class MessengerServerTopics
     {
-        public string SendSSETopic => "com.streetwriters.sse.send";
+        public const string SendSSETopic = "com.streetwriters.sse.send";
     }
 
     public class SubscriptionServerTopics
     {
-        public string CreateSubscriptionTopic => "com.streetwriters.subscriptions.create";
-        public string DeleteSubscriptionTopic => "com.streetwriters.subscriptions.delete";
+        public const string CreateSubscriptionTopic = "com.streetwriters.subscriptions.create";
+        public const string DeleteSubscriptionTopic = "com.streetwriters.subscriptions.delete";
     }
 
     public class IdentityServerTopics
     {
-        public string CreateSubscriptionTopic => "com.streetwriters.subscriptions.create";
-        public string DeleteSubscriptionTopic => "com.streetwriters.subscriptions.delete";
+        public const string ClearCacheTopic = "com.streetwriters.identity.clear_cache";
+        public const string DeleteUserTopic = "com.streetwriters.identity.delete_user";
     }
 
     public class NotesnookServerTopics
     {
-        public string DeleteUserTopic => "com.streetwriters.notesnook.user.delete";
     }
 }
