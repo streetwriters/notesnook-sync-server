@@ -63,7 +63,8 @@ namespace Notesnook.API.Services
             if (!response.Success || (response.Errors != null && response.Errors.Length > 0))
             {
                 await Slogger<UserService>.Error(nameof(CreateUserAsync), "Couldn't sign up.", JsonSerializer.Serialize(response));
-                if (response.Errors != null && response.Errors.Length > 0) throw new Exception(string.Join(" ", response.Errors));
+                if (response.Errors != null && response.Errors.Length > 0)
+                    throw new Exception(string.Join(" ", response.Errors));
                 else throw new Exception("Could not create a new account. Error code: " + response.StatusCode);
             }
 
@@ -239,7 +240,7 @@ namespace Notesnook.API.Services
             return true;
         }
 
-        private string GetSalt()
+        private static string GetSalt()
         {
             byte[] salt = new byte[16];
             Rng.GetNonZeroBytes(salt);
