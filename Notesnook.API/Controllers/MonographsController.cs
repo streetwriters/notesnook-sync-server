@@ -74,6 +74,9 @@ namespace Notesnook.API.Controllers
         {
             if (await Monographs.GetAsync(monograph.Id) == null) return NotFound();
 
+            if (monograph.EncryptedContent?.Cipher.Length > MAX_DOC_SIZE || monograph.CompressedContent?.Length > MAX_DOC_SIZE)
+                return base.BadRequest("Monograph is too big. Max allowed size is 15mb.");
+
             if (monograph.EncryptedContent == null)
                 monograph.CompressedContent = monograph.Content.CompressBrotli();
             else
