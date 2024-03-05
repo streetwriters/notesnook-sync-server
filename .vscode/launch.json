@@ -9,8 +9,7 @@
       "type": "coreclr",
       "request": "launch",
       "preLaunchTask": "build-notesnook",
-      // If you have changed target frameworks, make sure to update the program path.
-      "program": "${workspaceFolder}/Notesnook.API/bin/Debug/net7.0/linux-x64/Notesnook.API.dll",
+      "program": "bin/Debug/net8.0/Notesnook.API.dll",
       "args": [],
       "cwd": "${workspaceFolder}/Notesnook.API",
       "stopAtEntry": false,
@@ -25,8 +24,7 @@
       "type": "coreclr",
       "request": "launch",
       "preLaunchTask": "build-identity",
-      // If you have changed target frameworks, make sure to update the program path.
-      "program": "${workspaceFolder}/Streetwriters.Identity/bin/Debug/net7.0/linux-x64/Streetwriters.Identity.dll",
+      "program": "bin/Debug/net8.0/Streetwriters.Identity.dll",
       "args": [],
       "cwd": "${workspaceFolder}/Streetwriters.Identity",
       "stopAtEntry": false,
@@ -41,8 +39,7 @@
       "type": "coreclr",
       "request": "launch",
       "preLaunchTask": "build-messenger",
-      // If you have changed target frameworks, make sure to update the program path.
-      "program": "${workspaceFolder}/Streetwriters.Messenger/bin/Debug/net7.0/linux-x64/Streetwriters.Messenger.dll",
+      "program": "bin/Debug/net8.0/Streetwriters.Messenger.dll",
       "args": [],
       "cwd": "${workspaceFolder}/Streetwriters.Messenger",
       "stopAtEntry": false,
