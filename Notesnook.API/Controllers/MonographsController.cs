@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 using System;
 using System.Linq;
 using System.Security.Claims;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -117,14 +118,30 @@ namespace Notesnook.API.Controllers
                 });
             }
 
-            if (monograph.SelfDestruct)
-                await Monographs.DeleteByIdAsync(monograph.Id);
-
             if (monograph.EncryptedContent == null)
                 monograph.Content = monograph.CompressedContent.DecompressBrotli();
             return Ok(monograph);
         }
 
+        [HttpGet("{id}/destruct")]
+        [AllowAnonymous]
+        public async Task<IActionResult> DestructMonographAsync([FromRoute] string id)
+        {
+            var monograph = await Monographs.GetAsync(id);
+            if (monograph == null)
+            {
+                return NotFound(new
+                {
+                    error = "invalid_id",
+                    error_description = $"No such monograph found."
+                });
+            }
+
+            if (monograph.SelfDestruct)
+                await Monographs.DeleteByIdAsync(monograph.Id);
+
+            return Ok();
+        }
 
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteAsync([FromRoute] string id)
