@@ -149,8 +149,6 @@ namespace Notesnook.API.Hubs
             "content",
             "shortcut",
             "reminder",
-            "color",
-            "tag",
             "relation", // relations must sync at the end to prevent invalid state
         };
 
@@ -240,16 +238,6 @@ namespace Notesnook.API.Hubs
                         case "relation":
                             Repositories.Relations.Upsert(JsonSerializer.Deserialize<Relation>(data), userId, dateSynced);
                             break;
-                        case "color":
-                            var color = JsonSerializer.Deserialize<Color>(data);
-                            if (color.Version < 5.9) continue;
-                            Repositories.Colors.Upsert(color, userId, dateSynced);
-                            break;
-                        case "tag":
-                            var tag = JsonSerializer.Deserialize<Models.Tag>(data);
-                            if (tag.Version < 5.9) continue;
-                            Repositories.Tags.Upsert(tag, userId, dateSynced);
-                            break;
                         case "settings":
                             var settings = JsonSerializer.Deserialize<Setting>(data);
                             settings.Id = MongoDB.Bson.ObjectId.Parse(userId);
@@ -286,8 +274,6 @@ namespace Notesnook.API.Hubs
                 "shortcut" => Repositories.Shortcuts.Upsert,
                 "reminder" => Repositories.Reminders.Upsert,
                 "relation" => Repositories.Relations.Upsert,
-                "color" => Repositories.Colors.Upsert,
-                "tag" => Repositories.Tags.Upsert,
                 _ => null,
             };
         }
@@ -471,8 +457,6 @@ namespace Notesnook.API.Hubs
                     Repositories.Contents.FindItemsSyncedAfter,
                     Repositories.Shortcuts.FindItemsSyncedAfter,
                     Repositories.Reminders.FindItemsSyncedAfter,
-                    Repositories.Colors.FindItemsSyncedAfter,
-                    Repositories.Tags.FindItemsSyncedAfter,
                     Repositories.Relations.FindItemsSyncedAfter,
                 },
                 types: CollectionKeys,
@@ -529,9 +513,7 @@ namespace Notesnook.API.Hubs
                             Repositories.LegacySettings.CountItemsSyncedAfterAsync(userId, lastSyncedTimestamp),
                             Repositories.Shortcuts.CountItemsSyncedAfterAsync(userId, lastSyncedTimestamp),
                             Repositories.Reminders.CountItemsSyncedAfterAsync(userId, lastSyncedTimestamp),
-                            Repositories.Relations.CountItemsSyncedAfterAsync(userId, lastSyncedTimestamp),
-                            Repositories.Colors.CountItemsSyncedAfterAsync(userId, lastSyncedTimestamp),
-                            Repositories.Tags.CountItemsSyncedAfterAsync(userId, lastSyncedTimestamp)
+                            Repositories.Relations.CountItemsSyncedAfterAsync(userId, lastSyncedTimestamp)
                         )).Sum((a) => a);
 
             if (total == 0)
@@ -552,8 +534,6 @@ namespace Notesnook.API.Hubs
                 Repositories.Contents.FindItemsSyncedAfter,
                 Repositories.Shortcuts.FindItemsSyncedAfter,
                 Repositories.Reminders.FindItemsSyncedAfter,
-                Repositories.Colors.FindItemsSyncedAfter,
-                Repositories.Tags.FindItemsSyncedAfter,
                 Repositories.Relations.FindItemsSyncedAfter,
             };
 
