@@ -63,13 +63,13 @@ namespace Streetwriters.Common
     public class Servers
     {
 #if DEBUG
-        public static string GetLocalIPv4(NetworkInterfaceType _type)
+        public static string GetLocalIPv4()
         {
             var interfaces = NetworkInterface.GetAllNetworkInterfaces();
             string output = "";
             foreach (NetworkInterface item in interfaces)
             {
-                if (item.NetworkInterfaceType == _type && item.OperationalStatus == OperationalStatus.Up)
+                if ((item.NetworkInterfaceType == NetworkInterfaceType.Ethernet || item.NetworkInterfaceType == NetworkInterfaceType.Wireless80211) && item.OperationalStatus == OperationalStatus.Up)
                 {
                     foreach (UnicastIPAddressInformation ip in item.GetIPProperties().UnicastAddresses)
                     {
@@ -82,7 +82,7 @@ namespace Streetwriters.Common
             }
             return output;
         }
-        public readonly static string HOST = GetLocalIPv4(NetworkInterfaceType.Ethernet);
+        public readonly static string HOST = GetLocalIPv4();
         public static Server S3Server { get; } = new()
         {
             Port = 4568,
