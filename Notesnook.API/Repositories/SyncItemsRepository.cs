@@ -27,6 +27,7 @@ using System.Threading.Tasks;
 using Microsoft.VisualBasic;
 using MongoDB.Bson;
 using MongoDB.Driver;
+using Notesnook.API.Hubs;
 using Notesnook.API.Interfaces;
 using Notesnook.API.Models;
 using Streetwriters.Common;
@@ -37,8 +38,10 @@ namespace Notesnook.API.Repositories
 {
     public class SyncItemsRepository<T> : Repository<SyncItem> where T : SyncItem
     {
+        private string collectionName;
         public SyncItemsRepository(IDbContext dbContext, string databaseName, string collectionName) : base(dbContext, databaseName, collectionName)
         {
+            this.collectionName = collectionName;
             Collection.Indexes.CreateOne(new CreateIndexModel<SyncItem>(Builders<SyncItem>.IndexKeys.Ascending(i => i.UserId).Descending(i => i.DateSynced)));
             Collection.Indexes.CreateOne(new CreateIndexModel<SyncItem>(Builders<SyncItem>.IndexKeys.Ascending(i => i.UserId).Ascending((i) => i.ItemId)));
             Collection.Indexes.CreateOne(new CreateIndexModel<SyncItem>(Builders<SyncItem>.IndexKeys.Ascending(i => i.UserId)));
@@ -96,7 +99,6 @@ namespace Notesnook.API.Repositories
 
         public void Upsert(SyncItem item, string userId, long dateSynced)
         {
-
             if (item.Length > 15 * 1024 * 1024)
             {
                 throw new Exception($"Size of item \"{item.ItemId}\" is too large. Maximum allowed size is 15 MB.");
@@ -107,11 +109,49 @@ namespace Notesnook.API.Repositories
                 throw new Exception($"Invalid alg identifier {item.Algorithm}");
             }
 
+            // Handle case where the cipher is corrupted.
+            if (!IsBase64String(item.Cipher))
+            {
+                Slogger<SyncHub>.Error("Upsert", "Corrupted", item.ItemId, item.Length.ToString(), item.Cipher);
+                throw new Exception($"Corrupted item \"{item.ItemId}\" in collection \"{this.collectionName}\". Please report this error to support@streetwriters.co.");
+            }
+
             item.DateSynced = dateSynced;
             item.UserId = userId;
 
             // await base.UpsertAsync(item, (x) => (x.ItemId == item.ItemId) && x.UserId == userId);
-            base.Upsert(item, (x) => (x.ItemId == item.ItemId) && x.UserId == userId);
+            base.Upsert(item, (x) => x.UserId == userId && x.ItemId == item.ItemId);
+        }
+
+        private static bool IsBase64String(string value)
+        {
+            if (value == null || value.Length == 0 || value.Contains(' ') || value.Contains('\t') || value.Contains('\r') || value.Contains('\n'))
+                return false;
+            var index = value.Length - 1;
+            if (value[index] == '=')
+                index--;
+            if (value[index] == '=')
+                index--;
+            for (var i = 0; i <= index; i++)
+                if (IsInvalidBase64Char(value[i]))
+                    return false;
+            return true;
+        }
+
+        private static bool IsInvalidBase64Char(char value)
+        {
+            var code = (int)value;
+            // 1 - 9
+            if (code >= 48 && code <= 57)
+                return false;
+            // A - Z
+            if (code >= 65 && code <= 90)
+                return false;
+            // a - z
+            if (code >= 97 && code <= 122)
+                return false;
+            // - & _
+            return code != 45 && code != 95;
         }
     }
 }
