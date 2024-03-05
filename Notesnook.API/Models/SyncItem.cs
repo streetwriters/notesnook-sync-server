@@ -111,6 +111,9 @@ namespace Notesnook.API.Models
     }
 
     [MessagePack.MessagePackObject]
+    public class SettingItem : SyncItem { }
+
+    [MessagePack.MessagePackObject]
     public class Attachment : SyncItem { }
 
     [MessagePack.MessagePackObject]
@@ -139,4 +142,7 @@ namespace Notesnook.API.Models
 
     [MessagePack.MessagePackObject]
     public class Color : SyncItem { }
+
+    [MessagePack.MessagePackObject]
+    public class Vault : SyncItem { }
 }

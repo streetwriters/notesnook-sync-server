@@ -34,7 +34,9 @@ namespace Notesnook.API.Interfaces
         SyncItemsRepository<Content> Contents { get; }
         SyncItemsRepository<Setting> LegacySettings { get; }
         SyncItemsRepository<Attachment> Attachments { get; }
+        SyncItemsRepository<SettingItem> Settings { get; }
         SyncItemsRepository<Color> Colors { get; }
+        SyncItemsRepository<Vault> Vaults { get; }
         SyncItemsRepository<Tag> Tags { get; }
         Repository<UserSettings> UsersSettings { get; }
         Repository<Monograph> Monographs { get; }
