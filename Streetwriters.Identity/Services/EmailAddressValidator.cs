@@ -10,7 +10,7 @@ namespace Streetwriters.Identity.Services
     public class EmailAddressValidator
     {
         private static DateTimeOffset LAST_FETCH_TIME = DateTimeOffset.MinValue;
-        private static HashSet<string> BLACKLISTED_DOMAINS = new HashSet<string>();
+        private static HashSet<string> BLACKLISTED_DOMAINS = new();
 
         public static async Task<bool> IsEmailAddressValidAsync(string email)
         {

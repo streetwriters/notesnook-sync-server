@@ -78,6 +78,8 @@ namespace Notesnook.API.Controllers
 
             if (user.AttachmentsKey != null)
                 await UserService.SetUserAttachmentsKeyAsync(response.UserId, user.AttachmentsKey);
+            else if (user.Profile != null)
+                await UserService.SetUserProfileAsync(response.UserId, user.Profile);
             else return BadRequest();
 
             return Ok();
@@ -102,7 +104,7 @@ namespace Notesnook.API.Controllers
 
                 if (await UserService.DeleteUserAsync(userId, User.FindFirstValue("jti")))
                 {
-                    Response response = await this.httpClient.ForwardAsync<Response>(this.HttpContextAccessor, $"{Servers.IdentityServer.ToString()}/account/unregister", HttpMethod.Post);
+                    Response response = await this.httpClient.ForwardAsync<Response>(HttpContextAccessor, $"{Servers.IdentityServer}/account/unregister", HttpMethod.Post);
                     if (!response.Success) return BadRequest();
 
                     return Ok();

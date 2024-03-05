@@ -51,7 +51,7 @@ namespace Streetwriters.Data.DbContexts
                 using (IClientSessionHandle session = await MongoClient.StartSessionAsync())
                 {
 #if DEBUG
-                    await Task.WhenAll(_commands.Select(c => c(session, default(CancellationToken))));
+                    await Task.WhenAll(_commands.Select(c => c(session, default)));
 #else
                     await session.WithTransactionAsync(async (handle, token) =>
                     {
