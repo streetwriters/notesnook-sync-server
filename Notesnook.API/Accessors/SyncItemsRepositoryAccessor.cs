@@ -32,7 +32,7 @@ namespace Notesnook.API.Accessors
         public SyncItemsRepository<Relation> Relations { get; }
         public SyncItemsRepository<Reminder> Reminders { get; }
         public SyncItemsRepository<Content> Contents { get; }
-        public SyncItemsRepository<Setting> Settings { get; }
+        public SyncItemsRepository<Setting> LegacySettings { get; }
         public SyncItemsRepository<Attachment> Attachments { get; }
         public SyncItemsRepository<Color> Colors { get; }
         public SyncItemsRepository<Tag> Tags { get; }
@@ -42,7 +42,7 @@ namespace Notesnook.API.Accessors
         public SyncItemsRepositoryAccessor(SyncItemsRepository<Note> _notes,
         SyncItemsRepository<Notebook> _notebooks,
         SyncItemsRepository<Content> _content,
-        SyncItemsRepository<Setting> _settings,
+        SyncItemsRepository<Setting> _legacySettings,
         SyncItemsRepository<Attachment> _attachments,
         SyncItemsRepository<Shortcut> _shortcuts,
         SyncItemsRepository<Relation> _relations,
@@ -56,6 +56,7 @@ namespace Notesnook.API.Accessors
             Notes = _notes;
             Contents = _content;
             Settings = _settings;
+            LegacySettings = _legacySettings;
             Attachments = _attachments;
             UsersSettings = _usersSettings;
             Monographs = _monographs;

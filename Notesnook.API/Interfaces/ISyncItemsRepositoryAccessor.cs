@@ -32,7 +32,7 @@ namespace Notesnook.API.Interfaces
         SyncItemsRepository<Reminder> Reminders { get; }
         SyncItemsRepository<Relation> Relations { get; }
         SyncItemsRepository<Content> Contents { get; }
-        SyncItemsRepository<Setting> Settings { get; }
+        SyncItemsRepository<Setting> LegacySettings { get; }
         SyncItemsRepository<Attachment> Attachments { get; }
         SyncItemsRepository<Color> Colors { get; }
         SyncItemsRepository<Tag> Tags { get; }

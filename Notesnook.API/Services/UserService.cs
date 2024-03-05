@@ -167,18 +167,7 @@ namespace Notesnook.API.Services
         {
             var cc = new CancellationTokenSource();
 
-            Repositories.Notes.DeleteByUserId(userId);
-            Repositories.Notebooks.DeleteByUserId(userId);
-            Repositories.Shortcuts.DeleteByUserId(userId);
-            Repositories.Contents.DeleteByUserId(userId);
-            Repositories.Settings.DeleteByUserId(userId);
-            Repositories.Attachments.DeleteByUserId(userId);
-            Repositories.Reminders.DeleteByUserId(userId);
-            Repositories.Relations.DeleteByUserId(userId);
-            Repositories.Colors.DeleteByUserId(userId);
-            Repositories.Tags.DeleteByUserId(userId);
-            Repositories.UsersSettings.Delete((u) => u.UserId == userId);
-            Repositories.Monographs.DeleteMany((m) => m.UserId == userId);
+                Repositories.LegacySettings.DeleteByUserId(userId);
 
             if (!Constants.IS_SELF_HOSTED)
             {
@@ -215,6 +204,7 @@ namespace Notesnook.API.Services
             Repositories.Shortcuts.DeleteByUserId(userId);
             Repositories.Contents.DeleteByUserId(userId);
             Repositories.Settings.DeleteByUserId(userId);
+            Repositories.LegacySettings.DeleteByUserId(userId);
             Repositories.Attachments.DeleteByUserId(userId);
             Repositories.Reminders.DeleteByUserId(userId);
             Repositories.Relations.DeleteByUserId(userId);

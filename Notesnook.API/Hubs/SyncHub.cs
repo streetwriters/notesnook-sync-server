@@ -254,7 +254,7 @@ namespace Notesnook.API.Hubs
                             var settings = JsonSerializer.Deserialize<Setting>(data);
                             settings.Id = MongoDB.Bson.ObjectId.Parse(userId);
                             settings.ItemId = userId;
-                            Repositories.Settings.Upsert(settings, userId, dateSynced);
+                            Repositories.LegacySettings.Upsert(settings, userId, dateSynced);
                             break;
                         case "vaultKey":
                             userSettings.VaultKey = JsonSerializer.Deserialize<EncryptedData>(data);
@@ -339,7 +339,7 @@ namespace Notesnook.API.Hubs
                     if (settings == null) return 0;
                     settings.Id = MongoDB.Bson.ObjectId.Parse(userId);
                     settings.ItemId = userId;
-                    Repositories.Settings.Upsert(settings, userId, dateSynced);
+                    Repositories.LegacySettings.Upsert(settings, userId, dateSynced);
                 }
                 else
                 {
@@ -464,7 +464,7 @@ namespace Notesnook.API.Hubs
 
             var chunks = PrepareChunks(
                 collections: new[] {
-                    Repositories.Settings.FindItemsSyncedAfter,
+                    Repositories.LegacySettings.FindItemsSyncedAfter,
                     Repositories.Attachments.FindItemsSyncedAfter,
                     Repositories.Notes.FindItemsSyncedAfter,
                     Repositories.Notebooks.FindItemsSyncedAfter,
@@ -526,7 +526,7 @@ namespace Notesnook.API.Hubs
                             Repositories.Notes.CountItemsSyncedAfterAsync(userId, lastSyncedTimestamp),
                             Repositories.Notebooks.CountItemsSyncedAfterAsync(userId, lastSyncedTimestamp),
                             Repositories.Contents.CountItemsSyncedAfterAsync(userId, lastSyncedTimestamp),
-                            Repositories.Settings.CountItemsSyncedAfterAsync(userId, lastSyncedTimestamp),
+                            Repositories.LegacySettings.CountItemsSyncedAfterAsync(userId, lastSyncedTimestamp),
                             Repositories.Shortcuts.CountItemsSyncedAfterAsync(userId, lastSyncedTimestamp),
                             Repositories.Reminders.CountItemsSyncedAfterAsync(userId, lastSyncedTimestamp),
                             Repositories.Relations.CountItemsSyncedAfterAsync(userId, lastSyncedTimestamp),
@@ -545,7 +545,7 @@ namespace Notesnook.API.Hubs
             }
 
             var collections = new[] {
-                Repositories.Settings.FindItemsSyncedAfter,
+                Repositories.LegacySettings.FindItemsSyncedAfter,
                 Repositories.Attachments.FindItemsSyncedAfter,
                 Repositories.Notes.FindItemsSyncedAfter,
                 Repositories.Notebooks.FindItemsSyncedAfter,
