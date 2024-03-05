@@ -305,7 +305,14 @@ namespace Notesnook.API.Hubs
             GlobalSync.StartPush(userId, Context.ConnectionId);
 
 
-            if (userSettings.VaultKey != null && syncMetadata.VaultKey != null && !userSettings.VaultKey.Equals(syncMetadata.VaultKey) || (userSettings.VaultKey == null && syncMetadata.VaultKey != null))
+            if (
+                (userSettings.VaultKey != null &&
+                syncMetadata.VaultKey != null &&
+                !userSettings.VaultKey.Equals(syncMetadata.VaultKey) &&
+                !syncMetadata.VaultKey.IsEmpty()) ||
+                (userSettings.VaultKey == null &&
+                syncMetadata.VaultKey != null &&
+                !syncMetadata.VaultKey.IsEmpty()))
             {
                 userSettings.VaultKey = syncMetadata.VaultKey;
                 await Repositories.UsersSettings.UpsertAsync(userSettings, (u) => u.UserId == userId);

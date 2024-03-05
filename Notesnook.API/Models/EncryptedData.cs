@@ -25,8 +25,10 @@ using System.Text.Json.Serialization;
 
 namespace Notesnook.API.Models
 {
+    [MessagePack.MessagePackObject]
     public class EncryptedData : IEncrypted
     {
+        [MessagePack.Key("iv")]
         [JsonPropertyName("iv")]
         [BsonElement("iv")]
         [DataMember(Name = "iv")]
@@ -35,6 +37,7 @@ namespace Notesnook.API.Models
             get; set;
         }
 
+        [MessagePack.Key("cipher")]
         [JsonPropertyName("cipher")]
         [BsonElement("cipher")]
         [DataMember(Name = "cipher")]
@@ -43,11 +46,13 @@ namespace Notesnook.API.Models
             get; set;
         }
 
+        [MessagePack.Key("length")]
         [JsonPropertyName("length")]
         [BsonElement("length")]
         [DataMember(Name = "length")]
         public long Length { get; set; }
 
+        [MessagePack.Key("salt")]
         [JsonPropertyName("salt")]
         [BsonElement("salt")]
         [DataMember(Name = "salt")]
@@ -60,6 +65,11 @@ namespace Notesnook.API.Models
                 return IV == encryptedData.IV && Salt == encryptedData.Salt && Cipher == encryptedData.Cipher && Length == encryptedData.Length;
             }
             return base.Equals(obj);
+        }
+
+        public bool IsEmpty()
+        {
+            return this.Cipher == null && this.IV == null && this.Length == 0 && this.Salt == null;
         }
     }
 }
