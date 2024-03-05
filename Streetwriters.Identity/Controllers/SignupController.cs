@@ -52,69 +52,77 @@ namespace Streetwriters.Identity.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> Signup([FromForm] SignupForm form)
         {
-            var client = Clients.FindClientById(form.ClientId);
-            if (client == null) return BadRequest(new string[] { "Invalid client id." });
-
-            await AddClientRoleAsync(client.Id);
-
-            // email addresses must be case-insensitive
-            form.Email = form.Email.ToLowerInvariant();
-            form.Username = form.Username?.ToLowerInvariant();
-
-            if (!await EmailAddressValidator.IsEmailAddressValidAsync(form.Email)) return BadRequest(new string[] { "Invalid email address." });
-
-            var result = await UserManager.CreateAsync(new User
+            try
             {
-                Email = form.Email,
-                EmailConfirmed = false,
-                UserName = form.Username ?? form.Email,
-            }, form.Password);
+                var client = Clients.FindClientById(form.ClientId);
+                if (client == null) return BadRequest(new string[] { "Invalid client id." });
 
-            if (result.Errors.Any((e) => e.Code == "DuplicateEmail"))
-            {
-                var user = await UserManager.FindByEmailAsync(form.Email);
+                await AddClientRoleAsync(client.Id);
 
-                if (!await UserManager.IsInRoleAsync(user, client.Id))
+                // email addresses must be case-insensitive
+                form.Email = form.Email.ToLowerInvariant();
+                form.Username = form.Username?.ToLowerInvariant();
+
+                if (!await EmailAddressValidator.IsEmailAddressValidAsync(form.Email)) return BadRequest(new string[] { "Invalid email address." });
+
+                var result = await UserManager.CreateAsync(new User
                 {
-                    if (!await UserManager.CheckPasswordAsync(user, form.Password))
+                    Email = form.Email,
+                    EmailConfirmed = false,
+                    UserName = form.Username ?? form.Email,
+                }, form.Password);
+
+                if (result.Errors.Any((e) => e.Code == "DuplicateEmail"))
+                {
+                    var user = await UserManager.FindByEmailAsync(form.Email);
+
+                    if (!await UserManager.IsInRoleAsync(user, client.Id))
                     {
-                        // TODO
-                        await UserManager.RemovePasswordAsync(user);
-                        await UserManager.AddPasswordAsync(user, form.Password);
+                        if (!await UserManager.CheckPasswordAsync(user, form.Password))
+                        {
+                            // TODO
+                            await UserManager.RemovePasswordAsync(user);
+                            await UserManager.AddPasswordAsync(user, form.Password);
+                        }
+                        await MFAService.DisableMFAAsync(user);
+                        await UserManager.AddToRoleAsync(user, client.Id);
                     }
-                    await MFAService.DisableMFAAsync(user);
+                    else
+                    {
+                        return BadRequest(new string[] { "Invalid email address.." });
+                    }
+
+                    return Ok(new
+                    {
+                        userId = user.Id.ToString()
+                    });
+                }
+
+                if (result.Succeeded)
+                {
+                    var user = await UserManager.FindByEmailAsync(form.Email);
+
                     await UserManager.AddToRoleAsync(user, client.Id);
-                }
-                else
-                {
-                    return BadRequest(new string[] { "Invalid email address." });
+                    if (Constants.IS_SELF_HOSTED)
+                        await UserManager.AddClaimAsync(user, UserService.SubscriptionTypeToClaim(client.Id, Common.Enums.SubscriptionType.PREMIUM));
+                    await UserManager.AddClaimAsync(user, new Claim("platform", PlatformFromUserAgent(base.HttpContext.Request.Headers.UserAgent)));
+
+                    var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
+                    var callbackUrl = Url.TokenLink(user.Id.ToString(), code, client.Id, TokenType.CONFRIM_EMAIL, Request.Scheme);
+                    await EmailSender.SendConfirmationEmailAsync(user.Email, callbackUrl, client);
+                    return Ok(new
+                    {
+                        userId = user.Id.ToString()
+                    });
                 }
 
-                return Ok(new
-                {
-                    userId = user.Id.ToString()
-                });
+                return BadRequest(result.Errors.ToErrors());
             }
-
-            if (result.Succeeded)
+            catch (System.Exception ex)
             {
-                var user = await UserManager.FindByEmailAsync(form.Email);
-
-                await UserManager.AddToRoleAsync(user, client.Id);
-                if (Constants.IS_SELF_HOSTED)
-                    await UserManager.AddClaimAsync(user, UserService.SubscriptionTypeToClaim(client.Id, Common.Enums.SubscriptionType.PREMIUM));
-                await UserManager.AddClaimAsync(user, new Claim("platform", PlatformFromUserAgent(base.HttpContext.Request.Headers.UserAgent)));
-
-                var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
-                var callbackUrl = Url.TokenLink(user.Id.ToString(), code, client.Id, TokenType.CONFRIM_EMAIL, Request.Scheme);
-                await EmailSender.SendConfirmationEmailAsync(user.Email, callbackUrl, client);
-                return Ok(new
-                {
-                    userId = user.Id.ToString()
-                });
+                await Slogger<SignupController>.Error("Signup", ex.ToString());
+                return BadRequest("Failed to create an account.");
             }
-
-            return BadRequest(result.Errors.ToErrors());
         }
 
         string PlatformFromUserAgent(string userAgent)
