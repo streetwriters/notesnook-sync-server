@@ -15,6 +15,9 @@ namespace Notesnook.API.Models.Responses
         [JsonPropertyName("subscription")]
         public ISubscription Subscription { get; set; }
 
+        [JsonPropertyName("profile")]
+        public EncryptedData Profile { get; set; }
+
         [JsonIgnore]
         public bool Success { get; set; }
         public int StatusCode { get; set; }

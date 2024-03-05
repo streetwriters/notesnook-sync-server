@@ -153,6 +153,7 @@ namespace Notesnook.API.Services
             response.AttachmentsKey = userSettings.AttachmentsKey;
             response.Salt = userSettings.Salt;
             response.Subscription = subscription;
+            response.Profile = userSettings.Profile;
             return response;
         }
 
@@ -160,6 +161,13 @@ namespace Notesnook.API.Services
         {
             var userSettings = await Repositories.UsersSettings.FindOneAsync((u) => u.UserId == userId);
             userSettings.AttachmentsKey = (EncryptedData)key;
+            await Repositories.UsersSettings.UpdateAsync(userSettings.Id, userSettings);
+        }
+
+        public async Task SetUserProfileAsync(string userId, IEncrypted profile)
+        {
+            var userSettings = await Repositories.UsersSettings.FindOneAsync((u) => u.UserId == userId);
+            userSettings.Profile = (EncryptedData)profile;
             await Repositories.UsersSettings.UpdateAsync(userSettings.Id, userSettings);
         }
 
@@ -220,6 +228,7 @@ namespace Notesnook.API.Services
 
             userSettings.AttachmentsKey = null;
             userSettings.VaultKey = null;
+            userSettings.Profile = null;
             userSettings.LastSynced = 0;
 
             await Repositories.UsersSettings.UpsertAsync(userSettings, (s) => s.UserId == userId);
