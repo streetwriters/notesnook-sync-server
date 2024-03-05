@@ -87,15 +87,17 @@ namespace Streetwriters.Identity.Validation
             if (user == null) return;
 
             var result = await SignInManager.CheckPasswordSignInAsync(user, password, true);
-            if (!result.Succeeded)
-            {
-                await EmailSender.SendFailedLoginAlertAsync(user.Email, httpContext.GetClientInfo(), client).ConfigureAwait(false);
-                return;
-            }
-            else if (result.IsLockedOut)
+
+            if (result.IsLockedOut)
             {
                 var timeLeft = user.LockoutEnd - DateTimeOffset.Now;
                 context.Result = new LockedOutValidationResult(timeLeft);
+                return;
+            }
+
+            if (!result.Succeeded)
+            {
+                await EmailSender.SendFailedLoginAlertAsync(user.Email, httpContext.GetClientInfo(), client).ConfigureAwait(false);
                 return;
             }
 
