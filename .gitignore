@@ -262,6 +262,6 @@ __pycache__/
 
 keys/
 dist/
-appsettings.json
 keystore/
 .env.local
+Notesnook.API/sync/
