@@ -174,40 +174,68 @@ namespace Notesnook.API.Services
 
         public async Task<bool> DeleteUserAsync(string userId, string jti)
         {
-            var cc = new CancellationTokenSource();
+            try
+            {
+                await Slogger<UserService>.Info(nameof(DeleteUserAsync), "Deleting user account", userId);
 
+                SyncDeviceService.ResetDevices(userId);
+
+                var cc = new CancellationTokenSource();
+
+                Repositories.Notes.DeleteByUserId(userId);
+                Repositories.Notebooks.DeleteByUserId(userId);
+                Repositories.Shortcuts.DeleteByUserId(userId);
+                Repositories.Contents.DeleteByUserId(userId);
                 Repositories.Settings.DeleteByUserId(userId);
                 Repositories.LegacySettings.DeleteByUserId(userId);
+                Repositories.Attachments.DeleteByUserId(userId);
+                Repositories.Reminders.DeleteByUserId(userId);
+                Repositories.Relations.DeleteByUserId(userId);
+                Repositories.Colors.DeleteByUserId(userId);
+                Repositories.Tags.DeleteByUserId(userId);
                 Repositories.Vaults.DeleteByUserId(userId);
+                Repositories.UsersSettings.Delete((u) => u.UserId == userId);
+                Repositories.Monographs.DeleteMany((m) => m.UserId == userId);
 
-            if (!Constants.IS_SELF_HOSTED)
-            {
-                await WampServers.SubscriptionServer.PublishMessageAsync(SubscriptionServerTopics.DeleteSubscriptionTopic, new DeleteSubscriptionMessage
-                {
-                    AppId = ApplicationType.NOTESNOOK,
-                    UserId = userId
-                });
-            }
+                var result = await unit.Commit();
+                await Slogger<UserService>.Info(nameof(DeleteUserAsync), "User account deleted", userId, result.ToString());
+                if (!result) return false;
 
-            await WampServers.MessengerServer.PublishMessageAsync(MessengerServerTopics.SendSSETopic, new SendSSEMessage
-            {
-                SendToAll = false,
-                OriginTokenId = jti,
-                UserId = userId,
-                Message = new Message
+                if (!Constants.IS_SELF_HOSTED)
                 {
-                    Type = "logout",
-                    Data = JsonSerializer.Serialize(new { reason = "Account deleted." })
+                    await WampServers.SubscriptionServer.PublishMessageAsync(SubscriptionServerTopics.DeleteSubscriptionTopic, new DeleteSubscriptionMessage
+                    {
+                        AppId = ApplicationType.NOTESNOOK,
+                        UserId = userId
+                    });
                 }
-            });
 
-            await S3Service.DeleteDirectoryAsync(userId);
+                await WampServers.MessengerServer.PublishMessageAsync(MessengerServerTopics.SendSSETopic, new SendSSEMessage
+                {
+                    SendToAll = false,
+                    OriginTokenId = jti,
+                    UserId = userId,
+                    Message = new Message
+                    {
+                        Type = "logout",
+                        Data = JsonSerializer.Serialize(new { reason = "Account deleted." })
+                    }
+                });
 
-            return await unit.Commit();
+                await S3Service.DeleteDirectoryAsync(userId);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await Slogger<UserService>.Error(nameof(DeleteUserAsync), "User account not deleted", userId, ex.ToString());
+            }
+            return false;
         }
 
         public async Task<bool> ResetUserAsync(string userId, bool removeAttachments)
         {
+            SyncDeviceService.ResetDevices(userId);
+
             var cc = new CancellationTokenSource();
 
             Repositories.Notes.DeleteByUserId(userId);
@@ -229,7 +257,6 @@ namespace Notesnook.API.Services
 
             userSettings.AttachmentsKey = null;
             userSettings.VaultKey = null;
-            userSettings.Profile = null;
             userSettings.LastSynced = 0;
 
             await Repositories.UsersSettings.UpsertAsync(userSettings, (s) => s.UserId == userId);

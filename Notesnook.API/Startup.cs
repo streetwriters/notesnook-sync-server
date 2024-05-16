@@ -160,41 +160,69 @@ namespace Notesnook.API
             });
 
             if (!BsonClassMap.IsClassMapRegistered(typeof(UserSettings)))
-            {
                 BsonClassMap.RegisterClassMap<UserSettings>();
-            }
 
             if (!BsonClassMap.IsClassMapRegistered(typeof(EncryptedData)))
-            {
                 BsonClassMap.RegisterClassMap<EncryptedData>();
-            }
 
             if (!BsonClassMap.IsClassMapRegistered(typeof(CallToAction)))
-            {
                 BsonClassMap.RegisterClassMap<CallToAction>();
-            }
 
-            if (!BsonClassMap.IsClassMapRegistered(typeof(Announcement)))
-            {
-                BsonClassMap.RegisterClassMap<Announcement>();
-            }
+            if (!BsonClassMap.IsClassMapRegistered(typeof(Attachment)))
+                BsonClassMap.RegisterClassMap<Attachment>();
+
+            if (!BsonClassMap.IsClassMapRegistered(typeof(Content)))
+                BsonClassMap.RegisterClassMap<Content>();
+
+            if (!BsonClassMap.IsClassMapRegistered(typeof(Note)))
+                BsonClassMap.RegisterClassMap<Note>();
+
+            if (!BsonClassMap.IsClassMapRegistered(typeof(Notebook)))
+                BsonClassMap.RegisterClassMap<Notebook>();
+
+            if (!BsonClassMap.IsClassMapRegistered(typeof(Relation)))
+                BsonClassMap.RegisterClassMap<Relation>();
+
+            if (!BsonClassMap.IsClassMapRegistered(typeof(Reminder)))
+                BsonClassMap.RegisterClassMap<Reminder>();
+
+            if (!BsonClassMap.IsClassMapRegistered(typeof(Setting)))
+                BsonClassMap.RegisterClassMap<Setting>();
+
+            if (!BsonClassMap.IsClassMapRegistered(typeof(SettingItem)))
+                BsonClassMap.RegisterClassMap<SettingItem>();
+
+            if (!BsonClassMap.IsClassMapRegistered(typeof(Shortcut)))
+                BsonClassMap.RegisterClassMap<Shortcut>();
+
+            if (!BsonClassMap.IsClassMapRegistered(typeof(Tag)))
+                BsonClassMap.RegisterClassMap<Tag>();
+
+            if (!BsonClassMap.IsClassMapRegistered(typeof(Color)))
+                BsonClassMap.RegisterClassMap<Color>();
+
+            if (!BsonClassMap.IsClassMapRegistered(typeof(Vault)))
+                BsonClassMap.RegisterClassMap<Vault>();
 
             services.AddScoped<IDbContext, MongoDbContext>();
             services.AddScoped<IUnitOfWork, UnitOfWork>();
 
-            services.AddScoped((provider) => new Repository<UserSettings>(provider.GetRequiredService<IDbContext>(), "notesnook", "user_settings"));
-            services.AddScoped((provider) => new Repository<Monograph>(provider.GetRequiredService<IDbContext>(), "notesnook", "monographs"));
-            services.AddScoped((provider) => new Repository<Announcement>(provider.GetRequiredService<IDbContext>(), "notesnook", "announcements"));
-            services.AddScoped((provider) => new SyncItemsRepository<Attachment>(provider.GetRequiredService<IDbContext>(), "notesnook", "attachments"));
-            services.AddScoped((provider) => new SyncItemsRepository<Content>(provider.GetRequiredService<IDbContext>(), "notesnook", "content"));
-            services.AddScoped((provider) => new SyncItemsRepository<Note>(provider.GetRequiredService<IDbContext>(), "notesnook", "notes"));
-            services.AddScoped((provider) => new SyncItemsRepository<Notebook>(provider.GetRequiredService<IDbContext>(), "notesnook", "notebooks"));
-            services.AddScoped((provider) => new SyncItemsRepository<Relation>(provider.GetRequiredService<IDbContext>(), "notesnook", "relations"));
-            services.AddScoped((provider) => new SyncItemsRepository<Reminder>(provider.GetRequiredService<IDbContext>(), "notesnook", "reminders"));
-            services.AddScoped((provider) => new SyncItemsRepository<Setting>(provider.GetRequiredService<IDbContext>(), "notesnook", "settings"));
-            services.AddScoped((provider) => new SyncItemsRepository<Shortcut>(provider.GetRequiredService<IDbContext>(), "notesnook", "shortcuts"));
-            services.AddScoped((provider) => new SyncItemsRepository<Tag>(provider.GetRequiredService<IDbContext>(), "notesnook", "tags"));
-            services.AddScoped((provider) => new SyncItemsRepository<Color>(provider.GetRequiredService<IDbContext>(), "notesnook", "colors"));
+            services.AddRepository<UserSettings>("user_settings")
+                    .AddRepository<Monograph>("monographs")
+                    .AddRepository<Announcement>("announcements");
+
+            services.AddSyncRepository<SettingItem>("settingsv2")
+                    .AddSyncRepository<Attachment>("attachments")
+                    .AddSyncRepository<Content>("content")
+                    .AddSyncRepository<Note>("notes")
+                    .AddSyncRepository<Notebook>("notebooks")
+                    .AddSyncRepository<Relation>("relations")
+                    .AddSyncRepository<Reminder>("reminders")
+                    .AddSyncRepository<Setting>("settings")
+                    .AddSyncRepository<Shortcut>("shortcuts")
+                    .AddSyncRepository<Tag>("tags")
+                    .AddSyncRepository<Color>("colors")
+                    .AddSyncRepository<Vault>("vaults");
 
             services.TryAddTransient<ISyncItemsRepositoryAccessor, SyncItemsRepositoryAccessor>();
             services.TryAddTransient<IUserService, UserService>();
@@ -202,7 +230,7 @@ namespace Notesnook.API
 
             services.AddControllers();
 
-            services.AddHealthChecks().AddMongoDb(dbSettings.ConnectionString, dbSettings.DatabaseName, "database-check");
+            services.AddHealthChecks(); // .AddMongoDb(dbSettings.ConnectionString, dbSettings.DatabaseName, "database-check");
             services.AddSignalR((hub) =>
             {
                 hub.MaximumReceiveMessageSize = 100 * 1024 * 1024;
@@ -245,15 +273,17 @@ namespace Notesnook.API
 
             app.UseWamp(WampServers.NotesnookServer, (realm, server) =>
             {
-                IUserService service = app.GetScopedService<IUserService>();
-
                 realm.Subscribe<DeleteUserMessage>(IdentityServerTopics.DeleteUserTopic, async (ev) =>
                 {
+                    IUserService service = app.GetScopedService<IUserService>();
                     await service.DeleteUserAsync(ev.UserId, null);
                 });
 
-                IDistributedCache cache = app.GetScopedService<IDistributedCache>();
-                realm.Subscribe<ClearCacheMessage>(IdentityServerTopics.ClearCacheTopic, (ev) => ev.Keys.ForEach((key) => cache.Remove(key)));
+                realm.Subscribe<ClearCacheMessage>(IdentityServerTopics.ClearCacheTopic, (ev) =>
+                {
+                    IDistributedCache cache = app.GetScopedService<IDistributedCache>();
+                    ev.Keys.ForEach((key) => cache.Remove(key));
+                });
             });
 
             app.UseRouting();
@@ -270,7 +300,27 @@ namespace Notesnook.API
                     options.CloseOnAuthenticationExpiration = false;
                     options.Transports = HttpTransportType.WebSockets;
                 });
+                endpoints.MapHub<SyncV2Hub>("/hubs/sync/v2", options =>
+                {
+                    options.CloseOnAuthenticationExpiration = false;
+                    options.Transports = HttpTransportType.WebSockets;
+                });
             });
+        }
+    }
+
+    public static class ServiceCollectionRepositoryExtensions
+    {
+        public static IServiceCollection AddRepository<T>(this IServiceCollection services, string collectionName, string database = "notesnook") where T : class
+        {
+            services.AddScoped((provider) => new Repository<T>(provider.GetRequiredService<IDbContext>(), database, collectionName));
+            return services;
+        }
+
+        public static IServiceCollection AddSyncRepository<T>(this IServiceCollection services, string collectionName, string database = "notesnook") where T : SyncItem
+        {
+            services.AddScoped((provider) => new SyncItemsRepository<T>(provider.GetRequiredService<IDbContext>(), database, collectionName));
+            return services;
         }
     }
 }

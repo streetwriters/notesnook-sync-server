@@ -24,6 +24,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using IdentityModel;
 using Microsoft.VisualBasic;
 using MongoDB.Bson;
 using MongoDB.Driver;
@@ -66,6 +67,35 @@ namespace Notesnook.API.Repositories
                 AllowPartialResults = false,
                 NoCursorTimeout = true,
                 Sort = new SortDefinitionBuilder<SyncItem>().Ascending((a) => a.Id)
+            });
+        }
+
+        public Task<IAsyncCursor<SyncItem>> FindItemsById(string userId, IEnumerable<string> ids, bool all, int batchSize)
+        {
+            var filters = new List<FilterDefinition<SyncItem>>(new[] { Builders<SyncItem>.Filter.Eq((i) => i.UserId, userId) });
+
+            if (!all) filters.Add(Builders<SyncItem>.Filter.In((i) => i.ItemId, ids));
+
+            return Collection.FindAsync(Builders<SyncItem>.Filter.And(filters), new FindOptions<SyncItem>
+            {
+                BatchSize = batchSize,
+                AllowDiskUse = true,
+                AllowPartialResults = false,
+                NoCursorTimeout = true
+            });
+        }
+
+        public Task<IAsyncCursor<SyncItem>> GetIdsAsync(string userId, int batchSize)
+        {
+            var filter = Builders<SyncItem>.Filter.Eq((i) => i.UserId, userId);
+            return Collection.FindAsync(filter, new FindOptions<SyncItem>
+            {
+                BatchSize = batchSize,
+                AllowDiskUse = true,
+                AllowPartialResults = false,
+                NoCursorTimeout = true,
+                Sort = new SortDefinitionBuilder<SyncItem>().Ascending((a) => a.Id),
+                Projection = Builders<SyncItem>.Projection.Include((i) => i.ItemId)
             });
         }
         // public async Task DeleteIdsAsync(string[] ids, string userId, CancellationToken token = default(CancellationToken))
