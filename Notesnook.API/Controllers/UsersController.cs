@@ -78,9 +78,6 @@ namespace Notesnook.API.Controllers
 
             if (user.AttachmentsKey != null)
                 await UserService.SetUserAttachmentsKeyAsync(response.UserId, user.AttachmentsKey);
-            else if (user.Profile != null)
-                await UserService.SetUserProfileAsync(response.UserId, user.Profile);
-            else return BadRequest();
 
             return Ok();
         }

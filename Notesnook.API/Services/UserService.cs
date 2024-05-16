@@ -18,7 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 using System;
+using System.IO;
 using System.Net.Http;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -154,7 +156,6 @@ namespace Notesnook.API.Services
             response.AttachmentsKey = userSettings.AttachmentsKey;
             response.Salt = userSettings.Salt;
             response.Subscription = subscription;
-            response.Profile = userSettings.Profile;
             return response;
         }
 
@@ -162,13 +163,6 @@ namespace Notesnook.API.Services
         {
             var userSettings = await Repositories.UsersSettings.FindOneAsync((u) => u.UserId == userId);
             userSettings.AttachmentsKey = (EncryptedData)key;
-            await Repositories.UsersSettings.UpdateAsync(userSettings.Id, userSettings);
-        }
-
-        public async Task SetUserProfileAsync(string userId, IEncrypted profile)
-        {
-            var userSettings = await Repositories.UsersSettings.FindOneAsync((u) => u.UserId == userId);
-            userSettings.Profile = (EncryptedData)profile;
             await Repositories.UsersSettings.UpdateAsync(userSettings.Id, userSettings);
         }
 
