@@ -78,8 +78,8 @@ namespace Streetwriters.Data.DbContexts
                 return;
             }
             var settings = MongoClientSettings.FromConnectionString(DbSettings.ConnectionString);
-            settings.MaxConnectionPoolSize = 5000;
-            settings.MinConnectionPoolSize = 300;
+            settings.MaxConnectionPoolSize = 500;
+            settings.MinConnectionPoolSize = 0;
             MongoClient = new MongoClient(settings);
         }
 
