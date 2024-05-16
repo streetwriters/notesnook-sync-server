@@ -89,6 +89,14 @@ namespace Streetwriters.Identity.Validation
             var user = await UserManager.FindByIdAsync(userId);
             if (user == null) return;
 
+            var isLockedOut = await UserManager.IsLockedOutAsync(user);
+            if (isLockedOut)
+            {
+                var timeLeft = user.LockoutEnd - DateTimeOffset.Now;
+                context.Result = new LockedOutValidationResult(timeLeft);
+                return;
+            }
+
             context.Result.Error = "invalid_mfa";
             context.Result.ErrorDescription = "Please provide a valid multi-factor authentication code.";
 
@@ -99,14 +107,6 @@ namespace Streetwriters.Identity.Validation
             if (string.IsNullOrEmpty(mfaMethod) || !MFAService.IsValidMFAMethod(mfaMethod))
             {
                 context.Result.ErrorDescription = "Please provide a valid multi-factor authentication method.";
-                return;
-            }
-
-            var isLockedOut = await UserManager.IsLockedOutAsync(user);
-            if (isLockedOut)
-            {
-                var timeLeft = user.LockoutEnd - DateTimeOffset.Now;
-                context.Result = new LockedOutValidationResult(timeLeft);
                 return;
             }
 
@@ -132,8 +132,9 @@ namespace Streetwriters.Identity.Validation
                 }
             }
 
+            await UserManager.ResetAccessFailedCountAsync(user);
             context.Result.IsError = false;
-            context.Result.Subject = await TokenGenerationService.TransformTokenRequestAsync(context.Request, user, GrantType, new string[] { Config.MFA_PASSWORD_GRANT_TYPE_SCOPE });
+            context.Result.Subject = await TokenGenerationService.TransformTokenRequestAsync(context.Request, user, GrantType, [Config.MFA_PASSWORD_GRANT_TYPE_SCOPE]);
         }
 
 

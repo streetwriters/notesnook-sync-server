@@ -26,11 +26,12 @@ namespace Streetwriters.Identity.Validation
     {
         public LockedOutValidationResult(TimeSpan? timeLeft)
         {
-            base.Error = "locked_out";
+            Error = "locked_out";
+            IsError = true;
             if (timeLeft.HasValue)
-                base.ErrorDescription = $"You have been locked out. Please try again in {timeLeft?.Minutes.Pluralize("minute", "minutes")} and {timeLeft?.Seconds.Pluralize("second", "seconds")}.";
+                ErrorDescription = $"You have been locked out. Please try again in {timeLeft?.Minutes.Pluralize("minute", "minutes")} and {timeLeft?.Seconds.Pluralize("second", "seconds")}.";
             else
-                base.ErrorDescription = $"You have been locked out.";
+                ErrorDescription = $"You have been locked out.";
         }
     }
 }

@@ -101,6 +101,7 @@ namespace Streetwriters.Identity.Validation
                 return;
             }
 
+            await UserManager.ResetAccessFailedCountAsync(user);
             var sub = await UserManager.GetUserIdAsync(user);
             context.Result = new GrantValidationResult(sub, AuthenticationMethods.Password);
         }
