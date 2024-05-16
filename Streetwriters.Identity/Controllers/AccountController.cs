@@ -255,6 +255,7 @@ namespace Streetwriters.Identity.Controllers
             return Ok(new
             {
                 access_token = token,
+                scope = string.Join(' ', Config.ApiScopes.Select(s => s.Name)),
                 expires_in = 18000
             });
         }
