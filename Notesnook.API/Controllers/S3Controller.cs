@@ -29,7 +29,7 @@ namespace Notesnook.API.Controllers
 {
     [ApiController]
     [Route("s3")]
-    [Authorize("Sync")]
+    [Authorize("Pro")]
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public class S3Controller : ControllerBase
     {
@@ -101,8 +101,6 @@ namespace Notesnook.API.Controllers
         {
             var userId = this.User.FindFirstValue("sub");
             var size = await S3Service.GetObjectSizeAsync(userId, name);
-            if (size == null) return BadRequest();
-
             HttpContext.Response.Headers.ContentLength = size;
             return Ok();
         }

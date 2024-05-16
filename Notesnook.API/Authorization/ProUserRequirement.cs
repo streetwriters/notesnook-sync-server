@@ -25,7 +25,7 @@ namespace Notesnook.API.Authorization
 {
     public class ProUserRequirement : AuthorizationHandler<ProUserRequirement>, IAuthorizationRequirement
     {
-        private string[] allowedClaims = { "trial", "premium", "premium_canceled" };
+        private readonly string[] allowedClaims = { "trial", "premium", "premium_canceled" };
         protected override Task HandleRequirementAsync(AuthorizationHandlerContext context, ProUserRequirement requirement)
         {
             var isProOrTrial = context.User.HasClaim((c) => c.Type == "notesnook:status" && allowedClaims.Contains(c.Value));
