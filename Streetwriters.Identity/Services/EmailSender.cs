@@ -231,8 +231,9 @@ namespace Streetwriters.Identity.Services
                     return builder.ToMessageBody();
                 }
             }
-            catch (PrivateKeyNotFoundException)
+            catch (Exception ex)
             {
+                await Slogger<EmailSender>.Error("GetEmailBodyAsync", ex.ToString());
                 return builder.ToMessageBody();
             }
         }
