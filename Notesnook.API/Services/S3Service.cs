@@ -137,14 +137,14 @@ namespace Notesnook.API.Services
                 throw new Exception("Could not delete directory.");
         }
 
-        public async Task<long?> GetObjectSizeAsync(string userId, string name)
+        public async Task<long> GetObjectSizeAsync(string userId, string name)
         {
             var url = this.GetPresignedURL(userId, name, HttpVerb.HEAD, S3ClientMode.INTERNAL);
-            if (url == null) return null;
+            if (url == null) return 0;
 
             var request = new HttpRequestMessage(HttpMethod.Head, url);
             var response = await httpClient.SendAsync(request);
-            return response.Content.Headers.ContentLength;
+            return response.Content.Headers.ContentLength ?? 0;
         }
 
 
