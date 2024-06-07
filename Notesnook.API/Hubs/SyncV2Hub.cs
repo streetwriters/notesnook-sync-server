@@ -80,21 +80,21 @@ namespace Notesnook.API.Hubs
             await base.OnConnectedAsync();
         }
 
-        private Action<SyncItem, string, long> MapTypeToUpsertAction(string type)
+        private Action<IEnumerable<SyncItem>, string, long> MapTypeToUpsertAction(string type)
         {
             return type switch
             {
-                "settingitem" => Repositories.Settings.Upsert,
-                "attachment" => Repositories.Attachments.Upsert,
-                "note" => Repositories.Notes.Upsert,
-                "notebook" => Repositories.Notebooks.Upsert,
-                "content" => Repositories.Contents.Upsert,
-                "shortcut" => Repositories.Shortcuts.Upsert,
-                "reminder" => Repositories.Reminders.Upsert,
-                "relation" => Repositories.Relations.Upsert,
-                "color" => Repositories.Colors.Upsert,
-                "vault" => Repositories.Vaults.Upsert,
-                "tag" => Repositories.Tags.Upsert,
+                "settingitem" => Repositories.Settings.UpsertMany,
+                "attachment" => Repositories.Attachments.UpsertMany,
+                "note" => Repositories.Notes.UpsertMany,
+                "notebook" => Repositories.Notebooks.UpsertMany,
+                "content" => Repositories.Contents.UpsertMany,
+                "shortcut" => Repositories.Shortcuts.UpsertMany,
+                "reminder" => Repositories.Reminders.UpsertMany,
+                "relation" => Repositories.Relations.UpsertMany,
+                "color" => Repositories.Colors.UpsertMany,
+                "vault" => Repositories.Vaults.UpsertMany,
+                "tag" => Repositories.Tags.UpsertMany,
                 _ => null,
             };
         }
