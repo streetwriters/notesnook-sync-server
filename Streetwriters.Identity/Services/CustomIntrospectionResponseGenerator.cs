@@ -46,6 +46,7 @@ namespace Streetwriters.Identity.Services
             if (result.TryGetValue("sub", out object userId))
             {
                 var user = await UserManager.FindByIdAsync(userId.ToString());
+                if (user == null || user.Claims == null) return result;
 
                 var verifiedClaim = user.Claims.Find((c) => c.ClaimType == "verified");
                 if (verifiedClaim != null)
