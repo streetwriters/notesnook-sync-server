@@ -172,7 +172,7 @@ namespace Notesnook.API.Services
             {
                 await Slogger<UserService>.Info(nameof(DeleteUserAsync), "Deleting user account", userId);
 
-                SyncDeviceService.ResetDevices(userId);
+                new SyncDeviceService(new SyncDevice(ref userId, ref userId)).ResetDevices();
 
                 var cc = new CancellationTokenSource();
 
@@ -228,7 +228,7 @@ namespace Notesnook.API.Services
 
         public async Task<bool> ResetUserAsync(string userId, bool removeAttachments)
         {
-            SyncDeviceService.ResetDevices(userId);
+            new SyncDeviceService(new SyncDevice(ref userId, ref userId)).ResetDevices();
 
             var cc = new CancellationTokenSource();
 

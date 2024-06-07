@@ -131,8 +131,8 @@ namespace Notesnook.API.Hubs
 
             if (!await unit.Commit()) return 0;
 
-            await SyncDeviceService.AddIdsToOtherDevicesAsync(userId, deviceId, pushItem.Items.Select((i) => $"{i.ItemId}:{pushItem.Type}").ToList());
-            return 1;
+                await new SyncDeviceService(new SyncDevice(ref userId, ref deviceId)).AddIdsToOtherDevicesAsync(pushItem.Items.Select((i) => $"{i.ItemId}:{pushItem.Type}").ToList());
+                return 1;
         }
 
         public async Task<bool> PushCompleted()
@@ -193,13 +193,12 @@ namespace Notesnook.API.Hubs
         public async Task<SyncV2Metadata> RequestFetch(string deviceId)
         {
             var userId = Context.User.FindFirstValue("sub");
+            var deviceService = new SyncDeviceService(new SyncDevice(ref userId, ref deviceId));
+            if (!deviceService.IsDeviceRegistered()) deviceService.RegisterDevice();
 
-            if (!SyncDeviceService.IsDeviceRegistered(userId, deviceId))
-                SyncDeviceService.RegisterDevice(userId, deviceId);
-
-            var isResetSync = SyncDeviceService.IsSyncReset(userId, deviceId);
-            if (!SyncDeviceService.IsUnsynced(userId, deviceId) &&
-                !SyncDeviceService.IsSyncPending(userId, deviceId) &&
+            var isResetSync = deviceService.IsSyncReset();
+            if (!deviceService.IsUnsynced() &&
+                !deviceService.IsSyncPending() &&
                 !isResetSync)
                 return new SyncV2Metadata { Synced = true };
 
@@ -241,11 +240,11 @@ namespace Notesnook.API.Hubs
                 {
                     var syncedIds = chunk.Items.Select((i) => $"{i.ItemId}:{chunk.Type}").ToHashSet();
                     ids = ids.Where((id) => !syncedIds.Contains(id)).ToArray();
-                    await SyncDeviceService.WritePendingIdsAsync(userId, deviceId, ids);
+                        await deviceService.WritePendingIdsAsync(ids);
                 }
             }
 
-            SyncDeviceService.Reset(userId, deviceId);
+                deviceService.Reset();
 
             return new SyncV2Metadata
             {

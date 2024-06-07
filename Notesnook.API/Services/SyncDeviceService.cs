@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -26,46 +27,94 @@ using System.Threading.Tasks;
 
 namespace Notesnook.API.Services
 {
-    public class SyncDeviceService
+    public struct SyncDevice(ref string userId, ref string deviceId)
     {
-        private static string UserSyncDirectoryPath(string userId) => Path.Join("sync", userId);
-        private static string UserDeviceDirectoryPath(string userId, string deviceId) => Path.Join(SyncDeviceService.UserSyncDirectoryPath(userId), deviceId);
+        public readonly string DeviceId = deviceId;
+        public readonly string UserId = userId;
 
-        private static string PendingIdsFilePath(string userId, string deviceId) => Path.Join(SyncDeviceService.UserDeviceDirectoryPath(userId, deviceId), "pending");
-
-        private static string UnsyncedIdsFilePath(string userId, string deviceId) => Path.Join(SyncDeviceService.UserDeviceDirectoryPath(userId, deviceId), "unsynced");
-
-        private static string ResetSyncFilePath(string userId, string deviceId) => Path.Join(SyncDeviceService.UserDeviceDirectoryPath(userId, deviceId), "reset-sync");
-
-        public static async Task<string[]> GetUnsyncedIdsAsync(string userId, string deviceId)
+        private string userSyncDirectoryPath = null;
+        public string UserSyncDirectoryPath
+        {
+            get
+            {
+                userSyncDirectoryPath ??= Path.Join("sync", UserId);
+                return userSyncDirectoryPath;
+            }
+        }
+        private string userDeviceDirectoryPath = null;
+        public string UserDeviceDirectoryPath
+        {
+            get
+            {
+                userDeviceDirectoryPath ??= Path.Join(UserSyncDirectoryPath, DeviceId);
+                return userDeviceDirectoryPath;
+            }
+        }
+        private string pendingIdsFilePath = null;
+        public string PendingIdsFilePath
+        {
+            get
+            {
+                pendingIdsFilePath ??= Path.Join(UserDeviceDirectoryPath, "pending");
+                return pendingIdsFilePath;
+            }
+        }
+        private string unsyncedIdsFilePath = null;
+        public string UnsyncedIdsFilePath
+        {
+            get
+            {
+                unsyncedIdsFilePath ??= Path.Join(UserDeviceDirectoryPath, "unsynced");
+                return unsyncedIdsFilePath;
+            }
+        }
+        private string resetSyncFilePath = null;
+        public string ResetSyncFilePath
+        {
+            get
+            {
+                resetSyncFilePath ??= Path.Join(UserDeviceDirectoryPath, "reset-sync");
+                return resetSyncFilePath;
+            }
+        }
+    }
+    public class SyncDeviceService(SyncDevice device)
+    {
+        public async Task<string[]> GetUnsyncedIdsAsync()
         {
             try
             {
-                return await File.ReadAllLinesAsync(UnsyncedIdsFilePath(userId, deviceId));
+                return await File.ReadAllLinesAsync(device.UnsyncedIdsFilePath);
             }
-            catch
-            {
-                return Array.Empty<string>();
-            }
+            catch { return []; }
         }
 
-        public static async Task<string[]> FetchUnsyncedIdsAsync(string userId, string deviceId)
+        public async Task<string[]> GetUnsyncedIdsAsync(string deviceId)
         {
-            if (IsSyncReset(userId, deviceId)) return Array.Empty<string>();
-            if (UnsyncedIdsFileLocks.TryGetValue(deviceId, out SemaphoreSlim fileLock) && fileLock.CurrentCount == 0)
+            try
+            {
+                return await File.ReadAllLinesAsync(Path.Join(device.UserSyncDirectoryPath, deviceId, "unsynced"));
+            }
+            catch { return []; }
+        }
+
+        public async Task<string[]> FetchUnsyncedIdsAsync()
+        {
+            if (IsSyncReset()) return Array.Empty<string>();
+            if (UnsyncedIdsFileLocks.TryGetValue(device.DeviceId, out SemaphoreSlim fileLock) && fileLock.CurrentCount == 0)
                 await fileLock.WaitAsync();
             try
             {
-                var unsyncedIds = await GetUnsyncedIdsAsync(userId, deviceId);
-                if (IsSyncPending(userId, deviceId))
+                var unsyncedIds = await GetUnsyncedIdsAsync();
+                if (IsSyncPending())
                 {
-                    unsyncedIds = unsyncedIds.Union(await File.ReadAllLinesAsync(PendingIdsFilePath(userId, deviceId))).ToArray();
+                    unsyncedIds = unsyncedIds.Union(await File.ReadAllLinesAsync(device.PendingIdsFilePath)).ToArray();
                 }
 
-                if (unsyncedIds.Length == 0) return Array.Empty<string>();
+                if (unsyncedIds.Length == 0) return [];
 
-                File.Delete(UnsyncedIdsFilePath(userId, deviceId));
-                await File.WriteAllLinesAsync(PendingIdsFilePath(userId, deviceId), unsyncedIds);
+                File.Delete(device.UnsyncedIdsFilePath);
+                await File.WriteAllLinesAsync(device.PendingIdsFilePath, unsyncedIds);
 
                 return unsyncedIds;
             }
@@ -80,87 +129,93 @@ namespace Notesnook.API.Services
         }
 
 
-        public static async Task WritePendingIdsAsync(string userId, string deviceId, IEnumerable<string> ids)
+        public async Task WritePendingIdsAsync(IEnumerable<string> ids)
         {
-            await File.WriteAllLinesAsync(PendingIdsFilePath(userId, deviceId), ids);
+            await File.WriteAllLinesAsync(device.PendingIdsFilePath, ids);
         }
 
-        public static bool IsSyncReset(string userId, string deviceId)
+        public bool IsSyncReset()
         {
-            return File.Exists(ResetSyncFilePath(userId, deviceId));
+            return File.Exists(device.ResetSyncFilePath);
+        }
+        public bool IsSyncReset(string deviceId)
+        {
+            return File.Exists(Path.Join(device.UserSyncDirectoryPath, deviceId, "reset-sync"));
         }
 
-        public static bool IsSyncPending(string userId, string deviceId)
+        public bool IsSyncPending()
         {
-            return File.Exists(PendingIdsFilePath(userId, deviceId));
+            return File.Exists(device.PendingIdsFilePath);
         }
 
-        public static bool IsUnsynced(string userId, string deviceId)
+        public bool IsUnsynced()
         {
-            return File.Exists(UnsyncedIdsFilePath(userId, deviceId));
+            return File.Exists(device.UnsyncedIdsFilePath);
         }
 
-        public static void Reset(string userId, string deviceId)
+        public void Reset()
         {
-            File.Delete(ResetSyncFilePath(userId, deviceId));
-            File.Delete(PendingIdsFilePath(userId, deviceId));
+            File.Delete(device.ResetSyncFilePath);
+            File.Delete(device.PendingIdsFilePath);
         }
 
-        public static bool IsDeviceRegistered(string userId, string deviceId)
+        public bool IsDeviceRegistered()
         {
-            return Directory.Exists(UserDeviceDirectoryPath(userId, deviceId));
+            return Directory.Exists(device.UserDeviceDirectoryPath);
+        }
+        public bool IsDeviceRegistered(string deviceId)
+        {
+            return Directory.Exists(Path.Join(device.UserSyncDirectoryPath, deviceId));
         }
 
-        public static IEnumerable<string> ListDevices(string userId)
+        public string[] ListDevices()
         {
-            return Directory.EnumerateDirectories(UserSyncDirectoryPath(userId)).Select((path) => Path.GetFileName(path));
+            return Directory.GetDirectories(device.UserSyncDirectoryPath).Select((path) => path[(path.LastIndexOf(Path.DirectorySeparatorChar) + 1)..]).ToArray();
         }
 
-        public static void ResetDevices(string userId)
+        public void ResetDevices()
         {
-            if (File.Exists(UserSyncDirectoryPath(userId))) File.Delete(UserSyncDirectoryPath(userId));
-            Directory.CreateDirectory(UserSyncDirectoryPath(userId));
+            if (File.Exists(device.UserSyncDirectoryPath)) File.Delete(device.UserSyncDirectoryPath);
+            Directory.CreateDirectory(device.UserSyncDirectoryPath);
         }
 
-        private static readonly Dictionary<string, SemaphoreSlim> UnsyncedIdsFileLocks = new();
-        public static async Task AddIdsToOtherDevicesAsync(string userId, string deviceId, List<string> ids)
+        private readonly ConcurrentDictionary<string, SemaphoreSlim> UnsyncedIdsFileLocks = [];
+        public async Task AddIdsToOtherDevicesAsync(List<string> ids)
         {
-            foreach (var id in ListDevices(userId))
+            await Parallel.ForEachAsync(ListDevices(), async (id, ct) =>
             {
-                if (id == deviceId || IsSyncReset(userId, id)) continue;
+                if (id == device.DeviceId || IsSyncReset(id)) return;
                 if (!UnsyncedIdsFileLocks.TryGetValue(id, out SemaphoreSlim fileLock))
                 {
-                    fileLock = new SemaphoreSlim(1, 1);
-                    UnsyncedIdsFileLocks.Add(id, fileLock);
+                    fileLock = UnsyncedIdsFileLocks.AddOrUpdate(id, (id) => new SemaphoreSlim(1, 1), (id, old) => new SemaphoreSlim(1, 1));
                 }
 
-                await fileLock.WaitAsync();
+                await fileLock.WaitAsync(ct);
                 try
                 {
-                    if (!IsDeviceRegistered(userId, id)) Directory.CreateDirectory(UserDeviceDirectoryPath(userId, id));
+                    if (!IsDeviceRegistered(id)) Directory.CreateDirectory(Path.Join(device.UserSyncDirectoryPath, id));
 
-                    var oldIds = await GetUnsyncedIdsAsync(userId, id);
-                    await File.WriteAllLinesAsync(UnsyncedIdsFilePath(userId, id), ids.Union(oldIds));
+                    var oldIds = await GetUnsyncedIdsAsync(id);
+                    await File.WriteAllLinesAsync(Path.Join(device.UserSyncDirectoryPath, id, "unsynced"), ids.Union(oldIds), ct);
                 }
                 finally
                 {
                     fileLock.Release();
                 }
-            }
-
+            });
         }
 
-        public static void RegisterDevice(string userId, string deviceId)
+        public void RegisterDevice()
         {
-            Directory.CreateDirectory(UserDeviceDirectoryPath(userId, deviceId));
-            File.Create(ResetSyncFilePath(userId, deviceId)).Close();
+            Directory.CreateDirectory(device.UserDeviceDirectoryPath);
+            File.Create(device.ResetSyncFilePath).Close();
         }
 
-        public static void UnregisterDevice(string userId, string deviceId)
+        public void UnregisterDevice()
         {
             try
             {
-                Directory.Delete(UserDeviceDirectoryPath(userId, deviceId), true);
+                Directory.Delete(device.UserDeviceDirectoryPath, true);
             }
             catch { }
         }
