@@ -165,6 +165,7 @@ namespace Streetwriters.Identity
 
             AddOperationalStore(services, new TokenCleanupOptions { Enable = true, Interval = 3600 * 12 });
 
+            services.AddScoped<IUserAccountService, UserAccountService>();
             services.AddTransient<IMFAService, MFAService>();
             services.AddControllers();
             services.AddTransient<IIntrospectionResponseGenerator, CustomIntrospectionResponseGenerator>();
@@ -201,6 +202,8 @@ namespace Streetwriters.Identity
 
             app.UseWamp(WampServers.IdentityServer, (realm, server) =>
             {
+                realm.Services.RegisterCallee(() => app.ApplicationServices.CreateScope().ServiceProvider.GetRequiredService<IUserAccountService>());
+
                 realm.Subscribe(SubscriptionServerTopics.CreateSubscriptionTopic, async (CreateSubscriptionMessage message) =>
                 {
                     using (var serviceScope = app.ApplicationServices.CreateScope())
