@@ -18,11 +18,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 using Microsoft.Extensions.DependencyInjection;
+using Streetwriters.Data.DbContexts;
+using Streetwriters.Data.Repositories;
 
 namespace Streetwriters.Common.Extensions
 {
     public static class ServiceCollectionServiceExtensions
     {
+        public static IServiceCollection AddRepository<T>(this IServiceCollection services, string collectionName, string database) where T : class
+        {
+            services.AddSingleton((provider) => MongoDbContext.GetMongoCollection<T>(provider.GetService<MongoDB.Driver.IMongoClient>(), database, collectionName));
+            services.AddScoped<Repository<T>>();
+            return services;
+        }
+
         public static IServiceCollection AddDefaultCors(this IServiceCollection services)
         {
             services.AddCors(options =>

@@ -172,9 +172,9 @@ namespace Notesnook.API
             services.AddScoped<IDbContext, MongoDbContext>();
             services.AddScoped<IUnitOfWork, UnitOfWork>();
 
-            services.AddRepository<UserSettings>("user_settings")
-                    .AddRepository<Monograph>("monographs")
-                    .AddRepository<Announcement>("announcements");
+            services.AddRepository<UserSettings>("user_settings", "notesnook")
+                    .AddRepository<Monograph>("monographs", "notesnook")
+                    .AddRepository<Announcement>("announcements", "notesnook");
 
             services.AddMongoCollection(Collections.SettingsKey)
                     .AddMongoCollection(Collections.AttachmentsKey)
