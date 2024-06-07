@@ -76,12 +76,11 @@ namespace Notesnook.API
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            var dbSettings = new DbSettings
+            services.AddSingleton(MongoDbContext.CreateMongoDbClient(new DbSettings
             {
                 ConnectionString = Constants.MONGODB_CONNECTION_STRING,
                 DatabaseName = Constants.MONGODB_DATABASE_NAME
-            };
-            services.AddSingleton<IDbSettings>(dbSettings);
+            }));
 
             services.TryAddSingleton<IHttpContextAccessor, HttpContextAccessor>();
 
@@ -181,9 +180,9 @@ namespace Notesnook.API
                     .AddMongoCollection(Collections.ColorsKey)
                     .AddMongoCollection(Collections.VaultsKey);
 
-            services.TryAddTransient<ISyncItemsRepositoryAccessor, SyncItemsRepositoryAccessor>();
-            services.TryAddTransient<IUserService, UserService>();
-            services.TryAddTransient<IS3Service, S3Service>();
+            services.AddScoped<ISyncItemsRepositoryAccessor, SyncItemsRepositoryAccessor>();
+            services.AddScoped<IUserService, UserService>();
+            services.AddScoped<IS3Service, S3Service>();
 
             services.AddControllers();
 
@@ -241,7 +240,7 @@ namespace Notesnook.API
                 realm.Subscribe<DeleteUserMessage>(IdentityServerTopics.DeleteUserTopic, async (ev) =>
                 {
                     IUserService service = app.GetScopedService<IUserService>();
-                    await service.DeleteUserAsync(ev.UserId, null);
+                    await service.DeleteUserAsync(ev.UserId);
                 });
 
                 realm.Subscribe<ClearCacheMessage>(IdentityServerTopics.ClearCacheTopic, (ev) =>

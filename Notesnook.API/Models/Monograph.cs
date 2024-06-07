@@ -24,6 +24,13 @@ using Notesnook.API.Interfaces;
 
 namespace Notesnook.API.Models
 {
+    public class ObjectWithId
+    {
+        [BsonId]
+        [BsonRepresentation(BsonType.ObjectId)]
+        public string Id { get; set; }
+    }
+
     public class Monograph : IMonograph
     {
         public Monograph()
