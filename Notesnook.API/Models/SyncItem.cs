@@ -17,17 +17,21 @@ You should have received a copy of the Affero GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+using System;
 using System.ComponentModel.DataAnnotations;
 using System.Runtime.Serialization;
 using System.Text.Json.Serialization;
 using MongoDB.Bson;
+using MongoDB.Bson.IO;
+using MongoDB.Bson.Serialization;
 using MongoDB.Bson.Serialization.Attributes;
+using MongoDB.Bson.Serialization.Serializers;
 using Notesnook.API.Interfaces;
 
 namespace Notesnook.API.Models
 {
     [MessagePack.MessagePackObject]
-    public class SyncItem : ISyncItem
+    public class SyncItem
     {
         [IgnoreDataMember]
         [MessagePack.IgnoreMember]
@@ -108,6 +112,103 @@ namespace Notesnook.API.Models
         {
             get; set;
         } = Algorithms.Default;
+    }
+
+    public class SyncItemBsonSerializer : SerializerBase<SyncItem>
+    {
+        public override void Serialize(BsonSerializationContext context, BsonSerializationArgs args, SyncItem value)
+        {
+            var writer = context.Writer;
+            writer.WriteStartDocument();
+
+            if (value.Id != ObjectId.Empty)
+            {
+                writer.WriteName("_id");
+                writer.WriteObjectId(value.Id);
+            }
+
+            writer.WriteName("DateSynced");
+            writer.WriteInt64(value.DateSynced);
+
+            writer.WriteName("UserId");
+            writer.WriteString(value.UserId);
+
+            writer.WriteName("IV");
+            writer.WriteString(value.IV);
+
+            writer.WriteName("Cipher");
+            writer.WriteString(value.Cipher);
+
+            writer.WriteName("ItemId");
+            writer.WriteString(value.ItemId);
+
+            writer.WriteName("Length");
+            writer.WriteInt64(value.Length);
+
+            writer.WriteName("Version");
+            writer.WriteDouble(value.Version);
+
+            writer.WriteName("Algorithm");
+            writer.WriteString(value.Algorithm);
+
+            writer.WriteEndDocument();
+        }
+
+        public override SyncItem Deserialize(BsonDeserializationContext context, BsonDeserializationArgs args)
+        {
+            var bsonReader = context.Reader;
+            bsonReader.ReadStartDocument();
+
+            bsonReader.ReadBsonType();
+            bsonReader.SkipName();
+            var id = bsonReader.ReadObjectId();
+
+            bsonReader.ReadBsonType();
+            bsonReader.SkipName();
+            var dateSynced = bsonReader.ReadInt64();
+
+            bsonReader.ReadBsonType();
+            bsonReader.SkipName();
+            var userId = bsonReader.ReadString();
+
+            bsonReader.ReadBsonType();
+            bsonReader.SkipName();
+            var iv = bsonReader.ReadString();
+
+            bsonReader.ReadBsonType();
+            bsonReader.SkipName();
+            var cipher = bsonReader.ReadString();
+
+            bsonReader.ReadBsonType();
+            bsonReader.SkipName();
+            var itemId = bsonReader.ReadString();
+
+            bsonReader.ReadBsonType();
+            bsonReader.SkipName();
+            var length = bsonReader.ReadInt64();
+
+            bsonReader.ReadBsonType();
+            bsonReader.SkipName();
+            var version = bsonReader.ReadDouble();
+
+            bsonReader.ReadBsonType();
+            bsonReader.SkipName();
+            var algorithm = bsonReader.ReadString();
+
+            bsonReader.ReadEndDocument();
+            return new SyncItem
+            {
+                Id = id,
+                DateSynced = dateSynced,
+                UserId = userId,
+                IV = iv,
+                Cipher = cipher,
+                ItemId = itemId,
+                Length = length,
+                Version = version,
+                Algorithm = algorithm
+            };
+        }
     }
 
     [MessagePack.MessagePackObject]
