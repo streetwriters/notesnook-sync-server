@@ -102,7 +102,7 @@ namespace Notesnook.API.Controllers
 
             var monographs = (await Monographs.Collection.FindAsync(Builders<Monograph>.Filter.Eq("UserId", userId), new FindOptions<Monograph, ObjectWithId>
             {
-                Projection = Builders<Monograph>.Projection.Include("Id"),
+                Projection = Builders<Monograph>.Projection.Include("_id"),
             })).ToEnumerable();
             return Ok(monographs.Select((m) => m.Id));
         }
