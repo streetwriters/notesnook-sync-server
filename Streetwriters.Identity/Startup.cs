@@ -40,6 +40,7 @@ using MongoDB.Bson.Serialization;
 using Quartz;
 using Streetwriters.Common;
 using Streetwriters.Common.Extensions;
+using Streetwriters.Common.Interfaces;
 using Streetwriters.Common.Messages;
 using Streetwriters.Common.Models;
 using Streetwriters.Identity.Helpers;
@@ -239,7 +240,7 @@ namespace Streetwriters.Identity
                 cm.SetIgnoreExtraElements(true);
             });
 
-            services.AddScoped<IPersistedGrantDbContext, CustomPersistedGrantDbContext>();
+            services.AddSingleton<IPersistedGrantDbContext, CustomPersistedGrantDbContext>();
             services.AddTransient<IPersistedGrantStore, PersistedGrantStore>();
             services.AddTransient<TokenCleanup>();
 
