@@ -29,7 +29,7 @@ namespace Streetwriters.Common
 {
     public class Clients
     {
-        private static Client Notesnook = new Client
+        public static readonly Client Notesnook = new()
         {
             Id = "notesnook",
             Name = "Notesnook",
@@ -53,7 +53,7 @@ namespace Streetwriters.Common
             }
         };
 
-        public static Dictionary<string, Client> ClientsMap = new Dictionary<string, Client>
+        public static Dictionary<string, Client> ClientsMap = new()
         {
             { "notesnook", Notesnook }
         };
