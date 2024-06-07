@@ -32,6 +32,7 @@ using Notesnook.API.Hubs;
 using Notesnook.API.Interfaces;
 using Notesnook.API.Models;
 using Streetwriters.Common;
+using Streetwriters.Data.DbContexts;
 using Streetwriters.Data.Interfaces;
 using Streetwriters.Data.Repositories;
 
@@ -52,7 +53,7 @@ namespace Notesnook.API.Repositories
 #endif
         }
 
-        private readonly List<string> ALGORITHMS = new List<string> { Algorithms.Default };
+        private readonly List<string> ALGORITHMS = [Algorithms.Default];
         private bool IsValidAlgorithm(string algorithm)
         {
             return ALGORITHMS.Contains(algorithm);
@@ -60,25 +61,27 @@ namespace Notesnook.API.Repositories
 
         public Task<long> CountItemsSyncedAfterAsync(string userId, long timestamp)
         {
-            return Collection.CountDocumentsAsync(n => (n.DateSynced > timestamp) && n.UserId.Equals(userId));
+            var filter = Builders<SyncItem>.Filter.And(Builders<SyncItem>.Filter.Gt("DateSynced", timestamp), Builders<SyncItem>.Filter.Eq("UserId", userId));
+            return Collection.CountDocumentsAsync(filter);
         }
         public Task<IAsyncCursor<SyncItem>> FindItemsSyncedAfter(string userId, long timestamp, int batchSize)
         {
-            return Collection.FindAsync(n => (n.DateSynced > timestamp) && n.UserId.Equals(userId), new FindOptions<SyncItem>
+            var filter = Builders<SyncItem>.Filter.And(Builders<SyncItem>.Filter.Gt("DateSynced", timestamp), Builders<SyncItem>.Filter.Eq("UserId", userId));
+            return Collection.FindAsync(filter, new FindOptions<SyncItem>
             {
                 BatchSize = batchSize,
                 AllowDiskUse = true,
                 AllowPartialResults = false,
                 NoCursorTimeout = true,
-                Sort = new SortDefinitionBuilder<SyncItem>().Ascending((a) => a.Id)
+                Sort = new SortDefinitionBuilder<SyncItem>().Ascending("_id")
             });
         }
 
         public Task<IAsyncCursor<SyncItem>> FindItemsById(string userId, IEnumerable<string> ids, bool all, int batchSize)
         {
-            var filters = new List<FilterDefinition<SyncItem>>(new[] { Builders<SyncItem>.Filter.Eq((i) => i.UserId, userId) });
+            var filters = new List<FilterDefinition<SyncItem>>(new[] { Builders<SyncItem>.Filter.Eq("UserId", userId) });
 
-            if (!all) filters.Add(Builders<SyncItem>.Filter.In((i) => i.ItemId, ids));
+            if (!all) filters.Add(Builders<SyncItem>.Filter.In("ItemId", ids));
 
             return Collection.FindAsync(Builders<SyncItem>.Filter.And(filters), new FindOptions<SyncItem>
             {
@@ -89,46 +92,14 @@ namespace Notesnook.API.Repositories
             });
         }
 
-        public Task<IAsyncCursor<SyncItem>> GetIdsAsync(string userId, int batchSize)
-        {
-            var filter = Builders<SyncItem>.Filter.Eq((i) => i.UserId, userId);
-            return Collection.FindAsync(filter, new FindOptions<SyncItem>
-            {
-                BatchSize = batchSize,
-                AllowDiskUse = true,
-                AllowPartialResults = false,
-                NoCursorTimeout = true,
-                Sort = new SortDefinitionBuilder<SyncItem>().Ascending((a) => a.Id),
-                Projection = Builders<SyncItem>.Projection.Include((i) => i.ItemId)
-            });
-        }
-        // public async Task DeleteIdsAsync(string[] ids, string userId, CancellationToken token = default(CancellationToken))
-        // {
-        //     await Collection.DeleteManyAsync<T>((i) => ids.Contains(i.Id) && i.UserId == userId, token);
-        // }
-
         public void DeleteByUserId(string userId)
         {
-            dbContext.AddCommand((handle, ct) => Collection.DeleteManyAsync(handle, (i) => i.UserId == userId, cancellationToken: ct));
-        }
-
-        public async Task UpsertAsync(SyncItem item, string userId, long dateSynced)
-        {
-
-            if (item.Length > 15 * 1024 * 1024)
+            var filter = Builders<SyncItem>.Filter.Eq("UserId", userId);
+            var writes = new List<WriteModel<SyncItem>>
             {
-                throw new Exception($"Size of item \"{item.ItemId}\" is too large. Maximum allowed size is 15 MB.");
-            }
-
-            if (!IsValidAlgorithm(item.Algorithm))
-            {
-                throw new Exception($"Invalid alg identifier {item.Algorithm}");
-            }
-
-            item.DateSynced = dateSynced;
-            item.UserId = userId;
-
-            await base.UpsertAsync(item, (x) => (x.ItemId == item.ItemId) && x.UserId == userId);
+                new DeleteManyModel<SyncItem>(filter)
+            };
+            dbContext.AddCommand((handle, ct) => Collection.BulkWriteAsync(handle, writes, options: null, ct));
         }
 
         public void Upsert(SyncItem item, string userId, long dateSynced)
@@ -153,6 +124,12 @@ namespace Notesnook.API.Repositories
             item.DateSynced = dateSynced;
             item.UserId = userId;
 
+            var filter = Builders<SyncItem>.Filter.And(
+                Builders<SyncItem>.Filter.Eq("UserId", userId),
+                Builders<SyncItem>.Filter.Eq("ItemId", item.ItemId)
+            );
+
+            dbContext.AddCommand((handle, ct) => Collection.ReplaceOneAsync(handle, filter, item, new ReplaceOptions { IsUpsert = true }, ct));
             // await base.UpsertAsync(item, (x) => (x.ItemId == item.ItemId) && x.UserId == userId);
             base.Upsert(item, (x) => x.UserId == userId && x.ItemId == item.ItemId);
         }
