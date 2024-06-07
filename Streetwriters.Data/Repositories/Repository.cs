@@ -31,19 +31,13 @@ namespace Streetwriters.Data.Repositories
     public class Repository<TEntity> where TEntity : class
     {
         protected readonly IDbContext dbContext;
-        protected IMongoCollection<TEntity> Collection { get; set; }
+        public IMongoCollection<TEntity> Collection { get; set; }
 
-        public Repository(IDbContext _dbContext, string databaseName, string collectionName)
+        public Repository(IDbContext _dbContext, IMongoCollection<TEntity> collection)
         {
             dbContext = _dbContext;
-            Collection = GetCollection(databaseName, collectionName);
+            Collection = collection;
         }
-
-        private protected IMongoCollection<TEntity> GetCollection(string databaseName, string collectionName)
-        {
-            return dbContext.GetCollection<TEntity>(databaseName, collectionName);
-        }
-
 
         public virtual void Insert(TEntity obj)
         {

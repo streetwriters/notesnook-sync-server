@@ -28,19 +28,25 @@ using System.Threading.Tasks;
 
 namespace Streetwriters.Data.DbContexts
 {
-    public class MongoDbContext : IDbContext
+    public class MongoDbContext(IMongoClient MongoClient) : IDbContext
     {
-        private IMongoDatabase Database { get; set; }
-        private MongoClient MongoClient { get; set; }
-        private readonly List<Func<IClientSessionHandle, CancellationToken, Task>> _commands;
-        private IDbSettings DbSettings { get; set; }
-        public MongoDbContext(IDbSettings dbSettings)
+        public static IMongoClient CreateMongoDbClient(IDbSettings dbSettings)
         {
-            DbSettings = dbSettings;
-            Configure();
-            // Every command will be stored and it'll be processed at SaveChanges
-            _commands = new List<Func<IClientSessionHandle, CancellationToken, Task>>();
+            var settings = MongoClientSettings.FromConnectionString(dbSettings.ConnectionString);
+            settings.MaxConnectionPoolSize = 500;
+            settings.MinConnectionPoolSize = 0;
+            return new MongoClient(settings);
         }
+
+        public static IMongoCollection<T> GetMongoCollection<T>(IMongoClient client, string databaseName, string collectionName)
+        {
+            return client.GetDatabase(databaseName).GetCollection<T>(collectionName, new MongoCollectionSettings()
+            {
+                AssignIdOnInsert = true,
+            });
+        }
+
+        private readonly List<Func<IClientSessionHandle, CancellationToken, Task>> _commands = [];
 
         public async Task<int> SaveChanges()
         {
@@ -51,7 +57,7 @@ namespace Streetwriters.Data.DbContexts
                 using (IClientSessionHandle session = await MongoClient.StartSessionAsync())
                 {
 #if DEBUG
-                    await Task.WhenAll(_commands.Select(c => c(session, default)));
+                    await Parallel.ForEachAsync(_commands, async (c, ct) => await c(session, ct));
 #else
                     await session.WithTransactionAsync(async (handle, token) =>
                     {
@@ -71,26 +77,6 @@ namespace Streetwriters.Data.DbContexts
             }
         }
 
-        private void Configure()
-        {
-            if (MongoClient != null)
-            {
-                return;
-            }
-            var settings = MongoClientSettings.FromConnectionString(DbSettings.ConnectionString);
-            settings.MaxConnectionPoolSize = 500;
-            settings.MinConnectionPoolSize = 0;
-            MongoClient = new MongoClient(settings);
-        }
-
-        public IMongoCollection<T> GetCollection<T>(string databaseName, string collectionName)
-        {
-            return MongoClient.GetDatabase(databaseName).GetCollection<T>(collectionName, new MongoCollectionSettings()
-            {
-                AssignIdOnInsert = true,
-            });
-        }
-
         public void AddCommand(Func<IClientSessionHandle, CancellationToken, Task> func)
         {
             _commands.Add(func);
@@ -99,11 +85,6 @@ namespace Streetwriters.Data.DbContexts
         public void Dispose()
         {
             GC.SuppressFinalize(this);
-        }
-
-        public Task DropDatabaseAsync()
-        {
-            return MongoClient.DropDatabaseAsync(DbSettings.DatabaseName);
         }
     }
 }
