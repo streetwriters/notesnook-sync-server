@@ -19,6 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using System.Linq;
 using System.Security.Claims;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Identity;
 using Streetwriters.Common.Enums;
 using Streetwriters.Common.Models;
 
@@ -77,6 +79,11 @@ namespace Streetwriters.Identity.Services
         public static string GetClaimKey(string clientId)
         {
             return $"{clientId}:status";
+        }
+
+        public static async Task<bool> IsUserValidAsync(UserManager<User> userManager, User user, string clientId)
+        {
+            return user != null && await userManager.IsInRoleAsync(user, clientId);
         }
     }
 }

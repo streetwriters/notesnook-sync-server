@@ -33,11 +33,13 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Streetwriters.Common;
 using Streetwriters.Common.Enums;
+using Streetwriters.Common.Interfaces;
 using Streetwriters.Common.Messages;
 using Streetwriters.Common.Models;
 using Streetwriters.Identity.Enums;
 using Streetwriters.Identity.Interfaces;
 using Streetwriters.Identity.Models;
+using Streetwriters.Identity.Services;
 using static IdentityServer4.IdentityServerConstants;
 
 namespace Streetwriters.Identity.Controllers
@@ -52,12 +54,14 @@ namespace Streetwriters.Identity.Controllers
         private ITokenGenerationService TokenGenerationService { get; set; }
         private IUserClaimsPrincipalFactory<User> PrincipalFactory { get; set; }
         private IdentityServerOptions ISOptions { get; set; }
+        private IUserAccountService UserAccountService { get; set; }
         public AccountController(UserManager<User> _userManager, IEmailSender _emailSender,
         SignInManager<User> _signInManager, RoleManager<MongoRole> _roleManager, IPersistedGrantStore store,
-        ITokenGenerationService tokenGenerationService, IMFAService _mfaService) : base(_userManager, _emailSender, _signInManager, _roleManager, _mfaService)
+        ITokenGenerationService tokenGenerationService, IMFAService _mfaService, IUserAccountService userAccountService) : base(_userManager, _emailSender, _signInManager, _roleManager, _mfaService)
         {
             PersistedGrantStore = store;
             TokenGenerationService = tokenGenerationService;
+            UserAccountService = userAccountService;
         }
 
         [HttpGet("confirm")]
@@ -69,7 +73,7 @@ namespace Streetwriters.Identity.Controllers
             if (client == null) return BadRequest("Invalid client_id.");
 
             var user = await UserManager.FindByIdAsync(userId);
-            if (!await IsUserValidAsync(user, clientId)) return BadRequest($"Unable to find user with ID '{userId}'.");
+            if (!await UserService.IsUserValidAsync(UserManager, user, clientId)) return BadRequest($"Unable to find user with ID '{userId}'.");
 
             switch (type)
             {
@@ -116,7 +120,7 @@ namespace Streetwriters.Identity.Controllers
             if (client == null) return BadRequest("Invalid client_id.");
 
             var user = await UserManager.GetUserAsync(User);
-            if (!await IsUserValidAsync(user, client.Id)) return BadRequest($"Unable to find user with ID '{UserManager.GetUserId(User)}'.");
+            if (!await UserService.IsUserValidAsync(UserManager, user, client.Id)) return BadRequest($"Unable to find user with ID '{UserManager.GetUserId(User)}'.");
 
             if (string.IsNullOrEmpty(newEmail))
             {
@@ -132,63 +136,13 @@ namespace Streetwriters.Identity.Controllers
             return Ok();
         }
 
-        [HttpPost("unregister")]
-        public async Task<IActionResult> UnregisterAccountAync([FromForm] DeleteAccountForm form)
-        {
-            var client = Clients.FindClientById(User.FindFirstValue("client_id"));
-            if (client == null) return BadRequest("Invalid client_id.");
-
-            var user = await UserManager.GetUserAsync(User);
-            if (!await IsUserValidAsync(user, client.Id)) return BadRequest($"Unable to find user with ID '{UserManager.GetUserId(User)}'.");
-
-            if (!await UserManager.CheckPasswordAsync(user, form.Password))
-            {
-                return Unauthorized();
-            }
-
-            await UserManager.DeleteAsync(user);
-
-            // await UserManager.RemoveFromRoleAsync(user, client.Id);
-            // await MFAService.DisableMFAAsync(user);
-
-            // IdentityUserClaim<string> statusClaim = user.Claims.FirstOrDefault((c) => c.ClaimType == $"{client.Id}:status");
-            // await UserManager.RemoveClaimAsync(user, statusClaim.ToClaim());
-            return Ok();
-        }
-
         [HttpGet]
         public async Task<IActionResult> GetUserAccount()
         {
             var client = Clients.FindClientById(User.FindFirstValue("client_id"));
             if (client == null) return BadRequest("Invalid client_id.");
-
             var user = await UserManager.GetUserAsync(User);
-            if (!await IsUserValidAsync(user, client.Id))
-                return BadRequest($"Unable to find user with ID '{UserManager.GetUserId(User)}'.");
-
-            var claims = await UserManager.GetClaimsAsync(user);
-            var marketingConsentClaim = claims.FirstOrDefault((claim) => claim.Type == $"{client.Id}:marketing_consent");
-
-            if (await UserManager.IsEmailConfirmedAsync(user) && !await UserManager.GetTwoFactorEnabledAsync(user))
-            {
-                await MFAService.EnableMFAAsync(user, MFAMethods.Email);
-                user = await UserManager.GetUserAsync(User);
-            }
-
-            return Ok(new UserModel
-            {
-                UserId = user.Id.ToString(),
-                Email = user.Email,
-                IsEmailConfirmed = user.EmailConfirmed,
-                MarketingConsent = marketingConsentClaim == null,
-                MFA = new MFAConfig
-                {
-                    IsEnabled = user.TwoFactorEnabled,
-                    PrimaryMethod = MFAService.GetPrimaryMethod(user),
-                    SecondaryMethod = MFAService.GetSecondaryMethod(user),
-                    RemainingValidCodes = await MFAService.GetRemainingValidCodesAsync(user)
-                }
-            });
+            return Ok(UserAccountService.GetUserAsync(client.Id, user.Id.ToString()));
         }
 
         [HttpPost("recover")]
@@ -199,7 +153,7 @@ namespace Streetwriters.Identity.Controllers
             if (client == null) return BadRequest("Invalid client_id.");
 
             var user = await UserManager.FindByEmailAsync(form.Email);
-            if (!await IsUserValidAsync(user, form.ClientId)) return Ok();
+            if (!await UserService.IsUserValidAsync(UserManager, user, form.ClientId)) return Ok();
 
             var code = await UserManager.GenerateUserTokenAsync(user, TokenOptions.DefaultProvider, "ResetPassword");
             var callbackUrl = Url.TokenLink(user.Id.ToString(), code, client.Id, TokenType.RESET_PASSWORD, Request.Scheme);
@@ -219,7 +173,7 @@ namespace Streetwriters.Identity.Controllers
             if (client == null) return BadRequest("Invalid client_id.");
 
             var user = await UserManager.GetUserAsync(User);
-            if (!await IsUserValidAsync(user, client.Id)) return BadRequest($"Unable to find user with ID '{UserManager.GetUserId(User)}'.");
+            if (!await UserService.IsUserValidAsync(UserManager, user, client.Id)) return BadRequest($"Unable to find user with ID '{UserManager.GetUserId(User)}'.");
 
             var subjectId = User.FindFirstValue("sub");
             var jti = User.FindFirstValue("jti");
@@ -246,7 +200,7 @@ namespace Streetwriters.Identity.Controllers
         {
             if (!Clients.IsValidClient(form.ClientId)) return BadRequest("Invalid clientId.");
             var user = await UserManager.FindByIdAsync(form.UserId);
-            if (!await IsUserValidAsync(user, form.ClientId))
+            if (!await UserService.IsUserValidAsync(UserManager, user, form.ClientId))
                 return BadRequest($"Unable to find user with ID '{form.UserId}'.");
 
             if (!await UserManager.VerifyUserTokenAsync(user, TokenOptions.DefaultProvider, "PasswordResetAuthorizationCode", form.Code))
@@ -267,7 +221,7 @@ namespace Streetwriters.Identity.Controllers
             if (client == null) return BadRequest("Invalid client_id.");
 
             var user = await UserManager.GetUserAsync(User);
-            if (!await IsUserValidAsync(user, client.Id))
+            if (!await UserService.IsUserValidAsync(UserManager, user, client.Id))
                 return BadRequest($"Unable to find user with ID '{UserManager.GetUserId(User)}'.");
 
             switch (form.Type)
@@ -338,7 +292,7 @@ namespace Streetwriters.Identity.Controllers
             if (client == null) return BadRequest("Invalid client_id.");
 
             var user = await UserManager.GetUserAsync(User);
-            if (!await IsUserValidAsync(user, client.Id)) return BadRequest($"Unable to find user with ID '{user.Id}'.");
+            if (!await UserService.IsUserValidAsync(UserManager, user, client.Id)) return BadRequest($"Unable to find user with ID '{user.Id}'.");
 
             var jti = User.FindFirstValue("jti");
 
@@ -385,11 +339,6 @@ namespace Streetwriters.Identity.Controllers
                 OriginTokenId = User.FindFirstValue("jti"),
                 Message = message
             });
-        }
-
-        public async Task<bool> IsUserValidAsync(User user, string clientId)
-        {
-            return user != null && await UserManager.IsInRoleAsync(user, clientId);
         }
     }
 }

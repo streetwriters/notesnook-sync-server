@@ -27,9 +27,10 @@ namespace Notesnook.API.Interfaces
     public interface IUserService
     {
         Task CreateUserAsync();
-        Task<bool> DeleteUserAsync(string userId, string jti);
+        Task DeleteUserAsync(string userId);
+        Task DeleteUserAsync(string userId, string jti, string password);
         Task<bool> ResetUserAsync(string userId, bool removeAttachments);
-        Task<UserResponse> GetUserAsync(bool repair = true);
+        Task<UserResponse> GetUserAsync(string userId);
         Task SetUserAttachmentsKeyAsync(string userId, IEncrypted key);
     }
 }

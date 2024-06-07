@@ -18,35 +18,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 using System;
-using System.Net.Http;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
 using Notesnook.API.Interfaces;
+using Notesnook.API.Models;
 using Notesnook.API.Models.Responses;
 using Streetwriters.Common;
-using Streetwriters.Common.Extensions;
-using Streetwriters.Common.Models;
 
 namespace Notesnook.API.Controllers
 {
     [ApiController]
     [Authorize]
     [Route("users")]
-    public class UsersController : ControllerBase
+    public class UsersController(IUserService UserService) : ControllerBase
     {
-        private readonly HttpClient httpClient;
-        private readonly IHttpContextAccessor HttpContextAccessor;
-        private IUserService UserService { get; set; }
-        public UsersController(IUserService userService, IHttpContextAccessor accessor)
-        {
-            httpClient = new HttpClient();
-            HttpContextAccessor = accessor;
-            UserService = userService;
-        }
-
         [HttpPost]
         [AllowAnonymous]
         public async Task<IActionResult> Signup()
@@ -66,20 +54,35 @@ namespace Notesnook.API.Controllers
         [HttpGet]
         public async Task<IActionResult> GetUser()
         {
-            UserResponse response = await UserService.GetUserAsync();
-            if (!response.Success) return BadRequest(response);
-            return Ok(response);
+            var userId = User.FindFirstValue("sub");
+            try
+            {
+                UserResponse response = await UserService.GetUserAsync(userId);
+                if (!response.Success) return BadRequest(response);
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                await Slogger<UsersController>.Error(nameof(GetUser), "Couldn't get user for id.", userId, ex.ToString());
+                return BadRequest(new { error = ex.Message });
+            }
         }
 
         [HttpPatch]
         public async Task<IActionResult> UpdateUser([FromBody] UserResponse user)
         {
-            UserResponse response = await UserService.GetUserAsync(false);
-
-            if (user.AttachmentsKey != null)
-                await UserService.SetUserAttachmentsKeyAsync(response.UserId, user.AttachmentsKey);
-
-            return Ok();
+            var userId = User.FindFirstValue("sub");
+            try
+            {
+                if (user.AttachmentsKey != null)
+                    await UserService.SetUserAttachmentsKeyAsync(userId, user.AttachmentsKey);
+                return Ok();
+            }
+            catch (Exception ex)
+            {
+                await Slogger<UsersController>.Error(nameof(GetUser), "Couldn't update user with id.", userId, ex.ToString());
+                return BadRequest(new { error = ex.Message });
+            }
         }
 
         [HttpPost("reset")]
@@ -93,24 +96,20 @@ namespace Notesnook.API.Controllers
         }
 
         [HttpPost("delete")]
-        public async Task<IActionResult> Delete()
+        [RequestTimeout(5 * 60 * 1000)]
+        public async Task<IActionResult> Delete([FromForm] DeleteAccountForm form)
         {
+            var userId = this.User.FindFirstValue("sub");
+            var jti = User.FindFirstValue("jti");
             try
             {
-                var userId = this.User.FindFirstValue("sub");
-
-                if (await UserService.DeleteUserAsync(userId, User.FindFirstValue("jti")))
-                {
-                    Response response = await this.httpClient.ForwardAsync<Response>(HttpContextAccessor, $"{Servers.IdentityServer}/account/unregister", HttpMethod.Post);
-                    if (!response.Success) return BadRequest();
-
-                    return Ok();
-                }
-                return BadRequest();
+                await UserService.DeleteUserAsync(userId, jti, form.Password);
+                return Ok();
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                await Slogger<UsersController>.Error(nameof(GetUser), "Couldn't delete user with id.", userId, ex.ToString());
+                return BadRequest(new { error = ex.Message });
             }
         }
     }

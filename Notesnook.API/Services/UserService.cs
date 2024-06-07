@@ -92,10 +92,11 @@ namespace Notesnook.API.Services
             await Slogger<UserService>.Info(nameof(CreateUserAsync), "New user created.", JsonSerializer.Serialize(response));
         }
 
-        public async Task<UserResponse> GetUserAsync(bool repair = true)
+        public async Task<UserResponse> GetUserAsync(string userId)
         {
-            UserResponse response = await httpClient.ForwardAsync<UserResponse>(this.HttpContextAccessor, $"{Servers.IdentityServer.ToString()}/account", HttpMethod.Get);
-            if (!response.Success) return response;
+            var userService = await WampServers.IdentityServer.GetServiceAsync<IUserAccountService>(IdentityServerTopics.UserAccountServiceTopic);
+
+            var user = await userService.GetUserAsync(Clients.Notesnook.Id, userId) ?? throw new Exception("User not found.");
 
             ISubscription subscription = null;
             if (Constants.IS_SELF_HOSTED)
@@ -105,7 +106,7 @@ namespace Notesnook.API.Services
                     AppId = ApplicationType.NOTESNOOK,
                     Provider = SubscriptionProvider.STREETWRITERS,
                     Type = SubscriptionType.PREMIUM,
-                    UserId = response.UserId,
+                    UserId = user.UserId,
                     StartDate = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
                     // this date doesn't matter as the subscription is static.
                     ExpiryDate = DateTimeOffset.UtcNow.AddYears(1).ToUnixTimeMilliseconds()
@@ -113,117 +114,92 @@ namespace Notesnook.API.Services
             }
             else
             {
-                SubscriptionResponse subscriptionResponse = await httpClient.ForwardAsync<SubscriptionResponse>(this.HttpContextAccessor, $"{Servers.SubscriptionServer}/subscriptions", HttpMethod.Get);
-                if (repair && subscriptionResponse.StatusCode == 404)
-                {
-                    await Slogger<UserService>.Error(nameof(GetUserAsync), "Repairing user subscription.", JsonSerializer.Serialize(response));
-                    // user was partially created. We should continue the process here.
-                    await WampServers.SubscriptionServer.PublishMessageAsync(SubscriptionServerTopics.CreateSubscriptionTopic, new CreateSubscriptionMessage
-                    {
-                        AppId = ApplicationType.NOTESNOOK,
-                        Provider = SubscriptionProvider.STREETWRITERS,
-                        Type = SubscriptionType.TRIAL,
-                        UserId = response.UserId,
-                        StartTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                        ExpiryTime = DateTimeOffset.UtcNow.AddDays(7).ToUnixTimeMilliseconds()
-                    });
-                    // just a dummy object
-                    subscriptionResponse.Subscription = new Subscription
-                    {
-                        AppId = ApplicationType.NOTESNOOK,
-                        Provider = SubscriptionProvider.STREETWRITERS,
-                        Type = SubscriptionType.TRIAL,
-                        UserId = response.UserId,
-                        StartDate = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                        ExpiryDate = DateTimeOffset.UtcNow.AddDays(7).ToUnixTimeMilliseconds()
-                    };
-                }
-                subscription = subscriptionResponse.Subscription;
+                var subscriptionService = await WampServers.SubscriptionServer.GetServiceAsync<IUserSubscriptionService>(SubscriptionServerTopics.UserSubscriptionServiceTopic);
+                subscription = await subscriptionService.GetUserSubscriptionAsync(Clients.Notesnook.Id, userId);
             }
 
-            var userSettings = await Repositories.UsersSettings.FindOneAsync((u) => u.UserId == response.UserId);
-            if (repair && userSettings == null)
+            var userSettings = await Repositories.UsersSettings.FindOneAsync((u) => u.UserId == user.UserId) ?? throw new Exception("User settings not found.");
+            return new UserResponse
             {
-                await Slogger<UserService>.Error(nameof(GetUserAsync), "Repairing user settings.", JsonSerializer.Serialize(response));
-                userSettings = new UserSettings
-                {
-                    UserId = response.UserId,
-                    LastSynced = 0,
-                    Salt = GetSalt()
-                };
-                await Repositories.UsersSettings.InsertAsync(userSettings);
-            }
-            response.AttachmentsKey = userSettings.AttachmentsKey;
-            response.Salt = userSettings.Salt;
-            response.Subscription = subscription;
-            return response;
+                UserId = user.UserId,
+                Email = user.Email,
+                IsEmailConfirmed = user.IsEmailConfirmed,
+                MarketingConsent = user.MarketingConsent,
+                MFA = user.MFA,
+                PhoneNumber = user.PhoneNumber,
+                AttachmentsKey = userSettings.AttachmentsKey,
+                Salt = userSettings.Salt,
+                Subscription = subscription,
+                Success = true,
+                StatusCode = 200
+            };
         }
 
         public async Task SetUserAttachmentsKeyAsync(string userId, IEncrypted key)
         {
-            var userSettings = await Repositories.UsersSettings.FindOneAsync((u) => u.UserId == userId);
+            var userSettings = await Repositories.UsersSettings.FindOneAsync((u) => u.UserId == userId) ?? throw new Exception("User not found.");
             userSettings.AttachmentsKey = (EncryptedData)key;
             await Repositories.UsersSettings.UpdateAsync(userSettings.Id, userSettings);
         }
 
-        public async Task<bool> DeleteUserAsync(string userId, string jti)
+        public async Task DeleteUserAsync(string userId)
         {
-            try
+            new SyncDeviceService(new SyncDevice(ref userId, ref userId)).ResetDevices();
+
+            var cc = new CancellationTokenSource();
+
+            Repositories.Notes.DeleteByUserId(userId);
+            Repositories.Notebooks.DeleteByUserId(userId);
+            Repositories.Shortcuts.DeleteByUserId(userId);
+            Repositories.Contents.DeleteByUserId(userId);
+            Repositories.Settings.DeleteByUserId(userId);
+            Repositories.LegacySettings.DeleteByUserId(userId);
+            Repositories.Attachments.DeleteByUserId(userId);
+            Repositories.Reminders.DeleteByUserId(userId);
+            Repositories.Relations.DeleteByUserId(userId);
+            Repositories.Colors.DeleteByUserId(userId);
+            Repositories.Tags.DeleteByUserId(userId);
+            Repositories.Vaults.DeleteByUserId(userId);
+            Repositories.UsersSettings.Delete((u) => u.UserId == userId);
+            Repositories.Monographs.DeleteMany((m) => m.UserId == userId);
+
+            var result = await unit.Commit();
+            await Slogger<UserService>.Info(nameof(DeleteUserAsync), "User data deleted", userId, result.ToString());
+            if (!result) throw new Exception("Could not delete user data.");
+
+            if (!Constants.IS_SELF_HOSTED)
             {
-                await Slogger<UserService>.Info(nameof(DeleteUserAsync), "Deleting user account", userId);
-
-                new SyncDeviceService(new SyncDevice(ref userId, ref userId)).ResetDevices();
-
-                var cc = new CancellationTokenSource();
-
-                Repositories.Notes.DeleteByUserId(userId);
-                Repositories.Notebooks.DeleteByUserId(userId);
-                Repositories.Shortcuts.DeleteByUserId(userId);
-                Repositories.Contents.DeleteByUserId(userId);
-                Repositories.Settings.DeleteByUserId(userId);
-                Repositories.LegacySettings.DeleteByUserId(userId);
-                Repositories.Attachments.DeleteByUserId(userId);
-                Repositories.Reminders.DeleteByUserId(userId);
-                Repositories.Relations.DeleteByUserId(userId);
-                Repositories.Colors.DeleteByUserId(userId);
-                Repositories.Tags.DeleteByUserId(userId);
-                Repositories.Vaults.DeleteByUserId(userId);
-                Repositories.UsersSettings.Delete((u) => u.UserId == userId);
-                Repositories.Monographs.DeleteMany((m) => m.UserId == userId);
-
-                var result = await unit.Commit();
-                await Slogger<UserService>.Info(nameof(DeleteUserAsync), "User account deleted", userId, result.ToString());
-                if (!result) return false;
-
-                if (!Constants.IS_SELF_HOSTED)
+                await WampServers.SubscriptionServer.PublishMessageAsync(SubscriptionServerTopics.DeleteSubscriptionTopic, new DeleteSubscriptionMessage
                 {
-                    await WampServers.SubscriptionServer.PublishMessageAsync(SubscriptionServerTopics.DeleteSubscriptionTopic, new DeleteSubscriptionMessage
-                    {
-                        AppId = ApplicationType.NOTESNOOK,
-                        UserId = userId
-                    });
-                }
-
-                await WampServers.MessengerServer.PublishMessageAsync(MessengerServerTopics.SendSSETopic, new SendSSEMessage
-                {
-                    SendToAll = false,
-                    OriginTokenId = jti,
-                    UserId = userId,
-                    Message = new Message
-                    {
-                        Type = "logout",
-                        Data = JsonSerializer.Serialize(new { reason = "Account deleted." })
-                    }
+                    AppId = ApplicationType.NOTESNOOK,
+                    UserId = userId
                 });
+            }
 
-                await S3Service.DeleteDirectoryAsync(userId);
-                return result;
-            }
-            catch (Exception ex)
+            await S3Service.DeleteDirectoryAsync(userId);
+        }
+
+        public async Task DeleteUserAsync(string userId, string jti, string password)
+        {
+            await Slogger<UserService>.Info(nameof(DeleteUserAsync), "Deleting user account", userId);
+
+            var userService = await WampServers.IdentityServer.GetServiceAsync<IUserAccountService>(IdentityServerTopics.UserAccountServiceTopic);
+            await userService.DeleteUserAsync(Clients.Notesnook.Id, userId, password);
+
+            await DeleteUserAsync(userId);
+
+            await WampServers.MessengerServer.PublishMessageAsync(MessengerServerTopics.SendSSETopic, new SendSSEMessage
             {
-                await Slogger<UserService>.Error(nameof(DeleteUserAsync), "User account not deleted", userId, ex.ToString());
-            }
-            return false;
+                SendToAll = false,
+                OriginTokenId = jti,
+                UserId = userId,
+                Message = new Message
+                {
+                    Type = "logout",
+                    Data = JsonSerializer.Serialize(new { reason = "Account deleted." })
+                }
+            });
+
         }
 
         public async Task<bool> ResetUserAsync(string userId, bool removeAttachments)
