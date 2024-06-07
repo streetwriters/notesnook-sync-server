@@ -29,7 +29,7 @@ namespace Notesnook.API.Authorization
 {
     public class SyncRequirement : AuthorizationHandler<SyncRequirement>, IAuthorizationRequirement
     {
-        private readonly Dictionary<string, string> pathErrorPhraseMap = new Dictionary<string, string>
+        private readonly Dictionary<string, string> pathErrorPhraseMap = new()
         {
             ["/sync/attachments"] = "use attachments",
             ["/sync"] = "sync your notes",
@@ -43,13 +43,9 @@ namespace Notesnook.API.Authorization
             PathString path = context.Resource is DefaultHttpContext httpContext ? httpContext.Request.Path : null;
             var result = this.IsAuthorized(context.User, path);
             if (result.Succeeded) context.Succeed(requirement);
-            else
-            {
-                var hasReason = result.AuthorizationFailure.FailureReasons.Any();
-                if (hasReason)
-                    context.Fail(result.AuthorizationFailure.FailureReasons.First());
-                else context.Fail();
-            }
+            else if (result.AuthorizationFailure.FailureReasons.Any())
+                context.Fail(result.AuthorizationFailure.FailureReasons.First());
+            else context.Fail();
 
             return Task.CompletedTask;
         }

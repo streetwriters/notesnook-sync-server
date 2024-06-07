@@ -48,7 +48,7 @@ namespace Notesnook.API.Extensions
             {
                 var error = string.Join("\n", policyAuthorizationResult.AuthorizationFailure.FailureReasons.Select((r) => r.Message));
 
-                if (!string.IsNullOrEmpty(error) && !isWebsocket)
+                if (!string.IsNullOrEmpty(error))
                 {
                     httpContext.Response.StatusCode = (int)HttpStatusCode.Unauthorized;
                     httpContext.Response.ContentType = "application/json";

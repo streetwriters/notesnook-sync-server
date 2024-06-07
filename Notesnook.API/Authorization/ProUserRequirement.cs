@@ -17,21 +17,47 @@ You should have received a copy of the Affero GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using System.Security.Claims;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 
 namespace Notesnook.API.Authorization
 {
     public class ProUserRequirement : AuthorizationHandler<ProUserRequirement>, IAuthorizationRequirement
     {
-        private readonly string[] allowedClaims = { "trial", "premium", "premium_canceled" };
+        private readonly Dictionary<string, string> pathErrorPhraseMap = new()
+        {
+            ["/s3"] = "upload attachments",
+            ["/s3/multipart"] = "upload attachments",
+        };
+        private readonly string[] allowedClaims = ["trial", "premium", "premium_canceled"];
         protected override Task HandleRequirementAsync(AuthorizationHandlerContext context, ProUserRequirement requirement)
         {
-            var isProOrTrial = context.User.HasClaim((c) => c.Type == "notesnook:status" && allowedClaims.Contains(c.Value));
-            if (isProOrTrial)
-                context.Succeed(requirement);
+            PathString path = context.Resource is DefaultHttpContext httpContext ? httpContext.Request.Path : null;
+            var isProOrTrial = context.User.Claims.Any((c) => c.Type == "notesnook:status" && allowedClaims.Contains(c.Value));
+            if (isProOrTrial) context.Succeed(requirement);
+            else
+            {
+                var phrase = "continue";
+                foreach (var item in pathErrorPhraseMap)
+                {
+                    if (path != null && path.StartsWithSegments(item.Key))
+                        phrase = item.Value;
+                }
+                var error = $"Please upgrade to Pro to {phrase}.";
+                context.Fail(new AuthorizationFailureReason(this, error));
+            }
             return Task.CompletedTask;
+        }
+
+        public override Task HandleAsync(AuthorizationHandlerContext context)
+        {
+            return this.HandleRequirementAsync(context, this);
         }
     }
 }
