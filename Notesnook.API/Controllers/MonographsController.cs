@@ -24,6 +24,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using MongoDB.Driver;
 using Notesnook.API.Models;
 using Streetwriters.Data.Interfaces;
 using Streetwriters.Data.Repositories;
@@ -99,8 +100,11 @@ namespace Notesnook.API.Controllers
             var userId = this.User.FindFirstValue("sub");
             if (userId == null) return Unauthorized();
 
-            var userMonographs = await Monographs.FindAsync((m) => m.UserId == userId);
-            return Ok(userMonographs.Select((m) => m.Id));
+            var monographs = (await Monographs.Collection.FindAsync(Builders<Monograph>.Filter.Eq("UserId", userId), new FindOptions<Monograph, ObjectWithId>
+            {
+                Projection = Builders<Monograph>.Projection.Include("Id"),
+            })).ToEnumerable();
+            return Ok(monographs.Select((m) => m.Id));
         }
 
 
