@@ -169,42 +169,6 @@ namespace Notesnook.API
             if (!BsonClassMap.IsClassMapRegistered(typeof(CallToAction)))
                 BsonClassMap.RegisterClassMap<CallToAction>();
 
-            if (!BsonClassMap.IsClassMapRegistered(typeof(Attachment)))
-                BsonClassMap.RegisterClassMap<Attachment>();
-
-            if (!BsonClassMap.IsClassMapRegistered(typeof(Content)))
-                BsonClassMap.RegisterClassMap<Content>();
-
-            if (!BsonClassMap.IsClassMapRegistered(typeof(Note)))
-                BsonClassMap.RegisterClassMap<Note>();
-
-            if (!BsonClassMap.IsClassMapRegistered(typeof(Notebook)))
-                BsonClassMap.RegisterClassMap<Notebook>();
-
-            if (!BsonClassMap.IsClassMapRegistered(typeof(Relation)))
-                BsonClassMap.RegisterClassMap<Relation>();
-
-            if (!BsonClassMap.IsClassMapRegistered(typeof(Reminder)))
-                BsonClassMap.RegisterClassMap<Reminder>();
-
-            if (!BsonClassMap.IsClassMapRegistered(typeof(Setting)))
-                BsonClassMap.RegisterClassMap<Setting>();
-
-            if (!BsonClassMap.IsClassMapRegistered(typeof(SettingItem)))
-                BsonClassMap.RegisterClassMap<SettingItem>();
-
-            if (!BsonClassMap.IsClassMapRegistered(typeof(Shortcut)))
-                BsonClassMap.RegisterClassMap<Shortcut>();
-
-            if (!BsonClassMap.IsClassMapRegistered(typeof(Tag)))
-                BsonClassMap.RegisterClassMap<Tag>();
-
-            if (!BsonClassMap.IsClassMapRegistered(typeof(Color)))
-                BsonClassMap.RegisterClassMap<Color>();
-
-            if (!BsonClassMap.IsClassMapRegistered(typeof(Vault)))
-                BsonClassMap.RegisterClassMap<Vault>();
-
             services.AddScoped<IDbContext, MongoDbContext>();
             services.AddScoped<IUnitOfWork, UnitOfWork>();
 
@@ -212,18 +176,18 @@ namespace Notesnook.API
                     .AddRepository<Monograph>("monographs")
                     .AddRepository<Announcement>("announcements");
 
-            services.AddSyncRepository<SettingItem>("settingsv2")
-                    .AddSyncRepository<Attachment>("attachments")
-                    .AddSyncRepository<Content>("content")
-                    .AddSyncRepository<Note>("notes")
-                    .AddSyncRepository<Notebook>("notebooks")
-                    .AddSyncRepository<Relation>("relations")
-                    .AddSyncRepository<Reminder>("reminders")
-                    .AddSyncRepository<Setting>("settings")
-                    .AddSyncRepository<Shortcut>("shortcuts")
-                    .AddSyncRepository<Tag>("tags")
-                    .AddSyncRepository<Color>("colors")
-                    .AddSyncRepository<Vault>("vaults");
+            services.AddMongoCollection(Collections.SettingsKey)
+                    .AddMongoCollection(Collections.AttachmentsKey)
+                    .AddMongoCollection(Collections.ContentKey)
+                    .AddMongoCollection(Collections.NotesKey)
+                    .AddMongoCollection(Collections.NotebooksKey)
+                    .AddMongoCollection(Collections.RelationsKey)
+                    .AddMongoCollection(Collections.RemindersKey)
+                    .AddMongoCollection(Collections.LegacySettingsKey)
+                    .AddMongoCollection(Collections.ShortcutsKey)
+                    .AddMongoCollection(Collections.TagsKey)
+                    .AddMongoCollection(Collections.ColorsKey)
+                    .AddMongoCollection(Collections.VaultsKey);
 
             services.TryAddTransient<ISyncItemsRepositoryAccessor, SyncItemsRepositoryAccessor>();
             services.TryAddTransient<IUserService, UserService>();
@@ -310,17 +274,11 @@ namespace Notesnook.API
         }
     }
 
-    public static class ServiceCollectionRepositoryExtensions
+    public static class ServiceCollectionMongoCollectionExtensions
     {
-        public static IServiceCollection AddRepository<T>(this IServiceCollection services, string collectionName, string database = "notesnook") where T : class
+        public static IServiceCollection AddMongoCollection(this IServiceCollection services, string collectionName, string database = "notesnook")
         {
-            services.AddScoped((provider) => new Repository<T>(provider.GetRequiredService<IDbContext>(), database, collectionName));
-            return services;
-        }
-
-        public static IServiceCollection AddSyncRepository<T>(this IServiceCollection services, string collectionName, string database = "notesnook") where T : SyncItem
-        {
-            services.AddScoped((provider) => new SyncItemsRepository<T>(provider.GetRequiredService<IDbContext>(), database, collectionName));
+            services.AddKeyedSingleton(collectionName, (provider, key) => MongoDbContext.GetMongoCollection<SyncItem>(provider.GetService<MongoDB.Driver.IMongoClient>(), database, collectionName));
             return services;
         }
     }

@@ -37,15 +37,19 @@ using Streetwriters.Data.Repositories;
 
 namespace Notesnook.API.Repositories
 {
-    public class SyncItemsRepository<T> : Repository<SyncItem> where T : SyncItem
+    public class SyncItemsRepository : Repository<SyncItem>
     {
-        private string collectionName;
-        public SyncItemsRepository(IDbContext dbContext, string databaseName, string collectionName) : base(dbContext, databaseName, collectionName)
+        private readonly string collectionName;
+        public SyncItemsRepository(IDbContext dbContext, IMongoCollection<SyncItem> collection) : base(dbContext, collection)
         {
-            this.collectionName = collectionName;
-            Collection.Indexes.CreateOne(new CreateIndexModel<SyncItem>(Builders<SyncItem>.IndexKeys.Ascending(i => i.UserId).Descending(i => i.DateSynced)));
-            Collection.Indexes.CreateOne(new CreateIndexModel<SyncItem>(Builders<SyncItem>.IndexKeys.Ascending(i => i.UserId).Ascending((i) => i.ItemId)));
-            Collection.Indexes.CreateOne(new CreateIndexModel<SyncItem>(Builders<SyncItem>.IndexKeys.Ascending(i => i.UserId)));
+            this.collectionName = collection.CollectionNamespace.CollectionName;
+#if DEBUG
+            Collection.Indexes.CreateMany([
+                new CreateIndexModel<SyncItem>(Builders<SyncItem>.IndexKeys.Ascending("UserId").Descending("DateSynced")),
+                new CreateIndexModel<SyncItem>(Builders<SyncItem>.IndexKeys.Ascending("UserId").Ascending("ItemId")),
+                new CreateIndexModel<SyncItem>(Builders<SyncItem>.IndexKeys.Ascending("UserId"))
+            ]);
+#endif
         }
 
         private readonly List<string> ALGORITHMS = new List<string> { Algorithms.Default };

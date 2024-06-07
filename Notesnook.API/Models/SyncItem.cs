@@ -210,40 +210,4 @@ namespace Notesnook.API.Models
             };
         }
     }
-
-    [MessagePack.MessagePackObject]
-    public class SettingItem : SyncItem { }
-
-    [MessagePack.MessagePackObject]
-    public class Attachment : SyncItem { }
-
-    [MessagePack.MessagePackObject]
-    public class Content : SyncItem { }
-
-    [MessagePack.MessagePackObject]
-    public class Note : SyncItem { }
-
-    [MessagePack.MessagePackObject]
-    public class Notebook : SyncItem { }
-
-    [MessagePack.MessagePackObject]
-    public class Relation : SyncItem { }
-
-    [MessagePack.MessagePackObject]
-    public class Reminder : SyncItem { }
-
-    [MessagePack.MessagePackObject]
-    public class Setting : SyncItem { }
-
-    [MessagePack.MessagePackObject]
-    public class Shortcut : SyncItem { }
-
-    [MessagePack.MessagePackObject]
-    public class Tag : SyncItem { }
-
-    [MessagePack.MessagePackObject]
-    public class Color : SyncItem { }
-
-    [MessagePack.MessagePackObject]
-    public class Vault : SyncItem { }
 }

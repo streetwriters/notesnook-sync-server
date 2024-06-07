@@ -26,18 +26,18 @@ namespace Notesnook.API.Interfaces
 {
     public interface ISyncItemsRepositoryAccessor
     {
-        SyncItemsRepository<Note> Notes { get; }
-        SyncItemsRepository<Notebook> Notebooks { get; }
-        SyncItemsRepository<Shortcut> Shortcuts { get; }
-        SyncItemsRepository<Reminder> Reminders { get; }
-        SyncItemsRepository<Relation> Relations { get; }
-        SyncItemsRepository<Content> Contents { get; }
-        SyncItemsRepository<Setting> LegacySettings { get; }
-        SyncItemsRepository<Attachment> Attachments { get; }
-        SyncItemsRepository<SettingItem> Settings { get; }
-        SyncItemsRepository<Color> Colors { get; }
-        SyncItemsRepository<Vault> Vaults { get; }
-        SyncItemsRepository<Tag> Tags { get; }
+        SyncItemsRepository Notes { get; }
+        SyncItemsRepository Notebooks { get; }
+        SyncItemsRepository Shortcuts { get; }
+        SyncItemsRepository Reminders { get; }
+        SyncItemsRepository Relations { get; }
+        SyncItemsRepository Contents { get; }
+        SyncItemsRepository LegacySettings { get; }
+        SyncItemsRepository Attachments { get; }
+        SyncItemsRepository Settings { get; }
+        SyncItemsRepository Colors { get; }
+        SyncItemsRepository Vaults { get; }
+        SyncItemsRepository Tags { get; }
         Repository<UserSettings> UsersSettings { get; }
         Repository<Monograph> Monographs { get; }
     }

@@ -17,59 +17,76 @@ You should have received a copy of the Affero GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+using Microsoft.Extensions.DependencyInjection;
+using MongoDB.Driver;
 using Notesnook.API.Interfaces;
 using Notesnook.API.Models;
 using Notesnook.API.Repositories;
+using Streetwriters.Data.Interfaces;
 using Streetwriters.Data.Repositories;
 
 namespace Notesnook.API.Accessors
 {
     public class SyncItemsRepositoryAccessor : ISyncItemsRepositoryAccessor
     {
-        public SyncItemsRepository<Note> Notes { get; }
-        public SyncItemsRepository<Notebook> Notebooks { get; }
-        public SyncItemsRepository<Shortcut> Shortcuts { get; }
-        public SyncItemsRepository<Relation> Relations { get; }
-        public SyncItemsRepository<Reminder> Reminders { get; }
-        public SyncItemsRepository<Content> Contents { get; }
-        public SyncItemsRepository<Setting> LegacySettings { get; }
-        public SyncItemsRepository<SettingItem> Settings { get; }
-        public SyncItemsRepository<Attachment> Attachments { get; }
-        public SyncItemsRepository<Color> Colors { get; }
-        public SyncItemsRepository<Vault> Vaults { get; }
-        public SyncItemsRepository<Tag> Tags { get; }
+        public SyncItemsRepository Notes { get; }
+        public SyncItemsRepository Notebooks { get; }
+        public SyncItemsRepository Shortcuts { get; }
+        public SyncItemsRepository Relations { get; }
+        public SyncItemsRepository Reminders { get; }
+        public SyncItemsRepository Contents { get; }
+        public SyncItemsRepository LegacySettings { get; }
+        public SyncItemsRepository Settings { get; }
+        public SyncItemsRepository Attachments { get; }
+        public SyncItemsRepository Colors { get; }
+        public SyncItemsRepository Vaults { get; }
+        public SyncItemsRepository Tags { get; }
         public Repository<UserSettings> UsersSettings { get; }
         public Repository<Monograph> Monographs { get; }
 
-        public SyncItemsRepositoryAccessor(SyncItemsRepository<Note> _notes,
-        SyncItemsRepository<Notebook> _notebooks,
-        SyncItemsRepository<Content> _content,
-        SyncItemsRepository<Setting> _legacySettings,
-        SyncItemsRepository<SettingItem> _settings,
-        SyncItemsRepository<Attachment> _attachments,
-        SyncItemsRepository<Shortcut> _shortcuts,
-        SyncItemsRepository<Relation> _relations,
-        SyncItemsRepository<Reminder> _reminders,
-        SyncItemsRepository<Color> _colors,
-        SyncItemsRepository<Vault> _vaults,
-        SyncItemsRepository<Tag> _tags,
-        Repository<UserSettings> _usersSettings,
-        Repository<Monograph> _monographs)
+        public SyncItemsRepositoryAccessor(IDbContext dbContext,
+
+        [FromKeyedServices(Collections.NotebooksKey)]
+        IMongoCollection<SyncItem> notebooks,
+        [FromKeyedServices(Collections.NotesKey)]
+        IMongoCollection<SyncItem> notes,
+        [FromKeyedServices(Collections.ContentKey)]
+        IMongoCollection<SyncItem> content,
+        [FromKeyedServices(Collections.SettingsKey)]
+        IMongoCollection<SyncItem> settings,
+        [FromKeyedServices(Collections.LegacySettingsKey)]
+        IMongoCollection<SyncItem> legacySettings,
+        [FromKeyedServices(Collections.AttachmentsKey)]
+        IMongoCollection<SyncItem> attachments,
+        [FromKeyedServices(Collections.ShortcutsKey)]
+        IMongoCollection<SyncItem> shortcuts,
+        [FromKeyedServices(Collections.RemindersKey)]
+        IMongoCollection<SyncItem> reminders,
+        [FromKeyedServices(Collections.RelationsKey)]
+        IMongoCollection<SyncItem> relations,
+        [FromKeyedServices(Collections.ColorsKey)]
+        IMongoCollection<SyncItem> colors,
+        [FromKeyedServices(Collections.VaultsKey)]
+        IMongoCollection<SyncItem> vaults,
+        [FromKeyedServices(Collections.TagsKey)]
+        IMongoCollection<SyncItem> tags,
+
+        Repository<UserSettings> usersSettings, Repository<Monograph> monographs)
         {
-            Notebooks = _notebooks;
-            Notes = _notes;
-            Contents = _content;
-            Settings = _settings;
-            LegacySettings = _legacySettings;
-            Attachments = _attachments;
-            UsersSettings = _usersSettings;
-            Monographs = _monographs;
-            Shortcuts = _shortcuts;
-            Reminders = _reminders;
-            Relations = _relations;
-            Colors = _colors;
-            Vaults = _vaults;
-            Tags = _tags;
+            UsersSettings = usersSettings;
+            Monographs = monographs;
+            Notebooks = new SyncItemsRepository(dbContext, notebooks);
+            Notes = new SyncItemsRepository(dbContext, notes);
+            Contents = new SyncItemsRepository(dbContext, content);
+            Settings = new SyncItemsRepository(dbContext, settings);
+            LegacySettings = new SyncItemsRepository(dbContext, legacySettings);
+            Attachments = new SyncItemsRepository(dbContext, attachments);
+            Shortcuts = new SyncItemsRepository(dbContext, shortcuts);
+            Reminders = new SyncItemsRepository(dbContext, reminders);
+            Relations = new SyncItemsRepository(dbContext, relations);
+            Colors = new SyncItemsRepository(dbContext, colors);
+            Vaults = new SyncItemsRepository(dbContext, vaults);
+            Tags = new SyncItemsRepository(dbContext, tags);
         }
     }
 }
