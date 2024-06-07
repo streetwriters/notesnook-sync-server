@@ -230,6 +230,8 @@ namespace Notesnook.API.Hubs
             var userId = Context.User.FindFirstValue("sub");
             if (string.IsNullOrEmpty(userId)) return 0;
 
+            SyncEventCounterSource.Log.Push();
+
             try
             {
                 var others = Clients.OthersInGroup(userId);
@@ -346,6 +348,8 @@ namespace Notesnook.API.Hubs
             {
                 throw new HubException("Cannot fetch data while another sync is in progress. Please try again later.");
             }
+
+            SyncEventCounterSource.Log.Fetch();
 
             var userSettings = await Repositories.UsersSettings.FindOneAsync((u) => u.UserId == userId);
             if (userSettings.LastSynced > 0 && lastSyncedTimestamp > userSettings.LastSynced)

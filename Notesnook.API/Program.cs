@@ -26,6 +26,8 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Hosting;
 using Streetwriters.Common;
 using System.Linq;
+using Microsoft.Extensions.Logging;
+using System.Net;
 
 namespace Notesnook.API
 {
@@ -59,6 +61,7 @@ namespace Notesnook.API
                                 listenerOptions.UseHttps(Servers.NotesnookAPI.SSLCertificate);
                             });
                         }
+                        options.Listen(IPAddress.Parse("127.0.0.1"), 5067);
                     });
                 });
     }

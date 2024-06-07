@@ -51,6 +51,8 @@ using Notesnook.API.Interfaces;
 using Notesnook.API.Models;
 using Notesnook.API.Repositories;
 using Notesnook.API.Services;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
 using Streetwriters.Common;
 using Streetwriters.Common.Extensions;
 using Streetwriters.Common.Messages;
@@ -208,6 +210,13 @@ namespace Notesnook.API
             {
                 options.Level = CompressionLevel.Fastest;
             });
+
+            services.AddOpenTelemetry()
+                    .ConfigureResource(resource => resource
+                        .AddService(serviceName: "Notesnook.API"))
+                    .WithMetrics((builder) => builder
+                            .AddMeter("Notesnook.API.Metrics.Sync")
+                            .AddPrometheusExporter());
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -221,6 +230,7 @@ namespace Notesnook.API
                 });
             }
 
+            app.UseOpenTelemetryPrometheusScrapingEndpoint((context) => context.Request.Path == "/metrics" && context.Connection.LocalPort == 5067);
             app.UseResponseCompression();
 
             app.UseCors("notesnook");
@@ -248,6 +258,7 @@ namespace Notesnook.API
 
             app.UseEndpoints(endpoints =>
             {
+                endpoints.MapPrometheusScrapingEndpoint();
                 endpoints.MapControllers();
                 endpoints.MapHealthChecks("/health");
                 endpoints.MapHub<SyncHub>("/hubs/sync", options =>
