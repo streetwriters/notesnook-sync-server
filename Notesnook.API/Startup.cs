@@ -107,22 +107,12 @@ namespace Notesnook.API
                     policy.RequireAuthenticatedUser();
                     policy.Requirements.Add(new SyncRequirement());
                 });
-                options.AddPolicy("Verified", policy =>
-                {
-                    policy.AuthenticationSchemes.Add("introspection");
-                    policy.RequireAuthenticatedUser();
-                    policy.Requirements.Add(new EmailVerifiedRequirement());
-                });
                 options.AddPolicy("Pro", policy =>
                 {
                     policy.AuthenticationSchemes.Add("introspection");
                     policy.RequireAuthenticatedUser();
+                    policy.Requirements.Add(new SyncRequirement());
                     policy.Requirements.Add(new ProUserRequirement());
-                });
-                options.AddPolicy("BasicAdmin", policy =>
-                {
-                    policy.AuthenticationSchemes.Add("BasicAuthentication");
-                    policy.RequireClaim(ClaimTypes.Role, "Admin");
                 });
 
                 options.DefaultPolicy = options.GetPolicy("Notesnook");
