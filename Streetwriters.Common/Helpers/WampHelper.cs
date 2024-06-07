@@ -27,9 +27,9 @@ namespace Streetwriters.Common.Helpers
 {
     public class WampHelper
     {
-        public static async Task<IWampRealmProxy> OpenWampChannelAsync<T>(string server, string realmName)
+        public static async Task<IWampRealmProxy> OpenWampChannelAsync(string server, string realmName)
         {
-            DefaultWampChannelFactory channelFactory = new DefaultWampChannelFactory();
+            DefaultWampChannelFactory channelFactory = new();
 
             IWampChannel channel = channelFactory.CreateJsonChannel(server, realmName);
 

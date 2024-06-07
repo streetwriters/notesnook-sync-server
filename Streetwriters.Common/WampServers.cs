@@ -23,6 +23,7 @@ using System.Collections.Generic;
 using System.Reactive.Subjects;
 using System.Threading.Tasks;
 using Streetwriters.Common.Helpers;
+using Streetwriters.Common.Interfaces;
 using WampSharp.V2.Client;
 
 namespace Streetwriters.Common
@@ -36,25 +37,28 @@ namespace Streetwriters.Common
         public T Topics { get; set; } = new T();
         public string Realm { get; set; }
 
+        private async Task<IWampRealmProxy> GetChannelAsync(string topic)
+        {
+            if (!Channels.TryGetValue(topic, out IWampRealmProxy channel) || !channel.Monitor.IsConnected)
+            {
+                channel = await WampHelper.OpenWampChannelAsync(Address, Realm);
+                Channels.AddOrUpdate(topic, (key) => channel, (key, old) => channel);
+            }
+            return channel;
+        }
+
+        public async Task<V> GetServiceAsync<V>(string topic) where V : class
+        {
+            var channel = await GetChannelAsync(topic);
+            return channel.Services.GetCalleeProxy<V>();
+        }
+
         public async Task PublishMessageAsync<V>(string topic, V message)
         {
             try
             {
-                IWampRealmProxy channel;
-                if (Channels.ContainsKey(topic))
-                    channel = Channels[topic];
-                else
-                {
-                    channel = await WampHelper.OpenWampChannelAsync<V>(this.Address, this.Realm);
-                    Channels.TryAdd(topic, channel);
-                }
-                if (!channel.Monitor.IsConnected)
-                {
-                    Channels.TryRemove(topic, out IWampRealmProxy value);
-                    await PublishMessageAsync<V>(topic, message);
-                    return;
-                }
-                WampHelper.PublishMessage<V>(channel, topic, message);
+                IWampRealmProxy channel = await GetChannelAsync(topic);
+                WampHelper.PublishMessage(channel, topic, message);
             }
             catch (Exception ex)
             {
@@ -97,19 +101,22 @@ namespace Streetwriters.Common
 
     public class MessengerServerTopics
     {
-        public const string SendSSETopic = "com.streetwriters.sse.send";
+        public const string SendSSETopic = "co.streetwriters.sse.send";
     }
 
     public class SubscriptionServerTopics
     {
-        public const string CreateSubscriptionTopic = "com.streetwriters.subscriptions.create";
-        public const string DeleteSubscriptionTopic = "com.streetwriters.subscriptions.delete";
+        public const string UserSubscriptionServiceTopic = "co.streetwriters.subscriptions.subscriptions";
+
+        public const string CreateSubscriptionTopic = "co.streetwriters.subscriptions.create";
+        public const string DeleteSubscriptionTopic = "co.streetwriters.subscriptions.delete";
     }
 
     public class IdentityServerTopics
     {
-        public const string ClearCacheTopic = "com.streetwriters.identity.clear_cache";
-        public const string DeleteUserTopic = "com.streetwriters.identity.delete_user";
+        public const string UserAccountServiceTopic = "co.streetwriters.identity.users";
+        public const string ClearCacheTopic = "co.streetwriters.identity.clear_cache";
+        public const string DeleteUserTopic = "co.streetwriters.identity.delete_user";
     }
 
     public class NotesnookServerTopics
