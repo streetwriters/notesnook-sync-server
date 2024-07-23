@@ -42,7 +42,8 @@ namespace Notesnook.API.Services
 
     public class S3Service : IS3Service
     {
-        private readonly string BUCKET_NAME = "nn-attachments";
+        private readonly string BUCKET_NAME = Constants.S3_BUCKET_NAME ?? "";
+        private readonly string INTERNAL_BUCKET_NAME = Constants.S3_INTERNAL_BUCKET_NAME ?? "";
         private AmazonS3Client S3Client { get; }
 
         // When running in a dockerized environment the sync server doesn't have access
@@ -96,7 +97,7 @@ namespace Notesnook.API.Services
             var objectName = GetFullObjectName(userId, name);
             if (objectName == null) throw new Exception("Invalid object name."); ;
 
-            var response = await GetS3Client(S3ClientMode.INTERNAL).DeleteObjectAsync(BUCKET_NAME, objectName);
+            var response = await GetS3Client(S3ClientMode.INTERNAL).DeleteObjectAsync(GetBucketName(S3ClientMode.INTERNAL), objectName);
 
             if (!IsSuccessStatusCode(((int)response.HttpStatusCode)))
                 throw new Exception("Could not delete object.");
@@ -106,7 +107,7 @@ namespace Notesnook.API.Services
         {
             var request = new ListObjectsV2Request
             {
-                BucketName = BUCKET_NAME,
+                BucketName = GetBucketName(S3ClientMode.INTERNAL),
                 Prefix = userId,
             };
 
@@ -126,10 +127,10 @@ namespace Notesnook.API.Services
 
             if (keys.Count <= 0) return;
 
-            var deleteObjectsResponse = await S3Client
+            var deleteObjectsResponse = await GetS3Client(S3ClientMode.INTERNAL)
             .DeleteObjectsAsync(new DeleteObjectsRequest
             {
-                BucketName = BUCKET_NAME,
+                BucketName = GetBucketName(S3ClientMode.INTERNAL),
                 Objects = keys,
             });
 
@@ -169,7 +170,7 @@ namespace Notesnook.API.Services
 
             if (string.IsNullOrEmpty(uploadId))
             {
-                var response = await GetS3Client(S3ClientMode.INTERNAL).InitiateMultipartUploadAsync(BUCKET_NAME, objectName);
+                var response = await GetS3Client(S3ClientMode.INTERNAL).InitiateMultipartUploadAsync(GetBucketName(S3ClientMode.INTERNAL), objectName);
                 if (!IsSuccessStatusCode(((int)response.HttpStatusCode))) throw new Exception("Failed to initiate multipart upload.");
 
                 uploadId = response.UploadId;
@@ -193,7 +194,7 @@ namespace Notesnook.API.Services
             var objectName = GetFullObjectName(userId, name);
             if (userId == null || objectName == null) throw new Exception("Could not abort multipart upload.");
 
-            var response = await GetS3Client(S3ClientMode.INTERNAL).AbortMultipartUploadAsync(BUCKET_NAME, objectName, uploadId);
+            var response = await GetS3Client(S3ClientMode.INTERNAL).AbortMultipartUploadAsync(GetBucketName(S3ClientMode.INTERNAL), objectName, uploadId);
             if (!IsSuccessStatusCode(((int)response.HttpStatusCode))) throw new Exception("Failed to abort multipart upload.");
         }
 
@@ -203,7 +204,7 @@ namespace Notesnook.API.Services
             if (userId == null || objectName == null) throw new Exception("Could not abort multipart upload.");
 
             uploadRequest.Key = objectName;
-            uploadRequest.BucketName = BUCKET_NAME;
+            uploadRequest.BucketName = GetBucketName(S3ClientMode.INTERNAL);
             var response = await GetS3Client(S3ClientMode.INTERNAL).CompleteMultipartUploadAsync(uploadRequest);
             if (!IsSuccessStatusCode(((int)response.HttpStatusCode))) throw new Exception("Failed to complete multipart upload.");
         }
@@ -215,7 +216,7 @@ namespace Notesnook.API.Services
 
             var request = new GetPreSignedUrlRequest
             {
-                BucketName = BUCKET_NAME,
+                BucketName = GetBucketName(mode),
                 Expires = System.DateTime.Now.AddHours(1),
                 Verb = httpVerb,
                 Key = objectName,
@@ -231,9 +232,9 @@ namespace Notesnook.API.Services
         private string GetPresignedURLForUploadPart(string objectName, string uploadId, int partNumber)
         {
 
-            return GetS3Client().GetPreSignedURL(new GetPreSignedUrlRequest
+            return GetS3Client(S3ClientMode.INTERNAL).GetPreSignedURL(new GetPreSignedUrlRequest
             {
-                BucketName = BUCKET_NAME,
+                BucketName = GetBucketName(S3ClientMode.INTERNAL),
                 Expires = System.DateTime.Now.AddHours(1),
                 Verb = HttpVerb.PUT,
                 Key = objectName,
@@ -262,6 +263,12 @@ namespace Notesnook.API.Services
         {
             if (mode == S3ClientMode.INTERNAL && S3InternalClient != null) return S3InternalClient;
             return S3Client;
+        }
+
+        string GetBucketName(S3ClientMode mode = S3ClientMode.EXTERNAL)
+        {
+            if (mode == S3ClientMode.INTERNAL && S3InternalClient != null) return INTERNAL_BUCKET_NAME;
+            return BUCKET_NAME;
         }
     }
 }

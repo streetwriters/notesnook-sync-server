@@ -30,6 +30,9 @@ namespace Streetwriters.Common
         public static string S3_ACCESS_KEY_ID => Environment.GetEnvironmentVariable("S3_ACCESS_KEY_ID");
         public static string S3_SERVICE_URL => Environment.GetEnvironmentVariable("S3_SERVICE_URL");
         public static string S3_REGION => Environment.GetEnvironmentVariable("S3_REGION");
+        public static string S3_BUCKET_NAME => Environment.GetEnvironmentVariable("S3_BUCKET_NAME");
+        public static string S3_INTERNAL_BUCKET_NAME => Environment.GetEnvironmentVariable("S3_INTERNAL_BUCKET_NAME");
+        public static string S3_INTERNAL_SERVICE_URL => Environment.GetEnvironmentVariable("S3_INTERNAL_SERVICE_URL");
 
         // SMTP settings
         public static string SMTP_USERNAME => Environment.GetEnvironmentVariable("SMTP_USERNAME");
@@ -70,7 +73,6 @@ namespace Streetwriters.Common
         // internal
         public static string MONGODB_CONNECTION_STRING => Environment.GetEnvironmentVariable("MONGODB_CONNECTION_STRING");
         public static string MONGODB_DATABASE_NAME => Environment.GetEnvironmentVariable("MONGODB_DATABASE_NAME");
-        public static string S3_INTERNAL_SERVICE_URL => Environment.GetEnvironmentVariable("S3_INTERNAL_SERVICE_URL");
         public static int SUBSCRIPTIONS_SERVER_PORT => int.Parse(Environment.GetEnvironmentVariable("SUBSCRIPTIONS_SERVER_PORT"));
         public static string SUBSCRIPTIONS_SERVER_HOST => Environment.GetEnvironmentVariable("SUBSCRIPTIONS_SERVER_HOST");
         public static string SUBSCRIPTIONS_SERVER_DOMAIN => Environment.GetEnvironmentVariable("SUBSCRIPTIONS_SERVER_DOMAIN");
