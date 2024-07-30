@@ -52,19 +52,19 @@ namespace Streetwriters.Common
         public static string TWILIO_AUTH_TOKEN => Environment.GetEnvironmentVariable("TWILIO_AUTH_TOKEN");
         public static string TWILIO_SERVICE_SID => Environment.GetEnvironmentVariable("TWILIO_SERVICE_SID");
         // Server discovery
-        public static int NOTESNOOK_SERVER_PORT => int.Parse(Environment.GetEnvironmentVariable("NOTESNOOK_SERVER_PORT"));
+        public static int NOTESNOOK_SERVER_PORT => int.Parse(Environment.GetEnvironmentVariable("NOTESNOOK_SERVER_PORT") ?? "80");
         public static string NOTESNOOK_SERVER_HOST => Environment.GetEnvironmentVariable("NOTESNOOK_SERVER_HOST");
         public static string NOTESNOOK_SERVER_DOMAIN => Environment.GetEnvironmentVariable("NOTESNOOK_SERVER_DOMAIN");
         public static string NOTESNOOK_CERT_PATH => Environment.GetEnvironmentVariable("NOTESNOOK_CERT_PATH");
         public static string NOTESNOOK_CERT_KEY_PATH => Environment.GetEnvironmentVariable("NOTESNOOK_CERT_KEY_PATH");
 
-        public static int IDENTITY_SERVER_PORT => int.Parse(Environment.GetEnvironmentVariable("IDENTITY_SERVER_PORT"));
+        public static int IDENTITY_SERVER_PORT => int.Parse(Environment.GetEnvironmentVariable("IDENTITY_SERVER_PORT") ?? "80");
         public static string IDENTITY_SERVER_HOST => Environment.GetEnvironmentVariable("IDENTITY_SERVER_HOST");
         public static string IDENTITY_SERVER_DOMAIN => Environment.GetEnvironmentVariable("IDENTITY_SERVER_DOMAIN");
         public static string IDENTITY_CERT_PATH => Environment.GetEnvironmentVariable("IDENTITY_CERT_PATH");
         public static string IDENTITY_CERT_KEY_PATH => Environment.GetEnvironmentVariable("IDENTITY_CERT_KEY_PATH");
 
-        public static int SSE_SERVER_PORT => int.Parse(Environment.GetEnvironmentVariable("SSE_SERVER_PORT"));
+        public static int SSE_SERVER_PORT => int.Parse(Environment.GetEnvironmentVariable("SSE_SERVER_PORT") ?? "80");
         public static string SSE_SERVER_HOST => Environment.GetEnvironmentVariable("SSE_SERVER_HOST");
         public static string SSE_SERVER_DOMAIN => Environment.GetEnvironmentVariable("SSE_SERVER_DOMAIN");
         public static string SSE_CERT_PATH => Environment.GetEnvironmentVariable("SSE_CERT_PATH");
@@ -73,7 +73,7 @@ namespace Streetwriters.Common
         // internal
         public static string MONGODB_CONNECTION_STRING => Environment.GetEnvironmentVariable("MONGODB_CONNECTION_STRING");
         public static string MONGODB_DATABASE_NAME => Environment.GetEnvironmentVariable("MONGODB_DATABASE_NAME");
-        public static int SUBSCRIPTIONS_SERVER_PORT => int.Parse(Environment.GetEnvironmentVariable("SUBSCRIPTIONS_SERVER_PORT"));
+        public static int SUBSCRIPTIONS_SERVER_PORT => int.Parse(Environment.GetEnvironmentVariable("SUBSCRIPTIONS_SERVER_PORT") ?? "80");
         public static string SUBSCRIPTIONS_SERVER_HOST => Environment.GetEnvironmentVariable("SUBSCRIPTIONS_SERVER_HOST");
         public static string SUBSCRIPTIONS_SERVER_DOMAIN => Environment.GetEnvironmentVariable("SUBSCRIPTIONS_SERVER_DOMAIN");
         public static string SUBSCRIPTIONS_CERT_PATH => Environment.GetEnvironmentVariable("SUBSCRIPTIONS_CERT_PATH");

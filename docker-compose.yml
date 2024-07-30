@@ -1,7 +1,6 @@
 version: "3.4"
 
-x-server-discovery:
-  &server-discovery
+x-server-discovery: &server-discovery
   NOTESNOOK_SERVER_PORT: 80
   NOTESNOOK_SERVER_HOST: notesnook-server
   IDENTITY_SERVER_PORT: 80
@@ -10,13 +9,12 @@ x-server-discovery:
   SSE_SERVER_HOST: sse-server
   SELF_HOSTED: 1
 
-x-env-files:
-  &env-files
+x-env-files: &env-files
   - .env
 
 services:
   notesnook-db:
-    image: mongo
+    image: mongo:7.0.12
     networks:
       - notesnook
     command: --replSet rs0 --bind_ip_all
@@ -27,7 +25,7 @@ services:
   # upgrading it to a replica set. This is only required once but we running
   # it multiple times is no issue.
   initiate-rs0:
-    image: mongo
+    image: mongo:7.0.12
     networks:
       - notesnook
     depends_on:
@@ -42,7 +40,7 @@ services:
         EOF
 
   notesnook-s3:
-    image: minio/minio
+    image: minio/minio:RELEASE.2024-07-29T22-14-52Z
     ports:
       - 9000:9000
       - 9090:9090
@@ -52,14 +50,13 @@ services:
       - ${HOME}/.notesnook/s3:/data/s3
     environment:
       MINIO_BROWSER: "on"
-    env_file:
-      - ./.env.local
+    env_file: *env-files
     command: server /data/s3 --console-address :9090
 
   # There's no way to specify a default bucket in Minio so we have to
   # set it up ourselves.
   setup-s3:
-    image: minio/mc
+    image: minio/mc:RELEASE.2024-07-26T13-08-44Z
     depends_on:
       - notesnook-s3
     networks:
@@ -69,10 +66,10 @@ services:
     command:
       - -c
       - |
-        until mc config host add minio http://notesnook-s3:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD; do
+        until mc alias set minio http://notesnook-s3:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin}; do
           sleep 1;
         done;
-        mc mb minio/nn-attachments -p
+        mc mb minio/$$S3_BUCKET_NAME -p
 
   identity-server:
     build:
@@ -85,6 +82,12 @@ services:
     env_file: *env-files
     depends_on:
       - notesnook-db
+    healthcheck:
+      test: curl --fail http://localhost:8264/health || exit 1
+      interval: 40s
+      timeout: 30s
+      retries: 3
+      start_period: 60s
     environment:
       <<: *server-discovery
       MONGODB_CONNECTION_STRING: mongodb://notesnook-db:27017/identity?replSet=rs0
@@ -103,15 +106,22 @@ services:
       - notesnook-s3
       - setup-s3
       - identity-server
+    healthcheck:
+      test: curl --fail http://localhost:5264/health || exit 1
+      interval: 40s
+      timeout: 30s
+      retries: 3
+      start_period: 60s
     environment:
       <<: *server-discovery
       MONGODB_CONNECTION_STRING: mongodb://notesnook-db:27017/notesnook?replSet=rs0
       MONGODB_DATABASE_NAME: notesnook
-      S3_INTERNAL_SERVICE_URL: http://notesnook-s3:9000
-      S3_ACCESS_KEY_ID: "${MINIO_ROOT_USER:-minioadmin}"
-      S3_ACCESS_KEY: "${MINIO_ROOT_PASSWORD:-minioadmin}"
-      S3_SERVICE_URL: http://localhost:9000
-      S3_REGION: us-east-1
+      S3_INTERNAL_SERVICE_URL: "${S3_SERVICE_URL:-http://notesnook-s3:9000}"
+      S3_ACCESS_KEY_ID: "${S3_ACCESS_KEY_ID:-${MINIO_ROOT_USER:-minioadmin}}"
+      S3_ACCESS_KEY: "${S3_ACCESS_KEY:-${MINIO_ROOT_PASSWORD:-minioadmin}}"
+      S3_SERVICE_URL: "${S3_SERVICE_URL:-http://localhost:9000}"
+      S3_REGION: "${S3_REGION:-us-east-1}"
+      S3_BUCKET_NAME: "${S3_BUCKET_NAME}"
 
   sse-server:
     build:
@@ -125,8 +135,24 @@ services:
       - notesnook-server
     networks:
       - notesnook
+    healthcheck:
+      test: curl --fail http://localhost:7264/health || exit 1
+      interval: 40s
+      timeout: 30s
+      retries: 3
+      start_period: 60s
     environment:
       <<: *server-discovery
 
+  autoheal:
+    image: willfarrell/autoheal:latest
+    tty: true
+    restart: always
+    environment:
+      - AUTOHEAL_INTERVAL=60
+      - AUTOHEAL_START_PERIOD=300
+      - AUTOHEAL_DEFAULT_STOP_TIMEOUT=10
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
 networks:
   notesnook:
