@@ -32,6 +32,7 @@ RUN dotnet publish -c Release -o /app/publish \
   /p:TrimMode=partial \
   /p:PublishTrimmed=true \
   /p:PublishSingleFile=true \
+  /p:JsonSerializerIsReflectionEnabledByDefault=true \
   -a $TARGETARCH
 
 FROM --platform=$BUILDPLATFORM base AS final
