@@ -10,7 +10,7 @@ RUN dotnet restore -v d ./Notesnook.sln
 WORKDIR /app/Streetwriters.Messenger/
 # build
 ENV DOTNET_TC_QuickJitForLoops="1" DOTNET_ReadyToRun="0" DOTNET_TieredPGO="1" DOTNET_SYSTEM_GLOBALIZATION_INVARIANT="true"
-RUN dotnet publish -c Release -o /app/out --use-current-runtime --self-contained false --no-restore
+RUN dotnet publish -c Release -o /app/out --use-current-runtime --self-contained false --no-restore /p:Runtimeidentifier=linux-x64
 
 # final stage/image
 FROM mcr.microsoft.com/dotnet/aspnet:8.0
