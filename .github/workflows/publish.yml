@@ -56,11 +56,12 @@ jobs:
           context: .
           file: ${{ matrix.repos.file }}
           push: true
+          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v8
           tags: ${{ steps.meta.outputs.tags }}
 
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v1
         with:
-          subject-name: ${{ matrix.repos.image }}
+          subject-name: index.docker.io/${{ matrix.repos.image }}
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
