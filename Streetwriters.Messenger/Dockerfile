@@ -27,11 +27,12 @@ RUN dotnet build -c Release -o /app/build -a $TARGETARCH
 
 FROM build AS publish
 RUN dotnet publish -c Release -o /app/publish \
-    #--runtime alpine-x64 \
-    --self-contained true \
-    /p:PublishTrimmed=true \
-    /p:PublishSingleFile=true \
-    -a $TARGETARCH
+  #--runtime alpine-x64 \
+  --self-contained true \
+  /p:TrimMode=partial \
+  /p:PublishTrimmed=true \
+  /p:PublishSingleFile=true \
+  -a $TARGETARCH
 
 FROM --platform=$BUILDPLATFORM base AS final
 ARG TARGETARCH
