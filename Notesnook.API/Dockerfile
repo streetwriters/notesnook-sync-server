@@ -2,15 +2,22 @@ FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 
 WORKDIR /app
 
-ADD . /app
+# copy projects
+COPY Streetwriters.Data/*.csproj ./Streetwriters.Data/
+COPY Streetwriters.Common/*.csproj ./Streetwriters.Common/
+COPY Notesnook.API/*.csproj ./Notesnook.API/
 
-# restore all project dependencies
-RUN dotnet restore -v d ./Notesnook.sln
+# restore dependencies
+RUN dotnet restore -v d /app/Notesnook.API/Notesnook.API.csproj --use-current-runtime
+
+# copy everything else
+COPY Streetwriters.Data/ ./Streetwriters.Data/
+COPY Streetwriters.Common/ ./Streetwriters.Common/
+COPY Notesnook.API/ ./Notesnook.API/
 
 WORKDIR /app/Notesnook.API/
-# build
 ENV DOTNET_TC_QuickJitForLoops="1" DOTNET_ReadyToRun="0" DOTNET_TieredPGO="1" DOTNET_SYSTEM_GLOBALIZATION_INVARIANT="true"
-RUN dotnet publish -c Release -o /app/out --self-contained false --no-restore /p:Runtimeidentifier=linux-x64
+RUN dotnet publish -c Release -o /app/out --use-current-runtime --self-contained false --no-restore
 
 # final stage/image
 FROM mcr.microsoft.com/dotnet/aspnet:8.0
