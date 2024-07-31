@@ -1,5 +1,3 @@
-version: "3.4"
-
 x-server-discovery: &server-discovery
   NOTESNOOK_SERVER_PORT: 80
   NOTESNOOK_SERVER_HOST: notesnook-server
@@ -72,9 +70,7 @@ services:
         mc mb minio/$$S3_BUCKET_NAME -p
 
   identity-server:
-    build:
-      context: .
-      dockerfile: ./Streetwriters.Identity/Dockerfile
+    image: streetwriters/identity:latest
     ports:
       - "8264:80"
     networks:
@@ -94,9 +90,7 @@ services:
       MONGODB_DATABASE_NAME: identity
 
   notesnook-server:
-    build:
-      context: .
-      dockerfile: ./Notesnook.API/Dockerfile
+    image: streetwriters/notesnook-sync:latest
     ports:
       - "5264:80"
     networks:
@@ -114,7 +108,7 @@ services:
       start_period: 60s
     environment:
       <<: *server-discovery
-      MONGODB_CONNECTION_STRING: mongodb://notesnook-db:27017/notesnook?replSet=rs0
+      MONGODB_CONNECTION_STRING: mongodb://notesnook-db:27017/?replSet=rs0
       MONGODB_DATABASE_NAME: notesnook
       S3_INTERNAL_SERVICE_URL: "${S3_SERVICE_URL:-http://notesnook-s3:9000}"
       S3_ACCESS_KEY_ID: "${S3_ACCESS_KEY_ID:-${MINIO_ROOT_USER:-minioadmin}}"
@@ -124,9 +118,7 @@ services:
       S3_BUCKET_NAME: "${S3_BUCKET_NAME}"
 
   sse-server:
-    build:
-      context: .
-      dockerfile: ./Streetwriters.Messenger/Dockerfile
+    image: streetwriters/sse:latest
     ports:
       - "7264:80"
     env_file: *env-files
