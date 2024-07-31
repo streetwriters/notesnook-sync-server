@@ -37,11 +37,28 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v4
 
+      # Setup Buildx
+      - name: Docker Setup Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v8
+
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
+          ecr: auto
+          logout: true
+
+      # Pull previous image from docker hub to use it as cache to improve the image build time.
+      - name: docker pull cache image
+        continue-on-error: true
+        run: docker pull ${{ matrix.repos.image }}:latest
+
+      # Setup QEMU
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
@@ -58,6 +75,7 @@ jobs:
           push: true
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v8
           tags: ${{ steps.meta.outputs.tags }}
+          cache-from: ${{ matrix.repos.image }}:latest
 
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v1
