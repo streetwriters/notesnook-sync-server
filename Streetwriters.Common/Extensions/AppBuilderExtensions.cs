@@ -18,6 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 using System;
+using System.Collections.Generic;
+using System.Text.Json;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
@@ -30,13 +32,20 @@ namespace Streetwriters.Common.Extensions
 {
     public static class AppBuilderExtensions
     {
-        public static IApplicationBuilder UseVersion(this IApplicationBuilder app)
+        public static IApplicationBuilder UseVersion(this IApplicationBuilder app, Server server)
         {
             app.Map("/version", (app) =>
             {
                 app.Run(async context =>
                 {
-                    await context.Response.WriteAsync(Version.AsString());
+                    context.Response.ContentType = "application/json";
+                    var data = new Dictionary<string, string>
+                    {
+                        { "version", Version.AsString() },
+                        { "id", server.Id },
+                        { "instance", Constants.INSTANCE_NAME }
+                    };
+                    await context.Response.WriteAsync(JsonSerializer.Serialize(data));
                 });
             });
             return app;

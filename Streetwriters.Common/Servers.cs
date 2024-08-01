@@ -34,7 +34,7 @@ namespace Streetwriters.Common
             if (!string.IsNullOrEmpty(originCertPath) && !string.IsNullOrEmpty(originCertKeyPath))
                 this.SSLCertificate = X509Certificate2.CreateFromPemFile(originCertPath, originCertKeyPath);
         }
-
+        public string Id { get; set; }
         public int Port { get; set; }
         public string Hostname { get; set; }
         public string Domain { get; set; }
@@ -95,6 +95,7 @@ namespace Streetwriters.Common
             Domain = Constants.NOTESNOOK_SERVER_DOMAIN,
             Port = Constants.NOTESNOOK_SERVER_PORT,
             Hostname = Constants.NOTESNOOK_SERVER_HOST,
+            Id = "notesnook-sync"
         };
 
         public static Server MessengerServer { get; } = new(Constants.SSE_CERT_PATH, Constants.SSE_CERT_KEY_PATH)
@@ -102,6 +103,7 @@ namespace Streetwriters.Common
             Domain = Constants.SSE_SERVER_DOMAIN,
             Port = Constants.SSE_SERVER_PORT,
             Hostname = Constants.SSE_SERVER_HOST,
+            Id = "sse"
         };
 
         public static Server IdentityServer { get; } = new(Constants.IDENTITY_CERT_PATH, Constants.IDENTITY_CERT_KEY_PATH)
@@ -109,6 +111,7 @@ namespace Streetwriters.Common
             Domain = Constants.IDENTITY_SERVER_DOMAIN,
             Port = Constants.IDENTITY_SERVER_PORT,
             Hostname = Constants.IDENTITY_SERVER_HOST,
+            Id = "auth"
         };
 
         public static Server SubscriptionServer { get; } = new(Constants.SUBSCRIPTIONS_CERT_PATH, Constants.SUBSCRIPTIONS_CERT_KEY_PATH)
@@ -116,6 +119,7 @@ namespace Streetwriters.Common
             Domain = Constants.SUBSCRIPTIONS_SERVER_DOMAIN,
             Port = Constants.SUBSCRIPTIONS_SERVER_PORT,
             Hostname = Constants.SUBSCRIPTIONS_SERVER_HOST,
+            Id = "subscription"
         };
     }
 }

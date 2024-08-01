@@ -21,8 +21,8 @@ namespace Streetwriters.Common
 {
     public class Version
     {
-        public const int MAJOR = 2;
-        public const int MINOR = 3;
+        public const int MAJOR = 1;
+        public const int MINOR = 0;
         public const int PATCH = 0;
         public static string AsString()
         {
