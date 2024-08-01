@@ -233,7 +233,7 @@ namespace Notesnook.API
             app.UseResponseCompression();
 
             app.UseCors("notesnook");
-            app.UseVersion();
+            app.UseVersion(Servers.NotesnookAPI);
 
             app.UseWamp(WampServers.NotesnookServer, (realm, server) =>
             {

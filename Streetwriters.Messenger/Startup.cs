@@ -103,7 +103,7 @@ namespace Streetwriters.Messenger
             }
 
             app.UseCors("notesnook");
-            app.UseVersion();
+            app.UseVersion(Servers.MessengerServer);
 
             app.UseRouting();
 
