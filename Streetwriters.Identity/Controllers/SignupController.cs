@@ -68,7 +68,7 @@ namespace Streetwriters.Identity.Controllers
                 var result = await UserManager.CreateAsync(new User
                 {
                     Email = form.Email,
-                    EmailConfirmed = false,
+                    EmailConfirmed = Constants.IS_SELF_HOSTED,
                     UserName = form.Username ?? form.Email,
                 }, form.Password);
 
@@ -101,15 +101,18 @@ namespace Streetwriters.Identity.Controllers
                 if (result.Succeeded)
                 {
                     var user = await UserManager.FindByEmailAsync(form.Email);
-
                     await UserManager.AddToRoleAsync(user, client.Id);
                     if (Constants.IS_SELF_HOSTED)
+                    {
                         await UserManager.AddClaimAsync(user, UserService.SubscriptionTypeToClaim(client.Id, Common.Enums.SubscriptionType.PREMIUM));
-                    await UserManager.AddClaimAsync(user, new Claim("platform", PlatformFromUserAgent(base.HttpContext.Request.Headers.UserAgent)));
-
-                    var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
-                    var callbackUrl = Url.TokenLink(user.Id.ToString(), code, client.Id, TokenType.CONFRIM_EMAIL, Request.Scheme);
-                    await EmailSender.SendConfirmationEmailAsync(user.Email, callbackUrl, client);
+                    }
+                    else
+                    {
+                        await UserManager.AddClaimAsync(user, new Claim("platform", PlatformFromUserAgent(base.HttpContext.Request.Headers.UserAgent)));
+                        var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
+                        var callbackUrl = Url.TokenLink(user.Id.ToString(), code, client.Id, TokenType.CONFRIM_EMAIL, Request.Scheme);
+                        await EmailSender.SendConfirmationEmailAsync(user.Email, callbackUrl, client);
+                    }
                     return Ok(new
                     {
                         userId = user.Id.ToString()
