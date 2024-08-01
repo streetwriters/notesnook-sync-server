@@ -53,6 +53,8 @@ namespace Streetwriters.Identity.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> Signup([FromForm] SignupForm form)
         {
+            if (Constants.DISABLE_ACCOUNT_CREATION)
+                return BadRequest(new string[] { "Creating new accounts is not allowed." });
             try
             {
                 var client = Clients.FindClientById(form.ClientId);
@@ -106,7 +108,6 @@ namespace Streetwriters.Identity.Controllers
                     if (Constants.IS_SELF_HOSTED)
                     {
                         await UserManager.AddClaimAsync(user, UserService.SubscriptionTypeToClaim(client.Id, Common.Enums.SubscriptionType.PREMIUM));
-                        await MFAService.EnableMFAAsync(user, MFAMethods.Email);
                     }
                     else
                     {
