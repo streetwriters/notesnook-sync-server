@@ -26,6 +26,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Streetwriters.Common;
+using Streetwriters.Common.Enums;
 using Streetwriters.Common.Models;
 using Streetwriters.Identity.Enums;
 using Streetwriters.Identity.Interfaces;
@@ -105,6 +106,7 @@ namespace Streetwriters.Identity.Controllers
                     if (Constants.IS_SELF_HOSTED)
                     {
                         await UserManager.AddClaimAsync(user, UserService.SubscriptionTypeToClaim(client.Id, Common.Enums.SubscriptionType.PREMIUM));
+                        await MFAService.EnableMFAAsync(user, MFAMethods.Email);
                     }
                     else
                     {
