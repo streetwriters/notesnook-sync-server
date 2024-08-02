@@ -41,7 +41,6 @@ services:
     image: minio/minio:RELEASE.2024-07-29T22-14-52Z
     ports:
       - 9000:9000
-      - 9090:9090
     networks:
       - notesnook
     volumes:
@@ -59,7 +58,7 @@ services:
       - notesnook-s3
     networks:
       - notesnook
-    entrypoint: /bin/sh
+    entrypoint: /bin/bash
     env_file: *env-files
     command:
       - -c
@@ -111,6 +110,7 @@ services:
       MONGODB_CONNECTION_STRING: mongodb://notesnook-db:27017/?replSet=rs0
       MONGODB_DATABASE_NAME: notesnook
       S3_INTERNAL_SERVICE_URL: "${S3_SERVICE_URL:-http://notesnook-s3:9000}"
+      S3_INTERNAL_BUCKET_NAME: "${S3_BUCKET_NAME}"
       S3_ACCESS_KEY_ID: "${S3_ACCESS_KEY_ID:-${MINIO_ROOT_USER:-minioadmin}}"
       S3_ACCESS_KEY: "${S3_ACCESS_KEY:-${MINIO_ROOT_PASSWORD:-minioadmin}}"
       S3_SERVICE_URL: "${S3_SERVICE_URL:-http://localhost:9000}"
