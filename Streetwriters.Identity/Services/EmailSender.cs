@@ -196,8 +196,8 @@ namespace Streetwriters.Identity.Services
             message.To.Add(new MailboxAddress("", email));
             message.Subject = await Template.Parse(template.Subject).RenderAsync(template.Data);
 
-            if (!string.IsNullOrEmpty(Constants.SMTP_REPLYTO_NAME) && !string.IsNullOrEmpty(Constants.SMTP_REPLYTO_EMAIL))
-                message.ReplyTo.Add(new MailboxAddress(Constants.SMTP_REPLYTO_NAME, Constants.SMTP_REPLYTO_EMAIL));
+            if (!string.IsNullOrEmpty(Constants.SMTP_REPLYTO_EMAIL))
+                message.ReplyTo.Add(MailboxAddress.Parse(Constants.SMTP_REPLYTO_EMAIL));
 
             message.Body = await GetEmailBodyAsync(template, client, sender);
 

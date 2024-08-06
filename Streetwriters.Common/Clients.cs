@@ -34,7 +34,7 @@ namespace Streetwriters.Common
             Id = "notesnook",
             Name = "Notesnook",
             SenderEmail = Constants.NOTESNOOK_SENDER_EMAIL,
-            SenderName = Constants.NOTESNOOK_SENDER_NAME,
+            SenderName = "Notesnook",
             Type = ApplicationType.NOTESNOOK,
             AppId = ApplicationType.NOTESNOOK,
             AccountRecoveryRedirectURL = $"{Constants.NOTESNOOK_APP_HOST}/account/recovery",

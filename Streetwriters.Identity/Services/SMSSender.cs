@@ -19,21 +19,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using Streetwriters.Identity.Interfaces;
 using Streetwriters.Common.Interfaces;
-using MessageBird;
-using MessageBird.Objects;
-using Microsoft.Extensions.Options;
-using Streetwriters.Identity.Models;
 using Streetwriters.Common;
 using Twilio.Rest.Verify.V2.Service;
 using Twilio;
 using System.Threading.Tasks;
-using System;
 
 namespace Streetwriters.Identity.Services
 {
     public class SMSSender : ISMSSender
     {
-        private Client client;
         public SMSSender()
         {
             if (!string.IsNullOrEmpty(Constants.TWILIO_ACCOUNT_SID) && !string.IsNullOrEmpty(Constants.TWILIO_AUTH_TOKEN))

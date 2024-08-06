@@ -41,10 +41,8 @@ namespace Streetwriters.Common
         public static string SMTP_PASSWORD => Environment.GetEnvironmentVariable("SMTP_PASSWORD");
         public static string SMTP_HOST => Environment.GetEnvironmentVariable("SMTP_HOST");
         public static string SMTP_PORT => Environment.GetEnvironmentVariable("SMTP_PORT");
-        public static string SMTP_REPLYTO_NAME => Environment.GetEnvironmentVariable("SMTP_REPLYTO_NAME");
         public static string SMTP_REPLYTO_EMAIL => Environment.GetEnvironmentVariable("SMTP_REPLYTO_EMAIL");
         public static string NOTESNOOK_SENDER_EMAIL => Environment.GetEnvironmentVariable("NOTESNOOK_SENDER_EMAIL");
-        public static string NOTESNOOK_SENDER_NAME => Environment.GetEnvironmentVariable("NOTESNOOK_SENDER_NAME");
 
         public static string NOTESNOOK_APP_HOST => Environment.GetEnvironmentVariable("NOTESNOOK_APP_HOST");
         public static string NOTESNOOK_API_SECRET => Environment.GetEnvironmentVariable("NOTESNOOK_API_SECRET");
