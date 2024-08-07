@@ -71,7 +71,7 @@ services:
   identity-server:
     image: streetwriters/identity:latest
     ports:
-      - "8264:80"
+      - 8264:80
     networks:
       - notesnook
     env_file: *env-files
@@ -91,7 +91,7 @@ services:
   notesnook-server:
     image: streetwriters/notesnook-sync:latest
     ports:
-      - "5264:80"
+      - 5264:80
     networks:
       - notesnook
     env_file: *env-files
@@ -120,7 +120,7 @@ services:
   sse-server:
     image: streetwriters/sse:latest
     ports:
-      - "7264:80"
+      - 7264:80
     env_file: *env-files
     depends_on:
       - identity-server
