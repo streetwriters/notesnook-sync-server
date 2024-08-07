@@ -39,9 +39,9 @@ namespace Streetwriters.Common.Extensions
                 app.Run(async context =>
                 {
                     context.Response.ContentType = "application/json";
-                    var data = new Dictionary<string, string>
+                    var data = new Dictionary<string, object>
                     {
-                        { "version", Version.AsString() },
+                        { "version", Constants.COMPATIBILITY_VERSION },
                         { "id", server.Id },
                         { "instance", Constants.INSTANCE_NAME }
                     };
