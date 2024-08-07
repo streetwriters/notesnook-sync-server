@@ -66,7 +66,7 @@ services:
         until mc alias set minio http://notesnook-s3:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin}; do
           sleep 1;
         done;
-        mc mb minio/$$S3_BUCKET_NAME -p
+        mc mb minio/attachments -p
 
   identity-server:
     image: streetwriters/identity:latest
@@ -110,12 +110,12 @@ services:
       MONGODB_CONNECTION_STRING: mongodb://notesnook-db:27017/?replSet=rs0
       MONGODB_DATABASE_NAME: notesnook
       S3_INTERNAL_SERVICE_URL: "${S3_SERVICE_URL:-http://notesnook-s3:9000}"
-      S3_INTERNAL_BUCKET_NAME: "${S3_BUCKET_NAME}"
-      S3_ACCESS_KEY_ID: "${S3_ACCESS_KEY_ID:-${MINIO_ROOT_USER:-minioadmin}}"
-      S3_ACCESS_KEY: "${S3_ACCESS_KEY:-${MINIO_ROOT_PASSWORD:-minioadmin}}"
+      S3_INTERNAL_BUCKET_NAME: "attachments"
+      S3_ACCESS_KEY_ID: "${MINIO_ROOT_USER:-minioadmin}"
+      S3_ACCESS_KEY: "${MINIO_ROOT_PASSWORD:-minioadmin}"
       S3_SERVICE_URL: "${S3_SERVICE_URL:-http://localhost:9000}"
-      S3_REGION: "${S3_REGION:-us-east-1}"
-      S3_BUCKET_NAME: "${S3_BUCKET_NAME}"
+      S3_REGION: "us-east-1"
+      S3_BUCKET_NAME: "attachments"
 
   sse-server:
     image: streetwriters/sse:latest
