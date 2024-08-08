@@ -11,12 +11,49 @@ x-env-files: &env-files
   - .env
 
 services:
+  validate:
+    image: vandot/alpine-bash
+    entrypoint: /bin/bash
+    env_file: *env-files
+    command:
+      - -c
+      - |
+        # List of required environment variables
+        required_vars=(
+          "INSTANCE_NAME"
+          "NOTESNOOK_API_SECRET"
+          "DISABLE_ACCOUNT_CREATION"
+          "SMTP_USERNAME"
+          "SMTP_PASSWORD"
+          "SMTP_HOST"
+          "SMTP_PORT"
+          "NOTESNOOK_SENDER_EMAIL"
+          "NOTESNOOK_SERVER_DOMAIN"
+          "IDENTITY_SERVER_DOMAIN"
+          "SSE_SERVER_DOMAIN"
+          "NOTESNOOK_APP_HOST"
+        )
+
+        # Check each required environment variable
+        for var in "$${required_vars[@]}"; do
+          if [ -z "$${!var}" ]; then
+            echo "Error: Required environment variable $$var is not set."
+            exit 1
+          fi
+        done
+
+        echo "All required environment variables are set."
+    # Ensure the validate service runs first
+    restart: "no"
+
   notesnook-db:
     image: mongo:7.0.12
     networks:
       - notesnook
     command: --replSet rs0 --bind_ip_all
-
+    depends_on:
+      validate:
+        condition: service_completed_successfully
   # the notesnook sync server requires transactions which only work
   # with a MongoDB replica set.
   # This job just runs `rs.initiate()` on our mongodb instance
@@ -47,6 +84,9 @@ services:
       - ${HOME}/.notesnook/s3:/data/s3
     environment:
       MINIO_BROWSER: "on"
+    depends_on:
+      validate:
+        condition: service_completed_successfully
     env_file: *env-files
     command: server /data/s3 --console-address :9090
 
@@ -144,6 +184,9 @@ services:
       - AUTOHEAL_INTERVAL=60
       - AUTOHEAL_START_PERIOD=300
       - AUTOHEAL_DEFAULT_STOP_TIMEOUT=10
+    depends_on:
+      validate:
+        condition: service_completed_successfully
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
 networks:
