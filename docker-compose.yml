@@ -1,9 +1,9 @@
 x-server-discovery: &server-discovery
-  NOTESNOOK_SERVER_PORT: 80
+  NOTESNOOK_SERVER_PORT: 5264
   NOTESNOOK_SERVER_HOST: notesnook-server
-  IDENTITY_SERVER_PORT: 80
+  IDENTITY_SERVER_PORT: 8264
   IDENTITY_SERVER_HOST: identity-server
-  SSE_SERVER_PORT: 80
+  SSE_SERVER_PORT: 7264
   SSE_SERVER_HOST: sse-server
   SELF_HOSTED: 1
 
@@ -111,7 +111,7 @@ services:
   identity-server:
     image: streetwriters/identity:latest
     ports:
-      - 8264:80
+      - 8264:8264
     networks:
       - notesnook
     env_file: *env-files
@@ -131,7 +131,7 @@ services:
   notesnook-server:
     image: streetwriters/notesnook-sync:latest
     ports:
-      - 5264:80
+      - 5264:5264
     networks:
       - notesnook
     env_file: *env-files
@@ -160,7 +160,7 @@ services:
   sse-server:
     image: streetwriters/sse:latest
     ports:
-      - 7264:80
+      - 7264:7264
     env_file: *env-files
     depends_on:
       - identity-server
