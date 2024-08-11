@@ -156,58 +156,50 @@ namespace Notesnook.API.Models
 
         public override SyncItem Deserialize(BsonDeserializationContext context, BsonDeserializationArgs args)
         {
+            var syncItem = new SyncItem();
             var bsonReader = context.Reader;
             bsonReader.ReadStartDocument();
 
-            bsonReader.ReadBsonType();
-            bsonReader.SkipName();
-            var id = bsonReader.ReadObjectId();
-
-            bsonReader.ReadBsonType();
-            bsonReader.SkipName();
-            var dateSynced = bsonReader.ReadInt64();
-
-            bsonReader.ReadBsonType();
-            bsonReader.SkipName();
-            var userId = bsonReader.ReadString();
-
-            bsonReader.ReadBsonType();
-            bsonReader.SkipName();
-            var iv = bsonReader.ReadString();
-
-            bsonReader.ReadBsonType();
-            bsonReader.SkipName();
-            var cipher = bsonReader.ReadString();
-
-            bsonReader.ReadBsonType();
-            bsonReader.SkipName();
-            var itemId = bsonReader.ReadString();
-
-            bsonReader.ReadBsonType();
-            bsonReader.SkipName();
-            var length = bsonReader.ReadInt64();
-
-            bsonReader.ReadBsonType();
-            bsonReader.SkipName();
-            var version = bsonReader.ReadDouble();
-
-            bsonReader.ReadBsonType();
-            bsonReader.SkipName();
-            var algorithm = bsonReader.ReadString();
-
-            bsonReader.ReadEndDocument();
-            return new SyncItem
+            while (bsonReader.ReadBsonType() != BsonType.EndOfDocument)
             {
-                Id = id,
-                DateSynced = dateSynced,
-                UserId = userId,
-                IV = iv,
-                Cipher = cipher,
-                ItemId = itemId,
-                Length = length,
-                Version = version,
-                Algorithm = algorithm
-            };
+                var fieldName = bsonReader.ReadName();
+
+                switch (fieldName)
+                {
+                    case "DateSynced":
+                        syncItem.DateSynced = bsonReader.ReadInt64();
+                        break;
+                    case "UserId":
+                        syncItem.UserId = bsonReader.ReadString();
+                        break;
+                    case "IV":
+                        syncItem.IV = bsonReader.ReadString();
+                        break;
+                    case "Cipher":
+                        syncItem.Cipher = bsonReader.ReadString();
+                        break;
+                    case "ItemId":
+                        syncItem.ItemId = bsonReader.ReadString();
+                        break;
+                    case "_id":
+                        syncItem.Id = bsonReader.ReadObjectId();
+                        break;
+                    case "Length":
+                        syncItem.Length = bsonReader.ReadInt64();
+                        break;
+                    case "Version":
+                        syncItem.Version = bsonReader.ReadDouble();
+                        break;
+                    case "Algorithm":
+                        syncItem.Algorithm = bsonReader.ReadString();
+                        break;
+                    default:
+                        bsonReader.SkipValue();
+                        break;
+                }
+            }
+            bsonReader.ReadEndDocument();
+            return syncItem;
         }
     }
 }
