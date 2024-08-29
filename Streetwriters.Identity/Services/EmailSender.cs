@@ -179,7 +179,7 @@ namespace Streetwriters.Identity.Services
             {
                 if (int.TryParse(Constants.SMTP_PORT, out int port))
                 {
-                    await mailClient.ConnectAsync(Constants.SMTP_HOST, port, MailKit.Security.SecureSocketOptions.StartTls);
+                    await mailClient.ConnectAsync(Constants.SMTP_HOST, port, MailKit.Security.SecureSocketOptions.Auto);
                 }
                 else
                 {

@@ -92,7 +92,6 @@ namespace Streetwriters.Common
 #endif
         public static Server NotesnookAPI { get; } = new(Constants.NOTESNOOK_CERT_PATH, Constants.NOTESNOOK_CERT_KEY_PATH)
         {
-            Domain = Constants.NOTESNOOK_SERVER_DOMAIN,
             Port = Constants.NOTESNOOK_SERVER_PORT,
             Hostname = Constants.NOTESNOOK_SERVER_HOST,
             Id = "notesnook-sync"
@@ -100,7 +99,6 @@ namespace Streetwriters.Common
 
         public static Server MessengerServer { get; } = new(Constants.SSE_CERT_PATH, Constants.SSE_CERT_KEY_PATH)
         {
-            Domain = Constants.SSE_SERVER_DOMAIN,
             Port = Constants.SSE_SERVER_PORT,
             Hostname = Constants.SSE_SERVER_HOST,
             Id = "sse"
@@ -116,7 +114,6 @@ namespace Streetwriters.Common
 
         public static Server SubscriptionServer { get; } = new(Constants.SUBSCRIPTIONS_CERT_PATH, Constants.SUBSCRIPTIONS_CERT_KEY_PATH)
         {
-            Domain = Constants.SUBSCRIPTIONS_SERVER_DOMAIN,
             Port = Constants.SUBSCRIPTIONS_SERVER_PORT,
             Hostname = Constants.SUBSCRIPTIONS_SERVER_HOST,
             Id = "subscription"

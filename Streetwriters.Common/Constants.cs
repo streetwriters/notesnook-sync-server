@@ -43,7 +43,7 @@ namespace Streetwriters.Common
         public static string SMTP_HOST => Environment.GetEnvironmentVariable("SMTP_HOST");
         public static string SMTP_PORT => Environment.GetEnvironmentVariable("SMTP_PORT");
         public static string SMTP_REPLYTO_EMAIL => Environment.GetEnvironmentVariable("SMTP_REPLYTO_EMAIL");
-        public static string NOTESNOOK_SENDER_EMAIL => Environment.GetEnvironmentVariable("NOTESNOOK_SENDER_EMAIL");
+        public static string NOTESNOOK_SENDER_EMAIL => Environment.GetEnvironmentVariable("NOTESNOOK_SENDER_EMAIL") ?? Environment.GetEnvironmentVariable("SMTP_USERNAME");
 
         public static string NOTESNOOK_APP_HOST => Environment.GetEnvironmentVariable("NOTESNOOK_APP_HOST");
         public static string NOTESNOOK_API_SECRET => Environment.GetEnvironmentVariable("NOTESNOOK_API_SECRET");
@@ -55,7 +55,6 @@ namespace Streetwriters.Common
         // Server discovery
         public static int NOTESNOOK_SERVER_PORT => int.Parse(Environment.GetEnvironmentVariable("NOTESNOOK_SERVER_PORT") ?? "80");
         public static string NOTESNOOK_SERVER_HOST => Environment.GetEnvironmentVariable("NOTESNOOK_SERVER_HOST");
-        public static string NOTESNOOK_SERVER_DOMAIN => Environment.GetEnvironmentVariable("NOTESNOOK_SERVER_DOMAIN");
         public static string NOTESNOOK_CERT_PATH => Environment.GetEnvironmentVariable("NOTESNOOK_CERT_PATH");
         public static string NOTESNOOK_CERT_KEY_PATH => Environment.GetEnvironmentVariable("NOTESNOOK_CERT_KEY_PATH");
 
@@ -67,7 +66,6 @@ namespace Streetwriters.Common
 
         public static int SSE_SERVER_PORT => int.Parse(Environment.GetEnvironmentVariable("SSE_SERVER_PORT") ?? "80");
         public static string SSE_SERVER_HOST => Environment.GetEnvironmentVariable("SSE_SERVER_HOST");
-        public static string SSE_SERVER_DOMAIN => Environment.GetEnvironmentVariable("SSE_SERVER_DOMAIN");
         public static string SSE_CERT_PATH => Environment.GetEnvironmentVariable("SSE_CERT_PATH");
         public static string SSE_CERT_KEY_PATH => Environment.GetEnvironmentVariable("SSE_CERT_KEY_PATH");
 
@@ -76,7 +74,6 @@ namespace Streetwriters.Common
         public static string MONGODB_DATABASE_NAME => Environment.GetEnvironmentVariable("MONGODB_DATABASE_NAME");
         public static int SUBSCRIPTIONS_SERVER_PORT => int.Parse(Environment.GetEnvironmentVariable("SUBSCRIPTIONS_SERVER_PORT") ?? "80");
         public static string SUBSCRIPTIONS_SERVER_HOST => Environment.GetEnvironmentVariable("SUBSCRIPTIONS_SERVER_HOST");
-        public static string SUBSCRIPTIONS_SERVER_DOMAIN => Environment.GetEnvironmentVariable("SUBSCRIPTIONS_SERVER_DOMAIN");
         public static string SUBSCRIPTIONS_CERT_PATH => Environment.GetEnvironmentVariable("SUBSCRIPTIONS_CERT_PATH");
         public static string SUBSCRIPTIONS_CERT_KEY_PATH => Environment.GetEnvironmentVariable("SUBSCRIPTIONS_CERT_KEY_PATH");
         public static string[] NOTESNOOK_CORS_ORIGINS => Environment.GetEnvironmentVariable("NOTESNOOK_CORS")?.Split(",") ?? new string[] { };

@@ -27,10 +27,7 @@ services:
           "SMTP_PASSWORD"
           "SMTP_HOST"
           "SMTP_PORT"
-          "NOTESNOOK_SENDER_EMAIL"
-          "NOTESNOOK_SERVER_DOMAIN"
           "IDENTITY_SERVER_DOMAIN"
-          "SSE_SERVER_DOMAIN"
           "NOTESNOOK_APP_HOST"
         )
 
