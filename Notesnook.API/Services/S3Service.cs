@@ -145,6 +145,12 @@ namespace Notesnook.API.Services
 
             var request = new HttpRequestMessage(HttpMethod.Head, url);
             var response = await httpClient.SendAsync(request);
+            const long MAX_SIZE = 513 * 1024 * 1024; // 512 MB
+            if (!Constants.IS_SELF_HOSTED && response.Content.Headers.ContentLength >= MAX_SIZE)
+            {
+                await this.DeleteObjectAsync(userId, name);
+                throw new Exception("File size exceeds the maximum allowed size.");
+            }
             return response.Content.Headers.ContentLength ?? 0;
         }
 
