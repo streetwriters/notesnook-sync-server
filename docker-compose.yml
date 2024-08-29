@@ -115,7 +115,7 @@ services:
     depends_on:
       - notesnook-db
     healthcheck:
-      test: curl --fail http://localhost:8264/health || exit 1
+      test: wget --tries=1 -nv -q  http://localhost:8264/health -O- || exit 1
       interval: 40s
       timeout: 30s
       retries: 3
@@ -137,7 +137,7 @@ services:
       - setup-s3
       - identity-server
     healthcheck:
-      test: curl --fail http://localhost:5264/health || exit 1
+      test: wget --tries=1 -nv -q  http://localhost:5264/health -O- || exit 1
       interval: 40s
       timeout: 30s
       retries: 3
@@ -165,7 +165,7 @@ services:
     networks:
       - notesnook
     healthcheck:
-      test: curl --fail http://localhost:7264/health || exit 1
+      test: wget --tries=1 -nv -q  http://localhost:7264/health -O- || exit 1
       interval: 40s
       timeout: 30s
       retries: 3
