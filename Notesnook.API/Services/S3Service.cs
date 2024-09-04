@@ -220,6 +220,7 @@ namespace Notesnook.API.Services
             var objectName = GetFullObjectName(userId, name);
             if (userId == null || objectName == null) return null;
 
+            var client = GetS3Client(mode);
             var request = new GetPreSignedUrlRequest
             {
                 BucketName = GetBucketName(mode),
@@ -229,16 +230,17 @@ namespace Notesnook.API.Services
 #if DEBUG
                 Protocol = Protocol.HTTP,
 #else
-                Protocol = Constants.IS_SELF_HOSTED ? Protocol.HTTP : Protocol.HTTPS,
+                Protocol = client.Config.ServiceURL.StartsWith("http://") ? Protocol.HTTP : Protocol.HTTPS,
 #endif
             };
-            return GetS3Client(mode).GetPreSignedURL(request);
+            return client.GetPreSignedURL(request);
         }
 
         private string GetPresignedURLForUploadPart(string objectName, string uploadId, int partNumber)
         {
 
-            return GetS3Client(S3ClientMode.INTERNAL).GetPreSignedURL(new GetPreSignedUrlRequest
+            var client = GetS3Client(S3ClientMode.INTERNAL);
+            return client.GetPreSignedURL(new GetPreSignedUrlRequest
             {
                 BucketName = GetBucketName(S3ClientMode.INTERNAL),
                 Expires = System.DateTime.Now.AddHours(1),
@@ -249,7 +251,7 @@ namespace Notesnook.API.Services
 #if DEBUG
                 Protocol = Protocol.HTTP,
 #else
-                Protocol = Constants.IS_SELF_HOSTED ? Protocol.HTTP : Protocol.HTTPS,
+                Protocol = client.Config.ServiceURL.StartsWith("http://") ? Protocol.HTTP : Protocol.HTTPS,
 #endif
             });
         }
