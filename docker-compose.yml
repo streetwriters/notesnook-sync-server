@@ -45,6 +45,10 @@ services:
 
   notesnook-db:
     image: mongo:7.0.12
+    hostname: notesnook-db
+    volumes:
+      - ${HOME}/.notesnook/db/data:/data/db
+      - ${HOME}/.notesnook/db/configdb:/data/configdb
     networks:
       - notesnook
     command: --replSet rs0 --bind_ip_all
@@ -58,10 +62,6 @@ services:
   # it multiple times is no issue.
   initiate-rs0:
     image: mongo:7.0.12
-    hostname: notesnook-db
-    volumes:
-      - ${HOME}/.notesnook/db/data:/data/db
-      - ${HOME}/.notesnook/db/configdb:/data/configdb
     networks:
       - notesnook
     depends_on:
