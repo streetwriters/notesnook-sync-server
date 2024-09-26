@@ -77,8 +77,8 @@ This takes care of setting up everything including MongoDB, Minio etc.
 - [x] Fully Dockerize all services
 - [x] Use self-hosted Minio for S3 storage
 - [x] Publish on DockerHub
+- [x] Add settings to change server URLs in Notesnook client apps
 - [ ] Write self hosting docs
-- [ ] Add settings to change server URLs in Notesnook client apps
 
 ## License
 
