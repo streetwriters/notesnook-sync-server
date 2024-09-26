@@ -69,7 +69,7 @@ This takes care of setting up everything including MongoDB, Minio etc.
 
 ## TODO Self-hosting
 
-**Note: Self-hosting the Notesnook Sync Server is not yet possible. We are working to enable full on-premise self hosting so stay tuned!**
+**Note: Self-hosting the Notesnook Sync Server is now possible, but without support. Documentation will be provided at a later date. We are working to enable full on-premise self-hosting, so stay tuned!**
 
 - [x] Open source the Sync server
 - [x] Open source the Identity server
@@ -77,8 +77,8 @@ This takes care of setting up everything including MongoDB, Minio etc.
 - [x] Fully Dockerize all services
 - [x] Use self-hosted Minio for S3 storage
 - [x] Publish on DockerHub
+- [x] Add settings to change server URLs in Notesnook client apps (starting from v3.0.18)
 - [ ] Write self hosting docs
-- [ ] Add settings to change server URLs in Notesnook client apps
 
 ## License
 
