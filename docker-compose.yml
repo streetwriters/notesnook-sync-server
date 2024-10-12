@@ -27,8 +27,10 @@ services:
           "SMTP_PASSWORD"
           "SMTP_HOST"
           "SMTP_PORT"
-          "IDENTITY_SERVER_DOMAIN"
-          "NOTESNOOK_APP_HOST"
+          "AUTH_SERVER_PUBLIC_URL"
+          "NOTESNOOK_APP_PUBLIC_URL"
+          "MONOGRAPH_PUBLIC_URL"
+          "ATTACHMENTS_SERVER_PUBLIC_URL"
         )
 
         # Check each required environment variable
@@ -128,6 +130,8 @@ services:
       <<: *server-discovery
       MONGODB_CONNECTION_STRING: mongodb://notesnook-db:27017/identity?replSet=rs0
       MONGODB_DATABASE_NAME: identity
+      IDENTITY_SERVER_URL: ${AUTH_SERVER_PUBLIC_URL}
+      NOTESNOOK_APP_HOST: ${NOTESNOOK_APP_PUBLIC_URL}
 
   notesnook-server:
     image: streetwriters/notesnook-sync:latest
@@ -154,7 +158,7 @@ services:
       S3_INTERNAL_BUCKET_NAME: "attachments"
       S3_ACCESS_KEY_ID: "${MINIO_ROOT_USER:-minioadmin}"
       S3_ACCESS_KEY: "${MINIO_ROOT_PASSWORD:-minioadmin}"
-      S3_SERVICE_URL: "${S3_SERVICE_URL:-http://localhost:9000}"
+      S3_SERVICE_URL: "${ATTACHMENTS_SERVER_PUBLIC_URL}"
       S3_REGION: "us-east-1"
       S3_BUCKET_NAME: "attachments"
 
@@ -176,6 +180,26 @@ services:
       start_period: 60s
     environment:
       <<: *server-discovery
+
+  monograph-server:
+    image: streetwriters/monograph:latest
+    ports:
+      - 6264:3000
+    env_file: *env-files
+    depends_on:
+      - notesnook-server
+    networks:
+      - notesnook
+    healthcheck:
+      test: wget --tries=1 -nv -q  http://localhost:3000/api/health -O- || exit 1
+      interval: 40s
+      timeout: 30s
+      retries: 3
+      start_period: 60s
+    environment:
+      <<: *server-discovery
+      API_HOST: http://notesnook-server:5264
+      PUBLIC_URL: ${MONOGRAPH_PUBLIC_URL}
 
   autoheal:
     image: willfarrell/autoheal:latest
