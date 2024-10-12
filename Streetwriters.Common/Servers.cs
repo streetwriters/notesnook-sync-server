@@ -17,6 +17,7 @@ You should have received a copy of the Affero GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+using System;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
@@ -37,7 +38,7 @@ namespace Streetwriters.Common
         public string Id { get; set; }
         public int Port { get; set; }
         public string Hostname { get; set; }
-        public string Domain { get; set; }
+        public Uri PublicURL { get; set; }
         public X509Certificate2 SSLCertificate { get; }
         public bool IsSecure { get => this.SSLCertificate != null; }
 
@@ -86,8 +87,7 @@ namespace Streetwriters.Common
         public static Server S3Server { get; } = new()
         {
             Port = 4568,
-            Hostname = HOST,
-            Domain = HOST
+            Hostname = HOST
         };
 #endif
         public static Server NotesnookAPI { get; } = new(Constants.NOTESNOOK_CERT_PATH, Constants.NOTESNOOK_CERT_KEY_PATH)
@@ -106,7 +106,7 @@ namespace Streetwriters.Common
 
         public static Server IdentityServer { get; } = new(Constants.IDENTITY_CERT_PATH, Constants.IDENTITY_CERT_KEY_PATH)
         {
-            Domain = Constants.IDENTITY_SERVER_DOMAIN,
+            PublicURL = Constants.IDENTITY_SERVER_URL,
             Port = Constants.IDENTITY_SERVER_PORT,
             Hostname = Constants.IDENTITY_SERVER_HOST,
             Id = "auth"

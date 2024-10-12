@@ -60,7 +60,7 @@ namespace Streetwriters.Common
 
         public static int IDENTITY_SERVER_PORT => int.Parse(Environment.GetEnvironmentVariable("IDENTITY_SERVER_PORT") ?? "80");
         public static string IDENTITY_SERVER_HOST => Environment.GetEnvironmentVariable("IDENTITY_SERVER_HOST");
-        public static string IDENTITY_SERVER_DOMAIN => Environment.GetEnvironmentVariable("IDENTITY_SERVER_DOMAIN");
+        public static Uri IDENTITY_SERVER_URL => new(Environment.GetEnvironmentVariable("IDENTITY_SERVER_URL"));
         public static string IDENTITY_CERT_PATH => Environment.GetEnvironmentVariable("IDENTITY_CERT_PATH");
         public static string IDENTITY_CERT_KEY_PATH => Environment.GetEnvironmentVariable("IDENTITY_CERT_KEY_PATH");
 
