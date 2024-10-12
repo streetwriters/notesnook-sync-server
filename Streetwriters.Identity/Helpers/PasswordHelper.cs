@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
 using System.Text;
-using Sodium;
+using Geralt;
 
 namespace Streetwriters.Identity.Helpers
 {
@@ -27,12 +27,14 @@ namespace Streetwriters.Identity.Helpers
     {
         public static bool VerifyPassword(string password, string hash)
         {
-            return PasswordHash.ArgonHashStringVerify(hash, password);
+            return Argon2id.VerifyHash(Encoding.UTF8.GetBytes(hash), Encoding.UTF8.GetBytes(password));
         }
 
         public static string CreatePasswordHash(string password)
         {
-            return PasswordHash.ArgonHashString(password, 3, 65536);
+            Span<byte> hash = new(new byte[128]);
+            Argon2id.ComputeHash(hash, Encoding.UTF8.GetBytes(password), 3, 65536);
+            return Encoding.UTF8.GetString(hash);
         }
     }
 }

@@ -28,18 +28,14 @@ namespace Streetwriters.Identity.Services
     {
         public string HashPassword(TUser user, string password)
         {
-            if (password == null)
-                throw new ArgumentNullException(nameof(password));
-
+            ArgumentNullException.ThrowIfNullOrEmpty(password, nameof(password));
             return PasswordHelper.CreatePasswordHash(password);
         }
 
         public PasswordVerificationResult VerifyHashedPassword(TUser user, string hashedPassword, string providedPassword)
         {
-            if (hashedPassword == null)
-                throw new ArgumentNullException(nameof(hashedPassword));
-            if (providedPassword == null)
-                throw new ArgumentNullException(nameof(providedPassword));
+            ArgumentNullException.ThrowIfNullOrEmpty(hashedPassword, nameof(hashedPassword));
+            ArgumentNullException.ThrowIfNullOrEmpty(providedPassword, nameof(providedPassword));
 
             return PasswordHelper.VerifyPassword(providedPassword, hashedPassword) ? PasswordVerificationResult.Success : PasswordVerificationResult.Failed;
         }
