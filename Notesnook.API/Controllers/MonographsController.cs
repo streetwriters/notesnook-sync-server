@@ -36,6 +36,7 @@ namespace Notesnook.API.Controllers
     [Authorize("Sync")]
     public class MonographsController : ControllerBase
     {
+        const string SVG_PIXEL = "<svg xmlns='http://www.w3.org/2000/svg' width='1' height='1'><circle r='9'/></svg>";
         private Repository<Monograph> Monographs { get; set; }
         private readonly IUnitOfWork unit;
         private const int MAX_DOC_SIZE = 15 * 1024 * 1024;
@@ -127,24 +128,17 @@ namespace Notesnook.API.Controllers
             return Ok(monograph);
         }
 
-        [HttpGet("{id}/destruct")]
+        [HttpGet("{id}/view")]
         [AllowAnonymous]
-        public async Task<IActionResult> DestructMonographAsync([FromRoute] string id)
+        public async Task<IActionResult> TrackView([FromRoute] string id)
         {
             var monograph = await Monographs.GetAsync(id);
-            if (monograph == null)
-            {
-                return NotFound(new
-                {
-                    error = "invalid_id",
-                    error_description = $"No such monograph found."
-                });
-            }
+            if (monograph == null) return Content(SVG_PIXEL, "image/svg+xml");
 
             if (monograph.SelfDestruct)
                 await Monographs.DeleteByIdAsync(monograph.Id);
 
-            return Ok();
+            return Content(SVG_PIXEL, "image/svg+xml");
         }
 
         [HttpDelete("{id}")]
