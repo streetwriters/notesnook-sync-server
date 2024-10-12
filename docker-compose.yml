@@ -51,8 +51,8 @@ services:
     image: mongo:7.0.12
     hostname: notesnook-db
     volumes:
-      - ${HOME}/.notesnook/db/data:/data/db
-      - ${HOME}/.notesnook/db/configdb:/data/configdb
+      - dbdata:/data/db
+      - dbdata:/data/configdb
     networks:
       - notesnook
     command: --replSet rs0 --bind_ip_all
@@ -92,7 +92,7 @@ services:
     networks:
       - notesnook
     volumes:
-      - ${HOME}/.notesnook/s3:/data/s3
+      - s3data:/data/s3
     environment:
       MINIO_BROWSER: "on"
     depends_on:
@@ -228,3 +228,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
 networks:
   notesnook:
+
+volumes:
+  dbdata:
+  s3data:
