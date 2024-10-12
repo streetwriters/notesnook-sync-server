@@ -113,7 +113,7 @@ namespace Streetwriters.Identity.Controllers
                     {
                         await UserManager.AddClaimAsync(user, new Claim("platform", PlatformFromUserAgent(base.HttpContext.Request.Headers.UserAgent)));
                         var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
-                        var callbackUrl = Url.TokenLink(user.Id.ToString(), code, client.Id, TokenType.CONFRIM_EMAIL, Request.Scheme);
+                        var callbackUrl = Url.TokenLink(user.Id.ToString(), code, client.Id, TokenType.CONFRIM_EMAIL);
                         await EmailSender.SendConfirmationEmailAsync(user.Email, callbackUrl, client);
                     }
                     return Ok(new

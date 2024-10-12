@@ -125,7 +125,7 @@ namespace Streetwriters.Identity.Controllers
             if (string.IsNullOrEmpty(newEmail))
             {
                 var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
-                var callbackUrl = Url.TokenLink(user.Id.ToString(), code, client.Id, TokenType.CONFRIM_EMAIL, Request.Scheme);
+                var callbackUrl = Url.TokenLink(user.Id.ToString(), code, client.Id, TokenType.CONFRIM_EMAIL);
                 await EmailSender.SendConfirmationEmailAsync(user.Email, callbackUrl, client);
             }
             else
@@ -156,7 +156,7 @@ namespace Streetwriters.Identity.Controllers
             if (!await UserService.IsUserValidAsync(UserManager, user, form.ClientId)) return Ok();
 
             var code = await UserManager.GenerateUserTokenAsync(user, TokenOptions.DefaultProvider, "ResetPassword");
-            var callbackUrl = Url.TokenLink(user.Id.ToString(), code, client.Id, TokenType.RESET_PASSWORD, Request.Scheme);
+            var callbackUrl = Url.TokenLink(user.Id.ToString(), code, client.Id, TokenType.RESET_PASSWORD);
 #if DEBUG
             return Ok(callbackUrl);
 #else

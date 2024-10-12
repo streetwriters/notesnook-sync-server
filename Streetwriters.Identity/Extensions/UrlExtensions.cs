@@ -29,19 +29,20 @@ namespace Microsoft.AspNetCore.Mvc
 {
     public static class UrlHelperExtensions
     {
-        public static string TokenLink(this IUrlHelper urlHelper, string userId, string code, string clientId, TokenType type, string scheme)
+        public static string TokenLink(this IUrlHelper urlHelper, string userId, string code, string clientId, TokenType type)
         {
 
             return urlHelper.ActionLink(
 #if DEBUG
             host: $"{Servers.IdentityServer.Hostname}:{Servers.IdentityServer.Port}",
+            protocol: "http",
 #else
-            host: Servers.IdentityServer.Domain,  
+            host: Servers.IdentityServer.PublicURL.Host,
+            protocol: Servers.IdentityServer.PublicURL.Scheme,
 #endif
             action: nameof(AccountController.ConfirmToken),
             controller: "Account",
-            values: new { userId, code, clientId, type },
-            protocol: scheme);
+            values: new { userId, code, clientId, type });
 
         }
     }
