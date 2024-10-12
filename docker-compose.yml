@@ -6,6 +6,8 @@ x-server-discovery: &server-discovery
   SSE_SERVER_PORT: 7264
   SSE_SERVER_HOST: sse-server
   SELF_HOSTED: 1
+  IDENTITY_SERVER_URL: ${AUTH_SERVER_PUBLIC_URL}
+  NOTESNOOK_APP_HOST: ${NOTESNOOK_APP_PUBLIC_URL}
 
 x-env-files: &env-files
   - .env
@@ -57,6 +59,12 @@ services:
     depends_on:
       validate:
         condition: service_completed_successfully
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh mongodb://localhost:27017 --quiet
+      interval: 40s
+      timeout: 30s
+      retries: 3
+      start_period: 60s
   # the notesnook sync server requires transactions which only work
   # with a MongoDB replica set.
   # This job just runs `rs.initiate()` on our mongodb instance
@@ -92,6 +100,12 @@ services:
         condition: service_completed_successfully
     env_file: *env-files
     command: server /data/s3 --console-address :9090
+    healthcheck:
+      test: timeout 5s bash -c ':> /dev/tcp/127.0.0.1/9000' || exit 1
+      interval: 40s
+      timeout: 30s
+      retries: 3
+      start_period: 60s
 
   # There's no way to specify a default bucket in Minio so we have to
   # set it up ourselves.
@@ -130,8 +144,6 @@ services:
       <<: *server-discovery
       MONGODB_CONNECTION_STRING: mongodb://notesnook-db:27017/identity?replSet=rs0
       MONGODB_DATABASE_NAME: identity
-      IDENTITY_SERVER_URL: ${AUTH_SERVER_PUBLIC_URL}
-      NOTESNOOK_APP_HOST: ${NOTESNOOK_APP_PUBLIC_URL}
 
   notesnook-server:
     image: streetwriters/notesnook-sync:latest
