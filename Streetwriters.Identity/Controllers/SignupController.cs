@@ -53,7 +53,7 @@ namespace Streetwriters.Identity.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> Signup([FromForm] SignupForm form)
         {
-            if (Constants.DISABLE_ACCOUNT_CREATION)
+            if (Constants.DISABLE_SIGNUPS)
                 return BadRequest(new string[] { "Creating new accounts is not allowed." });
             try
             {

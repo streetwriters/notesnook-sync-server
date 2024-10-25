@@ -24,7 +24,7 @@ services:
         required_vars=(
           "INSTANCE_NAME"
           "NOTESNOOK_API_SECRET"
-          "DISABLE_ACCOUNT_CREATION"
+          "DISABLE_SIGNUPS"
           "SMTP_USERNAME"
           "SMTP_PASSWORD"
           "SMTP_HOST"
