@@ -25,7 +25,7 @@ namespace Streetwriters.Common
     {
         public static int COMPATIBILITY_VERSION = 1;
         public static bool IS_SELF_HOSTED => Environment.GetEnvironmentVariable("SELF_HOSTED") == "1";
-        public static bool DISABLE_ACCOUNT_CREATION => Environment.GetEnvironmentVariable("DISABLE_ACCOUNT_CREATION") == "1";
+        public static bool DISABLE_SIGNUPS => Environment.GetEnvironmentVariable("DISABLE_SIGNUPS") == "true";
         public static string INSTANCE_NAME => Environment.GetEnvironmentVariable("INSTANCE_NAME") ?? "default";
 
         // S3 related
