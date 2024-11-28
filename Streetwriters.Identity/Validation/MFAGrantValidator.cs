@@ -100,9 +100,6 @@ namespace Streetwriters.Identity.Validation
             context.Result.Error = "invalid_mfa";
             context.Result.ErrorDescription = "Please provide a valid multi-factor authentication code.";
 
-            if (!await UserManager.GetTwoFactorEnabledAsync(user))
-                await MFAService.EnableMFAAsync(user, MFAMethods.Email);
-
             if (string.IsNullOrEmpty(mfaCode)) return;
             if (string.IsNullOrEmpty(mfaMethod) || !MFAService.IsValidMFAMethod(mfaMethod))
             {
@@ -132,16 +129,15 @@ namespace Streetwriters.Identity.Validation
                 }
             }
 
+            // This must be done after the MFA code is verified
+            // otherwise the security stamp will be updated
+            // making all the 2FA code invalid
+            if (!await UserManager.GetTwoFactorEnabledAsync(user))
+                await MFAService.EnableMFAAsync(user, MFAMethods.Email);
+
             await UserManager.ResetAccessFailedCountAsync(user);
             context.Result.IsError = false;
             context.Result.Subject = await TokenGenerationService.TransformTokenRequestAsync(context.Request, user, GrantType, [Config.MFA_PASSWORD_GRANT_TYPE_SCOPE]);
-        }
-
-
-        string Pluralize(int? value, string singular, string plural)
-        {
-            if (value == null) return $"0 {plural}";
-            return value == 1 ? $"{value} {singular}" : $"{value} {plural}";
         }
     }
 }
