@@ -63,7 +63,7 @@ namespace Streetwriters.Common
 
     public class Servers
     {
-#if DEBUG
+#if (DEBUG || STAGING)
         public static string GetLocalIPv4()
         {
             var interfaces = NetworkInterface.GetAllNetworkInterfaces();

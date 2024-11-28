@@ -61,7 +61,7 @@ namespace Notesnook.API.Services
         {
             var config = new AmazonS3Config
             {
-#if DEBUG
+#if (DEBUG || STAGING)
                 ServiceURL = Servers.S3Server.ToString(),
 #else
                 ServiceURL = Constants.S3_SERVICE_URL,
@@ -71,7 +71,7 @@ namespace Notesnook.API.Services
                 SignatureMethod = SigningAlgorithm.HmacSHA256,
                 SignatureVersion = "4"
             };
-#if DEBUG
+#if (DEBUG || STAGING)
             S3Client = new AmazonS3Client("S3RVER", "S3RVER", config);
 #else
             S3Client = new AmazonS3Client(Constants.S3_ACCESS_KEY_ID, Constants.S3_ACCESS_KEY, config);
@@ -227,7 +227,7 @@ namespace Notesnook.API.Services
                 Expires = System.DateTime.Now.AddHours(1),
                 Verb = httpVerb,
                 Key = objectName,
-#if DEBUG
+#if (DEBUG || STAGING)
                 Protocol = Protocol.HTTP,
 #else
                 Protocol = client.Config.ServiceURL.StartsWith("http://") ? Protocol.HTTP : Protocol.HTTPS,
@@ -248,7 +248,7 @@ namespace Notesnook.API.Services
                 Key = objectName,
                 PartNumber = partNumber,
                 UploadId = uploadId,
-#if DEBUG
+#if (DEBUG || STAGING)
                 Protocol = Protocol.HTTP,
 #else
                 Protocol = client.Config.ServiceURL.StartsWith("http://") ? Protocol.HTTP : Protocol.HTTPS,

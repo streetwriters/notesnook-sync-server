@@ -17,16 +17,12 @@ You should have received a copy of the Affero GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#if !DEBUG
-using System.Net;
-#endif
 using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Hosting;
-using Streetwriters.Common;
-using System.Linq;
 using Microsoft.Extensions.Logging;
+using Streetwriters.Common;
 using System.Net;
 
 namespace Notesnook.API
@@ -35,7 +31,7 @@ namespace Notesnook.API
     {
         public static async Task Main(string[] args)
         {
-#if DEBUG
+#if (DEBUG || STAGING)
             DotNetEnv.Env.TraversePath().Load(".env.local");
 #else
             DotNetEnv.Env.TraversePath().Load(".env");

@@ -157,7 +157,7 @@ namespace Streetwriters.Identity.Controllers
 
             var code = await UserManager.GenerateUserTokenAsync(user, TokenOptions.DefaultProvider, "ResetPassword");
             var callbackUrl = Url.TokenLink(user.Id.ToString(), code, client.Id, TokenType.RESET_PASSWORD);
-#if DEBUG
+#if (DEBUG || STAGING)
             return Ok(callbackUrl);
 #else
             await Slogger<AccountController>.Info("ResetUserPassword", user.Email, callbackUrl);
