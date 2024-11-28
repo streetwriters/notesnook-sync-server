@@ -52,7 +52,6 @@ services:
     hostname: notesnook-db
     volumes:
       - dbdata:/data/db
-      - dbdata:/data/configdb
     networks:
       - notesnook
     command: --replSet rs0 --bind_ip_all
