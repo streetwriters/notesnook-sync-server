@@ -17,14 +17,14 @@ You should have received a copy of the Affero GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-using Microsoft.Extensions.Configuration;
-using MongoDB.Driver;
-using Streetwriters.Data.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
+using MongoDB.Driver;
+using Streetwriters.Data.Interfaces;
 
 namespace Streetwriters.Data.DbContexts
 {
@@ -35,15 +35,22 @@ namespace Streetwriters.Data.DbContexts
             var settings = MongoClientSettings.FromConnectionString(dbSettings.ConnectionString);
             settings.MaxConnectionPoolSize = 500;
             settings.MinConnectionPoolSize = 0;
+            settings.HeartbeatInterval = TimeSpan.FromSeconds(60);
             return new MongoClient(settings);
         }
 
-        public static IMongoCollection<T> GetMongoCollection<T>(IMongoClient client, string databaseName, string collectionName)
+        public static IMongoCollection<T> GetMongoCollection<T>(
+            IMongoClient client,
+            string databaseName,
+            string collectionName
+        )
         {
-            return client.GetDatabase(databaseName).GetCollection<T>(collectionName, new MongoCollectionSettings()
-            {
-                AssignIdOnInsert = true,
-            });
+            return client
+                .GetDatabase(databaseName)
+                .GetCollection<T>(
+                    collectionName,
+                    new MongoCollectionSettings() { AssignIdOnInsert = true }
+                );
         }
 
         private readonly List<Func<IClientSessionHandle, CancellationToken, Task>> _commands = [];
@@ -59,13 +66,14 @@ namespace Streetwriters.Data.DbContexts
 #if (DEBUG || STAGING)
                     await Parallel.ForEachAsync(_commands, async (c, ct) => await c(session, ct));
 #else
-                    await session.WithTransactionAsync(async (handle, token) =>
-                    {
-                        await Task.WhenAll(_commands.Select(c => c(handle, token)));
-                        return true;
-                    });
+                    await session.WithTransactionAsync(
+                        async (handle, token) =>
+                        {
+                            await Task.WhenAll(_commands.Select(c => c(handle, token)));
+                            return true;
+                        }
+                    );
 #endif
-
                 }
                 return count;
             }
