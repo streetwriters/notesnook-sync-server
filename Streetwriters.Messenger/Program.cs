@@ -34,7 +34,7 @@ namespace Streetwriters.Messenger
     {
         public static void Main(string[] args)
         {
-#if DEBUG
+#if (DEBUG || STAGING)
             DotNetEnv.Env.TraversePath().Load(".env.local");
 #else
             DotNetEnv.Env.TraversePath().Load(".env");

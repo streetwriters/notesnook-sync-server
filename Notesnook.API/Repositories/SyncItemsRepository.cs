@@ -44,13 +44,6 @@ namespace Notesnook.API.Repositories
         public SyncItemsRepository(IDbContext dbContext, IMongoCollection<SyncItem> collection) : base(dbContext, collection)
         {
             this.collectionName = collection.CollectionNamespace.CollectionName;
-#if DEBUG
-            Collection.Indexes.CreateMany([
-                new CreateIndexModel<SyncItem>(Builders<SyncItem>.IndexKeys.Ascending("UserId").Descending("DateSynced")),
-                new CreateIndexModel<SyncItem>(Builders<SyncItem>.IndexKeys.Ascending("UserId").Ascending("ItemId")),
-                new CreateIndexModel<SyncItem>(Builders<SyncItem>.IndexKeys.Ascending("UserId"))
-            ]);
-#endif
         }
 
         private readonly List<string> ALGORITHMS = [Algorithms.Default];

@@ -33,7 +33,7 @@ namespace Microsoft.AspNetCore.Mvc
         {
 
             return urlHelper.ActionLink(
-#if DEBUG
+#if (DEBUG || STAGING)
             host: $"{Servers.IdentityServer.Hostname}:{Servers.IdentityServer.Port}",
             protocol: "http",
 #else

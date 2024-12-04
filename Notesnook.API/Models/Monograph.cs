@@ -20,27 +20,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 using System.Text.Json.Serialization;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
-using Notesnook.API.Interfaces;
+using System.Runtime.Serialization;
 
 namespace Notesnook.API.Models
 {
     public class ObjectWithId
     {
         [BsonId]
+        [BsonIgnoreIfDefault]
         [BsonRepresentation(BsonType.ObjectId)]
-        public string Id { get; set; }
+        public string Id
+        {
+            get; set;
+        }
+
+        public string ItemId
+        {
+            get; set;
+        }
     }
 
-    public class Monograph : IMonograph
+    public class Monograph
     {
         public Monograph()
         {
             Id = ObjectId.GenerateNewId().ToString();
         }
 
+        [DataMember(Name = "id")]
+        [JsonPropertyName("id")]
+        [MessagePack.Key("id")]
+        public string ItemId
+        {
+            get; set;
+        }
+
         [BsonId]
+        [BsonIgnoreIfDefault]
         [BsonRepresentation(BsonType.ObjectId)]
-        public string Id { get; set; }
+        [JsonIgnore]
+        [MessagePack.IgnoreMember]
+        public string Id
+        {
+            get; set;
+        }
 
         [JsonPropertyName("title")]
         public string Title { get; set; }

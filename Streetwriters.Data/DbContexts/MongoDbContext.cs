@@ -56,7 +56,7 @@ namespace Streetwriters.Data.DbContexts
 
                 using (IClientSessionHandle session = await MongoClient.StartSessionAsync())
                 {
-#if DEBUG
+#if (DEBUG || STAGING)
                     await Parallel.ForEachAsync(_commands, async (c, ct) => await c(session, ct));
 #else
                     await session.WithTransactionAsync(async (handle, token) =>

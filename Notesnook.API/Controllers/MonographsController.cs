@@ -24,8 +24,10 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using MongoDB.Bson;
 using MongoDB.Driver;
 using Notesnook.API.Models;
+using Streetwriters.Common;
 using Streetwriters.Data.Interfaces;
 using Streetwriters.Data.Repositories;
 
@@ -46,53 +48,121 @@ namespace Notesnook.API.Controllers
             unit = unitOfWork;
         }
 
+        private static FilterDefinition<Monograph> CreateMonographFilter(string userId, Monograph monograph)
+        {
+            var userIdFilter = Builders<Monograph>.Filter.Eq("UserId", userId);
+            return ObjectId.TryParse(monograph.ItemId, out ObjectId id)
+            ? Builders<Monograph>.Filter
+                .And(userIdFilter,
+                    Builders<Monograph>.Filter.Or(
+                        Builders<Monograph>.Filter.Eq("_id", id), Builders<Monograph>.Filter.Eq("ItemId", monograph.ItemId)
+                    )
+                )
+            : Builders<Monograph>.Filter
+                .And(userIdFilter,
+                    Builders<Monograph>.Filter.Eq("ItemId", monograph.ItemId)
+                );
+        }
+
+        private static FilterDefinition<Monograph> CreateMonographFilter(string itemId)
+        {
+            return ObjectId.TryParse(itemId, out ObjectId id)
+            ? Builders<Monograph>.Filter.Or(
+                Builders<Monograph>.Filter.Eq("_id", id),
+                Builders<Monograph>.Filter.Eq("ItemId", itemId))
+            : Builders<Monograph>.Filter.Eq("ItemId", itemId);
+        }
+
+        private async Task<Monograph> FindMonographAsync(string userId, Monograph monograph)
+        {
+            var result = await Monographs.Collection.FindAsync(CreateMonographFilter(userId, monograph), new FindOptions<Monograph>
+            {
+                Limit = 1
+            });
+            return await result.FirstOrDefaultAsync();
+        }
+
+        private async Task<Monograph> FindMonographAsync(string itemId)
+        {
+            var result = await Monographs.Collection.FindAsync(CreateMonographFilter(itemId), new FindOptions<Monograph>
+            {
+                Limit = 1
+            });
+            return await result.FirstOrDefaultAsync();
+        }
+
         [HttpPost]
         public async Task<IActionResult> PublishAsync([FromBody] Monograph monograph)
         {
-            var userId = this.User.FindFirstValue("sub");
-            if (userId == null) return Unauthorized();
-
-            if (await Monographs.GetAsync(monograph.Id) != null) return base.Conflict("This monograph is already published.");
-
-            if (monograph.EncryptedContent == null)
-                monograph.CompressedContent = monograph.Content.CompressBrotli();
-            monograph.UserId = userId;
-            monograph.DatePublished = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-
-
-            if (monograph.EncryptedContent?.Cipher.Length > MAX_DOC_SIZE || monograph.CompressedContent?.Length > MAX_DOC_SIZE)
-                return base.BadRequest("Monograph is too big. Max allowed size is 15mb.");
-
-            Monographs.Insert(monograph);
-
-            if (!await unit.Commit()) return BadRequest();
-            return Ok(new
+            try
             {
-                id = monograph.Id
-            });
+                var userId = this.User.FindFirstValue("sub");
+                if (userId == null) return Unauthorized();
+
+                if (await FindMonographAsync(userId, monograph) != null) return base.Conflict("This monograph is already published.");
+
+                if (monograph.EncryptedContent == null)
+                    monograph.CompressedContent = monograph.Content.CompressBrotli();
+                monograph.UserId = userId;
+                monograph.DatePublished = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+                if (monograph.EncryptedContent?.Cipher.Length > MAX_DOC_SIZE || monograph.CompressedContent?.Length > MAX_DOC_SIZE)
+                    return base.BadRequest("Monograph is too big. Max allowed size is 15mb.");
+
+                await Monographs.InsertAsync(monograph);
+
+                return Ok(new
+                {
+                    id = monograph.ItemId
+                });
+            }
+            catch (Exception e)
+            {
+                await Slogger<MonographsController>.Error(nameof(PublishAsync), e.ToString());
+                return BadRequest();
+            }
         }
 
         [HttpPatch]
         public async Task<IActionResult> UpdateAsync([FromBody] Monograph monograph)
         {
-            if (await Monographs.GetAsync(monograph.Id) == null) return NotFound();
-
-            if (monograph.EncryptedContent?.Cipher.Length > MAX_DOC_SIZE || monograph.CompressedContent?.Length > MAX_DOC_SIZE)
-                return base.BadRequest("Monograph is too big. Max allowed size is 15mb.");
-
-            if (monograph.EncryptedContent == null)
-                monograph.CompressedContent = monograph.Content.CompressBrotli();
-            else
-                monograph.Content = null;
-
-            monograph.DatePublished = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            Monographs.Update(monograph.Id, monograph);
-
-            if (!await unit.Commit()) return BadRequest();
-            return Ok(new
+            try
             {
-                id = monograph.Id
-            });
+                var userId = this.User.FindFirstValue("sub");
+                if (userId == null) return Unauthorized();
+
+                if (await FindMonographAsync(userId, monograph) == null) return NotFound();
+
+                if (monograph.EncryptedContent?.Cipher.Length > MAX_DOC_SIZE || monograph.CompressedContent?.Length > MAX_DOC_SIZE)
+                    return base.BadRequest("Monograph is too big. Max allowed size is 15mb.");
+
+                if (monograph.EncryptedContent == null)
+                    monograph.CompressedContent = monograph.Content.CompressBrotli();
+                else
+                    monograph.Content = null;
+
+                monograph.DatePublished = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                var result = await Monographs.Collection.UpdateOneAsync(
+                    CreateMonographFilter(userId, monograph),
+                    Builders<Monograph>.Update
+                    .Set(m => m.DatePublished, monograph.DatePublished)
+                    .Set(m => m.CompressedContent, monograph.CompressedContent)
+                    .Set(m => m.EncryptedContent, monograph.EncryptedContent)
+                    .Set(m => m.SelfDestruct, monograph.SelfDestruct)
+                    .Set(m => m.Title, monograph.Title)
+                );
+                if (!result.IsAcknowledged) return BadRequest();
+
+                return Ok(new
+                {
+                    id = monograph.ItemId
+                });
+            }
+            catch (Exception e)
+            {
+                await Slogger<MonographsController>.Error(nameof(UpdateAsync), e.ToString());
+                return BadRequest();
+            }
         }
 
         [HttpGet]
@@ -103,17 +173,16 @@ namespace Notesnook.API.Controllers
 
             var monographs = (await Monographs.Collection.FindAsync(Builders<Monograph>.Filter.Eq("UserId", userId), new FindOptions<Monograph, ObjectWithId>
             {
-                Projection = Builders<Monograph>.Projection.Include("_id"),
+                Projection = Builders<Monograph>.Projection.Include("_id").Include("ItemId"),
             })).ToEnumerable();
-            return Ok(monographs.Select((m) => m.Id));
+            return Ok(monographs.Select((m) => m.ItemId ?? m.Id));
         }
-
 
         [HttpGet("{id}")]
         [AllowAnonymous]
         public async Task<IActionResult> GetMonographAsync([FromRoute] string id)
         {
-            var monograph = await Monographs.GetAsync(id);
+            var monograph = await FindMonographAsync(id);
             if (monograph == null)
             {
                 return NotFound(new
@@ -125,6 +194,7 @@ namespace Notesnook.API.Controllers
 
             if (monograph.EncryptedContent == null)
                 monograph.Content = monograph.CompressedContent.DecompressBrotli();
+            if (monograph.ItemId == null) monograph.ItemId = monograph.Id;
             return Ok(monograph);
         }
 
@@ -132,7 +202,7 @@ namespace Notesnook.API.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> TrackView([FromRoute] string id)
         {
-            var monograph = await Monographs.GetAsync(id);
+            var monograph = await FindMonographAsync(id);
             if (monograph == null) return Content(SVG_PIXEL, "image/svg+xml");
 
             if (monograph.SelfDestruct)
@@ -144,8 +214,7 @@ namespace Notesnook.API.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteAsync([FromRoute] string id)
         {
-            Monographs.DeleteById(id);
-            if (!await unit.Commit()) return BadRequest();
+            await Monographs.Collection.DeleteOneAsync(CreateMonographFilter(id));
             return Ok();
         }
     }

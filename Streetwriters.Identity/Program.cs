@@ -33,7 +33,7 @@ namespace Streetwriters.Identity
     {
         public static async Task Main(string[] args)
         {
-#if DEBUG
+#if (DEBUG || STAGING)
             DotNetEnv.Env.TraversePath().Load(".env.local");
 #else
             DotNetEnv.Env.TraversePath().Load(".env");
