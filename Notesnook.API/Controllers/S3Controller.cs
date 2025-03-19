@@ -24,6 +24,7 @@ using System.Threading.Tasks;
 using System.Security.Claims;
 using Notesnook.API.Interfaces;
 using System;
+using Notesnook.API.Models;
 
 namespace Notesnook.API.Controllers
 {
@@ -77,12 +78,13 @@ namespace Notesnook.API.Controllers
 
         [HttpPost("multipart")]
         [Authorize("Pro")]
-        public async Task<IActionResult> CompleteMultipartUpload([FromBody] CompleteMultipartUploadRequest uploadRequest)
+        public async Task<IActionResult> CompleteMultipartUpload([FromBody] CompleteMultipartUploadRequestWrapper uploadRequestWrapper)
         {
             var userId = this.User.FindFirstValue("sub");
             try
             {
-                await S3Service.CompleteMultipartUploadAsync(userId, uploadRequest);
+                CompleteMultipartUploadRequest request = uploadRequestWrapper.ToRequest();
+                await S3Service.CompleteMultipartUploadAsync(userId, request);
                 return Ok();
             }
             catch (Exception ex) { return BadRequest(ex.Message); }
