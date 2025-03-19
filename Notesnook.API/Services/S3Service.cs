@@ -176,7 +176,7 @@ namespace Notesnook.API.Services
 
             if (string.IsNullOrEmpty(uploadId))
             {
-                var response = await GetS3Client().InitiateMultipartUploadAsync(GetBucketName(), objectName);
+                var response = await GetS3Client(S3ClientMode.INTERNAL).InitiateMultipartUploadAsync(GetBucketName(S3ClientMode.INTERNAL), objectName);
                 if (!IsSuccessStatusCode(((int)response.HttpStatusCode))) throw new Exception("Failed to initiate multipart upload.");
 
                 uploadId = response.UploadId;
