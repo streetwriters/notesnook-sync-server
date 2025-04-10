@@ -36,12 +36,12 @@ namespace Streetwriters.Identity.Controllers
         protected UserManager<User> UserManager { get; set; }
         protected SignInManager<User> SignInManager { get; set; }
         protected RoleManager<MongoRole> RoleManager { get; set; }
-        protected IEmailSender EmailSender { get; set; }
+        protected ITemplatedEmailSender EmailSender { get; set; }
         protected UrlEncoder UrlEncoder { get; set; }
         protected IMFAService MFAService { get; set; }
         public IdentityControllerBase(
             UserManager<User> _userManager,
-            IEmailSender _emailSender,
+            ITemplatedEmailSender _emailSender,
             SignInManager<User> _signInManager,
             RoleManager<MongoRole> _roleManager,
             IMFAService _mfaService

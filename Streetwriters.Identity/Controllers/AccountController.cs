@@ -52,10 +52,8 @@ namespace Streetwriters.Identity.Controllers
     {
         private IPersistedGrantStore PersistedGrantStore { get; set; }
         private ITokenGenerationService TokenGenerationService { get; set; }
-        private IUserClaimsPrincipalFactory<User> PrincipalFactory { get; set; }
-        private IdentityServerOptions ISOptions { get; set; }
         private IUserAccountService UserAccountService { get; set; }
-        public AccountController(UserManager<User> _userManager, IEmailSender _emailSender,
+        public AccountController(UserManager<User> _userManager, ITemplatedEmailSender _emailSender,
         SignInManager<User> _signInManager, RoleManager<MongoRole> _roleManager, IPersistedGrantStore store,
         ITokenGenerationService tokenGenerationService, IMFAService _mfaService, IUserAccountService userAccountService) : base(_userManager, _emailSender, _signInManager, _roleManager, _mfaService)
         {

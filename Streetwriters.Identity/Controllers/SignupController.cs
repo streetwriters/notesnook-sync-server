@@ -39,7 +39,7 @@ namespace Streetwriters.Identity.Controllers
     [Route("signup")]
     public class SignupController : IdentityControllerBase
     {
-        public SignupController(UserManager<User> _userManager, IEmailSender _emailSender,
+        public SignupController(UserManager<User> _userManager, ITemplatedEmailSender _emailSender,
         SignInManager<User> _signInManager, RoleManager<MongoRole> _roleManager, IMFAService _mfaService) : base(_userManager, _emailSender, _signInManager, _roleManager, _mfaService)
         { }
 

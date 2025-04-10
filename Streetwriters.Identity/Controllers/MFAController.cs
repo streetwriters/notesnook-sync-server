@@ -41,7 +41,7 @@ namespace Streetwriters.Identity.Controllers
     [Authorize(LocalApi.PolicyName)]
     public class MFAController : IdentityControllerBase
     {
-        public MFAController(UserManager<User> _userManager, IEmailSender _emailSender,
+        public MFAController(UserManager<User> _userManager, ITemplatedEmailSender _emailSender,
         SignInManager<User> _signInManager, RoleManager<MongoRole> _roleManager, IMFAService _mfaService) : base(_userManager, _emailSender, _signInManager, _roleManager, _mfaService) { }
 
         [HttpPost]

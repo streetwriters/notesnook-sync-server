@@ -39,9 +39,9 @@ namespace Streetwriters.Identity.Services
         const string SMS_ID_CLAIM = "mfa:sms:id";
 
         private UserManager<User> UserManager { get; set; }
-        private IEmailSender EmailSender { get; set; }
+        private ITemplatedEmailSender EmailSender { get; set; }
         private ISMSSender SMSSender { get; set; }
-        public MFAService(UserManager<User> _userManager, IEmailSender emailSender, ISMSSender smsSender)
+        public MFAService(UserManager<User> _userManager, ITemplatedEmailSender emailSender, ISMSSender smsSender)
         {
             UserManager = _userManager;
             EmailSender = emailSender;

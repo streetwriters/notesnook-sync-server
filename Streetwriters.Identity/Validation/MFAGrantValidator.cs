@@ -48,8 +48,8 @@ namespace Streetwriters.Identity.Validation
         private IHttpContextAccessor HttpContextAccessor { get; set; }
         private ITokenValidator TokenValidator { get; set; }
         private ITokenGenerationService TokenGenerationService { get; set; }
-        private IEmailSender EmailSender { get; set; }
-        public MFAGrantValidator(UserManager<User> userManager, SignInManager<User> signInManager, IMFAService mfaService, IHttpContextAccessor httpContextAccessor, ITokenValidator tokenValidator, ITokenGenerationService tokenGenerationService, IEmailSender emailSender)
+        private ITemplatedEmailSender EmailSender { get; set; }
+        public MFAGrantValidator(UserManager<User> userManager, SignInManager<User> signInManager, IMFAService mfaService, IHttpContextAccessor httpContextAccessor, ITokenValidator tokenValidator, ITokenGenerationService tokenGenerationService, ITemplatedEmailSender emailSender)
         {
             UserManager = userManager;
             SignInManager = signInManager;

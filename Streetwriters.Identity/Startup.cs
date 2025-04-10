@@ -43,6 +43,7 @@ using Streetwriters.Common.Extensions;
 using Streetwriters.Common.Interfaces;
 using Streetwriters.Common.Messages;
 using Streetwriters.Common.Models;
+using Streetwriters.Common.Services;
 using Streetwriters.Identity.Helpers;
 using Streetwriters.Identity.Interfaces;
 using Streetwriters.Identity.Jobs;
@@ -69,6 +70,7 @@ namespace Streetwriters.Identity
             var connectionString = Constants.MONGODB_CONNECTION_STRING;
 
             services.AddTransient<IEmailSender, EmailSender>();
+            services.AddTransient<ITemplatedEmailSender, TemplatedEmailSender>();
             services.AddTransient<ISMSSender, SMSSender>();
             services.AddTransient<IPasswordHasher<User>, Argon2PasswordHasher<User>>();
 

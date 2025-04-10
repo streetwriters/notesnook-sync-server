@@ -6,13 +6,16 @@
 
 
   <ItemGroup>
+    <PackageReference Include="MailKit" Version="4.9.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="6.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.Cors" Version="2.2.0" />
+    <PackageReference Include="Scriban" Version="5.12.1" />
     <PackageReference Include="WampSharp.Default" Version="20.1.1" />
     <PackageReference Include="WampSharp.AspNetCore.WebSockets.Server" Version="20.1.1" />
     <PackageReference Include="WampSharp.NewtonsoftMsgpack" Version="20.1.1" />
     <PackageReference Include="Microsoft.AspNetCore.WebSockets" Version="2.2.1" />
     <PackageReference Include="AspNetCore.Identity.Mongo" Version="8.3.3" />
+    <PackageReference Include="WebMarkupMin.NUglify" Version="2.18.1" />
   </ItemGroup>
 
 
