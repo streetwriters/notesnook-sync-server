@@ -121,6 +121,13 @@ namespace Streetwriters.Identity.Services
             return method == MFAMethods.App || method == MFAMethods.Email || method == MFAMethods.SMS || method == MFAMethods.RecoveryCode;
         }
 
+        public bool IsValidMFAMethod(string method, User user)
+        {
+            var primaryMethod = GetPrimaryMethod(user);
+            var secondaryMethod = GetSecondaryMethod(user);
+            return IsValidMFAMethod(method) && (method == primaryMethod || method == secondaryMethod);
+        }
+
         private Task RemoveSecondaryMethodAsync(User user)
         {
             return this.RemoveClaimAsync(user, MFAService.SECONDARY_METHOD_CLAIM);
@@ -157,8 +164,8 @@ namespace Streetwriters.Identity.Services
         public async Task SendOTPAsync(User user, IClient client, MultiFactorSetupForm form, bool isSetup = false)
         {
             var method = form.Type;
-            if (method != MFAMethods.Email && method != MFAMethods.SMS) throw new Exception("Invalid method.");
-
+            if ((method != MFAMethods.Email && method != MFAMethods.SMS) || !IsValidMFAMethod(method, user))
+                throw new Exception("Invalid method.");
 
             if (isSetup &&
                 method == MFAMethods.SMS &&
