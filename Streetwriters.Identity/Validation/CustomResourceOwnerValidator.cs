@@ -84,7 +84,7 @@ namespace Streetwriters.Identity.Validation
                     var mfaCode = context.Request.Raw["mfa:code"];
                     var mfaMethod = context.Request.Raw["mfa:method"];
 
-                    if (string.IsNullOrEmpty(mfaCode) || !MFAService.IsValidMFAMethod(mfaMethod))
+                    if (string.IsNullOrEmpty(mfaCode) || !MFAService.IsValidMFAMethod(mfaMethod, user))
                     {
                         var sendPhoneNumber = primaryMethod == MFAMethods.SMS || secondaryMethod == MFAMethods.SMS;
 
