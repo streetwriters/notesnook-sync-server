@@ -236,13 +236,13 @@ namespace Notesnook.API.Services
             return client.GetPreSignedURL(request);
         }
 
-        private string GetPresignedURLForUploadPart(string objectName, string uploadId, int partNumber)
+        private string GetPresignedURLForUploadPart(string objectName, string uploadId, int partNumber, S3ClientMode mode = S3ClientMode.EXTERNAL)
         {
 
-            var client = GetS3Client(S3ClientMode.INTERNAL);
+            var client = GetS3Client(mode);
             return client.GetPreSignedURL(new GetPreSignedUrlRequest
             {
-                BucketName = GetBucketName(S3ClientMode.INTERNAL),
+                BucketName = GetBucketName(mode),
                 Expires = System.DateTime.Now.AddHours(1),
                 Verb = HttpVerb.PUT,
                 Key = objectName,
