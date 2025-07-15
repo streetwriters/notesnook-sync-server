@@ -101,7 +101,7 @@ namespace Streetwriters.Identity.Validation
             context.Result.ErrorDescription = "Please provide a valid multi-factor authentication code.";
 
             if (string.IsNullOrEmpty(mfaCode)) return;
-            if (string.IsNullOrEmpty(mfaMethod) || !MFAService.IsValidMFAMethod(mfaMethod, user))
+            if (string.IsNullOrEmpty(mfaMethod) || (!MFAService.IsValidMFAMethod(mfaMethod, user) && mfaMethod != MFAMethods.RecoveryCode))
             {
                 context.Result.ErrorDescription = "Please provide a valid multi-factor authentication method.";
                 return;
