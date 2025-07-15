@@ -31,6 +31,7 @@ using IdentityServer4.Stores;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Streetwriters.Common;
 using Streetwriters.Common.Enums;
 using Streetwriters.Common.Interfaces;
@@ -112,6 +113,7 @@ namespace Streetwriters.Identity.Controllers
         }
 
         [HttpPost("verify")]
+        [EnableRateLimiting("strict")]
         public async Task<IActionResult> SendVerificationEmail([FromForm] string newEmail)
         {
             var client = Clients.FindClientById(User.FindFirstValue("client_id"));
@@ -145,6 +147,7 @@ namespace Streetwriters.Identity.Controllers
 
         [HttpPost("recover")]
         [AllowAnonymous]
+        [EnableRateLimiting("strict")]
         public async Task<IActionResult> ResetUserPassword([FromForm] ResetPasswordForm form)
         {
             var client = Clients.FindClientById(form.ClientId);

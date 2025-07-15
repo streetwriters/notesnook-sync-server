@@ -26,6 +26,7 @@ using AspNetCore.Identity.Mongo.Model;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Streetwriters.Common;
 using Streetwriters.Common.Enums;
 using Streetwriters.Common.Models;
@@ -90,6 +91,7 @@ namespace Streetwriters.Identity.Controllers
         [HttpPost("send")]
         [Authorize("mfa")]
         [Authorize(LocalApi.PolicyName)]
+        [EnableRateLimiting("strict")]
         public async Task<IActionResult> RequestCode([FromForm] string type)
         {
             var client = Clients.FindClientById(User.FindFirstValue("client_id"));

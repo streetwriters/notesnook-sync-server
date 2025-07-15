@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
 using System.IO;
+using System.Threading.RateLimiting;
 using AspNetCore.Identity.Mongo;
 using IdentityServer4.MongoDB.Entities;
 using IdentityServer4.MongoDB.Interfaces;
@@ -32,6 +33,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -133,6 +135,18 @@ namespace Streetwriters.Identity
                 options.TokenLifespan = TimeSpan.FromHours(2);
             });
 
+            services.AddRateLimiter(options =>
+            {
+                options.AddSlidingWindowLimiter("strict", options =>
+                {
+                    options.PermitLimit = 30;
+                    options.Window = TimeSpan.FromSeconds(60);
+                    options.SegmentsPerWindow = 10;
+                    options.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+                    options.QueueLimit = 0;
+                });
+            });
+
             services.AddAuthorization(options =>
             {
                 options.AddPolicy("mfa", policy =>
@@ -199,6 +213,7 @@ namespace Streetwriters.Identity
             app.UseRouting();
 
             app.UseIdentityServer();
+            app.UseRateLimiter();
 
             app.UseAuthorization();
             app.UseAuthentication();

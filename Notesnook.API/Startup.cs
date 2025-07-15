@@ -150,7 +150,7 @@ namespace Notesnook.API
                 options.CacheDuration = TimeSpan.FromMinutes(30);
             });
 
-            BsonSerializer.RegisterSerializer(new SyncItemBsonSerializer());
+            // Serializer.RegisterSerializer(new SyncItemBsonSerializer());
             if (!BsonClassMap.IsClassMapRegistered(typeof(UserSettings)))
                 BsonClassMap.RegisterClassMap<UserSettings>();
 
