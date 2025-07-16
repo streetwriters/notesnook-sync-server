@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Amazon.S3.Model;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Security.Claims;
 using Notesnook.API.Interfaces;
@@ -77,12 +78,25 @@ namespace Notesnook.API.Controllers
 
         [HttpPost("multipart")]
         [Authorize("Pro")]
-        public async Task<IActionResult> CompleteMultipartUpload([FromBody] CompleteMultipartUploadRequest uploadRequest)
+        public async Task<IActionResult> CompleteMultipartUpload([FromBody] Models.Requests.CompleteMultipartUploadRequest uploadRequest)
         {
             var userId = this.User.FindFirstValue("sub");
             try
             {
-                await S3Service.CompleteMultipartUploadAsync(userId, uploadRequest);
+                var partETags = new List<PartETag>();
+                foreach (var part in uploadRequest.PartETags)
+                {
+                    partETags.Add(new PartETag(part.PartNumber, part.ETag));
+                }
+
+                var s3UploadRequest = new CompleteMultipartUploadRequest
+                {
+                    Key = uploadRequest.Key,
+                    UploadId = uploadRequest.UploadId,
+                    PartETags = partETags
+                };
+
+                await S3Service.CompleteMultipartUploadAsync(userId, s3UploadRequest);
                 return Ok();
             }
             catch (Exception ex) { return BadRequest(ex.Message); }
