@@ -86,5 +86,11 @@ namespace Notesnook.API.Models
 
         [JsonIgnore]
         public byte[] CompressedContent { get; set; }
+
+        [JsonPropertyName("password")]
+        public string Password { get; set; }
+
+        [JsonPropertyName("deleted")]
+        public bool Deleted { get; set; }
     }
 }
