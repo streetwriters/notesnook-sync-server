@@ -43,8 +43,8 @@ namespace Notesnook.API.Controllers
         {
             try
             {
-                var userId = this.User.FindFirstValue("sub");
-                new SyncDeviceService(new SyncDevice(ref userId, ref deviceId)).RegisterDevice();
+                var userId = this.User.FindFirstValue("sub") ?? throw new Exception("User not found.");
+                new SyncDeviceService(new SyncDevice(userId, deviceId)).RegisterDevice();
                 return Ok();
             }
             catch (Exception ex)
@@ -60,8 +60,8 @@ namespace Notesnook.API.Controllers
         {
             try
             {
-                var userId = this.User.FindFirstValue("sub");
-                new SyncDeviceService(new SyncDevice(ref userId, ref deviceId)).UnregisterDevice();
+                var userId = this.User.FindFirstValue("sub") ?? throw new Exception("User not found.");
+                new SyncDeviceService(new SyncDevice(userId, deviceId)).UnregisterDevice();
                 return Ok();
             }
             catch (Exception ex)

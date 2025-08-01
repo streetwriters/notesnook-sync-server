@@ -139,7 +139,7 @@ namespace Notesnook.API.Hubs
 
                 if (!await unit.Commit()) return 0;
 
-                await new SyncDeviceService(new SyncDevice(ref userId, ref deviceId)).AddIdsToOtherDevicesAsync(pushItem.Items.Select((i) => $"{i.ItemId}:{pushItem.Type}").ToList());
+                new SyncDeviceService(new SyncDevice(userId, deviceId)).AddIdsToOtherDevices(pushItem.Items.Select((i) => $"{i.ItemId}:{pushItem.Type}").ToList());
                 return 1;
             }
             finally
@@ -211,7 +211,7 @@ namespace Notesnook.API.Hubs
 
             SyncEventCounterSource.Log.FetchV2();
 
-            var deviceService = new SyncDeviceService(new SyncDevice(ref userId, ref deviceId));
+            var deviceService = new SyncDeviceService(new SyncDevice(userId, deviceId));
             if (!deviceService.IsDeviceRegistered()) deviceService.RegisterDevice();
 
             var isResetSync = deviceService.IsSyncReset();
@@ -224,7 +224,7 @@ namespace Notesnook.API.Hubs
             stopwatch.Start();
             try
             {
-                string[] ids = await deviceService.FetchUnsyncedIdsAsync();
+                string[] ids = deviceService.FetchUnsyncedIds();
 
                 var chunks = PrepareChunks(
                     collections: [
@@ -262,7 +262,7 @@ namespace Notesnook.API.Hubs
                     {
                         var syncedIds = chunk.Items.Select((i) => $"{i.ItemId}:{chunk.Type}").ToHashSet();
                         ids = ids.Where((id) => !syncedIds.Contains(id)).ToArray();
-                        await deviceService.WritePendingIdsAsync(ids);
+                        deviceService.WritePendingIds(ids);
                     }
                 }
 
