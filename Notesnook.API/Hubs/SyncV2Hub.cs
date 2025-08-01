@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Diagnostics.Metrics;
 using System.Linq;
 using System.Security.Claims;
 using System.Text.Json.Serialization;
@@ -28,8 +27,6 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
-using MongoDB.Bson;
-using MongoDB.Bson.Serialization;
 using MongoDB.Driver;
 using Notesnook.API.Authorization;
 using Notesnook.API.Interfaces;
@@ -43,6 +40,7 @@ namespace Notesnook.API.Hubs
     {
         Task<bool> SendItems(SyncTransferItemV2 transferItem);
         Task<bool> SendVaultKey(EncryptedData vaultKey);
+        Task<bool> SendMonographs(IEnumerable<Monograph> monographs);
         Task PushCompleted();
     }
 
@@ -257,6 +255,14 @@ namespace Notesnook.API.Hubs
                 if (userSettings.VaultKey != null)
                 {
                     if (!await Clients.Caller.SendVaultKey(userSettings.VaultKey).WaitAsync(TimeSpan.FromMinutes(10))) throw new HubException("Client rejected vault key.");
+                }
+
+                var userMonographs = await Repositories.Monographs.Collection.Find(m => m.UserId == userId).ToListAsync();
+                var unsyncedMonographIds = ids.Where((id) => id.EndsWith(":monograph")).Select((id) => id.Split(":")[0]).ToArray();
+                userMonographs = isResetSync ? userMonographs : userMonographs.Where(m => unsyncedMonographIds.Contains(m.ItemId ?? m.Id)).ToList();
+                if (userMonographs.Count > 0)
+                {
+                    if (!await Clients.Caller.SendMonographs(userMonographs).WaitAsync(TimeSpan.FromMinutes(10))) throw new HubException("Client rejected monographs.");
                 }
 
                 await foreach (var chunk in chunks)
