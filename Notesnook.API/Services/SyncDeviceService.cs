@@ -58,8 +58,12 @@ namespace Notesnook.API.Services
 
         private readonly void SetMetadata(string metadataKey, string value)
         {
-            var path = CreateFilePath(userId, deviceId, metadataKey);
-            File.WriteAllText(path, value);
+            try
+            {
+                var path = CreateFilePath(userId, deviceId, metadataKey);
+                File.WriteAllText(path, value);
+            }
+            catch (DirectoryNotFoundException) { }
         }
     }
 
@@ -88,7 +92,6 @@ namespace Notesnook.API.Services
             if (IsSyncReset()) return [];
             try
             {
-                device.LastAccessTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
                 var unsyncedIds = GetUnsyncedIds();
                 lock (device.DeviceId)
                 {
@@ -176,6 +179,7 @@ namespace Notesnook.API.Services
 
         public void AddIdsToOtherDevices(List<string> ids)
         {
+            device.LastAccessTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             foreach (string id in ListDevices())
             {
                 if (id == device.DeviceId || IsSyncReset(id)) return;
@@ -198,6 +202,7 @@ namespace Notesnook.API.Services
                     Directory.Delete(device.UserDeviceDirectoryPath, true);
                 Directory.CreateDirectory(device.UserDeviceDirectoryPath);
                 File.Create(device.ResetSyncFilePath).Close();
+                device.LastAccessTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             }
         }
 
