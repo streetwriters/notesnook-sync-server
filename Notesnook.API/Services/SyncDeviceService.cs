@@ -182,7 +182,7 @@ namespace Notesnook.API.Services
             device.LastAccessTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             foreach (string id in ListDevices())
             {
-                if (id == device.DeviceId || IsSyncReset(id)) return;
+                if (id == device.DeviceId || IsSyncReset(id)) continue;
 
                 lock (id)
                 {
