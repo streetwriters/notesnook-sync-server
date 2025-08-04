@@ -151,7 +151,7 @@ namespace Notesnook.API.Controllers
                 if (userId == null) return Unauthorized();
 
                 var existingMonograph = await FindMonographAsync(userId, monograph);
-                if (existingMonograph != null || existingMonograph.Deleted)
+                if (existingMonograph == null || existingMonograph.Deleted)
                 {
                     return NotFound();
                 }
