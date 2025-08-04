@@ -116,25 +116,16 @@ namespace Notesnook.API.Controllers
                 if (monograph.EncryptedContent?.Cipher.Length > MAX_DOC_SIZE || monograph.CompressedContent?.Length > MAX_DOC_SIZE)
                     return base.BadRequest("Monograph is too big. Max allowed size is 15mb.");
 
-                if (existingMonograph != null)
-                {
-                    monograph.Id = existingMonograph.Id;
-                    monograph.ItemId = existingMonograph.ItemId;
-                    monograph.Deleted = false;
-                    await Monographs.Collection.ReplaceOneAsync(
-                        CreateMonographFilter(userId, existingMonograph),
-                        monograph
-                    );
-                }
-                else
-                {
-                    await Monographs.InsertAsync(monograph);
-                }
+                monograph.Id = existingMonograph?.Id;
+                monograph.ItemId = existingMonograph?.ItemId;
+                monograph.Deleted = false;
+                await Monographs.Collection.ReplaceOneAsync(
+                    CreateMonographFilter(userId, existingMonograph),
+                    monograph,
+                    new ReplaceOptions { IsUpsert = true }
+                );
 
-                if (deviceId != null)
-                {
-                    await SyncMonograph(monograph.ItemId ?? monograph.Id, deviceId);
-                }
+                await MarkMonographForSyncAsync(monograph.ItemId ?? monograph.Id, deviceId);
 
                 return Ok(new
                 {
@@ -180,10 +171,7 @@ namespace Notesnook.API.Controllers
                 );
                 if (!result.IsAcknowledged) return BadRequest();
 
-                if (deviceId != null)
-                {
-                    await SyncMonograph(monograph.ItemId ?? monograph.Id, deviceId);
-                }
+                await MarkMonographForSyncAsync(monograph.ItemId ?? monograph.Id, deviceId);
 
                 return Ok(new
                 {
@@ -236,18 +224,22 @@ namespace Notesnook.API.Controllers
         public async Task<IActionResult> TrackView([FromRoute] string id)
         {
             var monograph = await FindMonographAsync(id);
-            if (monograph == null) return Content(SVG_PIXEL, "image/svg+xml");
+            if (monograph == null || monograph.Deleted) return Content(SVG_PIXEL, "image/svg+xml");
 
             if (monograph.SelfDestruct)
             {
                 var userId = this.User.FindFirstValue("sub");
-                await Monographs.Collection.UpdateOneAsync(
-                    CreateMonographFilter(userId, new Monograph { ItemId = id }),
-                    Builders<Monograph>.Update
-                    .Set(m => m.Deleted, true)
+                await Monographs.Collection.ReplaceOneAsync(
+                    CreateMonographFilter(userId, monograph),
+                    new Monograph
+                    {
+                        ItemId = id,
+                        Id = monograph.Id,
+                        Deleted = true
+                    }
                 );
 
-                await SyncMonograph(id);
+                await MarkMonographForSyncAsync(id);
             }
 
             return Content(SVG_PIXEL, "image/svg+xml");
@@ -266,55 +258,47 @@ namespace Notesnook.API.Controllers
                 });
             }
 
-            monograph.Title = null;
-            monograph.EncryptedContent = null;
-            monograph.CompressedContent = null;
-            monograph.Password = null;
-            monograph.DatePublished = default;
-            monograph.Deleted = true;
-
             var userId = this.User.FindFirstValue("sub");
             await Monographs.Collection.ReplaceOneAsync(
-                CreateMonographFilter(userId, new Monograph { ItemId = id }),
-                monograph
+                CreateMonographFilter(userId, monograph),
+                new Monograph
+                {
+                    ItemId = id,
+                    Id = monograph.Id,
+                    Deleted = true
+                }
             );
 
-            if (deviceId != null)
-            {
-                await SyncMonograph(id, deviceId);
-            }
+            await MarkMonographForSyncAsync(id, deviceId);
 
             return Ok();
         }
 
-        private async Task SyncMonograph(string monographId, string deviceId)
+        private async Task MarkMonographForSyncAsync(string monographId, string deviceId)
+        {
+            if (deviceId == null) return;
+            var userId = this.User.FindFirstValue("sub");
+
+            new SyncDeviceService(new SyncDevice(userId, deviceId)).AddIdsToOtherDevices([$"{monographId}:monograph"]);
+            await SendTriggerSyncEventAsync();
+        }
+
+        private async Task MarkMonographForSyncAsync(string monographId)
         {
             var userId = this.User.FindFirstValue("sub");
 
-            await new SyncDeviceService(new SyncDevice(ref userId, ref deviceId)).AddIdsToOtherDevicesAsync(new List<string> { $"{monographId}:monograph" });
-
-            await RaiseTriggerSyncSSE();
+            new SyncDeviceService(new SyncDevice(userId, string.Empty)).AddIdsToAllDevices([$"{monographId}:monograph"]);
+            await SendTriggerSyncEventAsync(sendToAllDevices: true);
         }
 
-        private async Task SyncMonograph(string monographId)
-        {
-            var userId = this.User.FindFirstValue("sub");
-
-            var emptyString = string.Empty;
-            await new SyncDeviceService(new SyncDevice(ref userId, ref emptyString)).AddIdsToAllDevicesAsync(new List<string> { $"{monographId}:monograph" });
-
-            await RaiseTriggerSyncSSE();
-        }
-
-        private async Task RaiseTriggerSyncSSE()
+        private async Task SendTriggerSyncEventAsync(bool sendToAllDevices = false)
         {
             var userId = this.User.FindFirstValue("sub");
             var jti = this.User.FindFirstValue("jti");
 
             await WampServers.MessengerServer.PublishMessageAsync(MessengerServerTopics.SendSSETopic, new SendSSEMessage
             {
-                SendToAll = true,
-                OriginTokenId = jti,
+                OriginTokenId = sendToAllDevices ? null : jti,
                 UserId = userId,
                 Message = new Message
                 {
