@@ -194,29 +194,19 @@ namespace Notesnook.API.Services
             }
         }
 
-        public async Task AddIdsToAllDevicesAsync(List<string> ids)
+        public void AddIdsToAllDevices(List<string> ids)
         {
-            await Parallel.ForEachAsync(ListDevices(), async (id, ct) =>
+            foreach (var id in ListDevices())
             {
                 if (IsSyncReset(id)) return;
-                if (!UnsyncedIdsFileLocks.TryGetValue(id, out SemaphoreSlim fileLock))
-                {
-                    fileLock = UnsyncedIdsFileLocks.AddOrUpdate(id, (id) => new SemaphoreSlim(1, 1), (id, old) => new SemaphoreSlim(1, 1));
-                }
-
-                await fileLock.WaitAsync(ct);
-                try
+                lock (id)
                 {
                     if (!IsDeviceRegistered(id)) Directory.CreateDirectory(Path.Join(device.UserSyncDirectoryPath, id));
 
-                    var oldIds = await GetUnsyncedIdsAsync(id);
-                    await File.WriteAllLinesAsync(Path.Join(device.UserSyncDirectoryPath, id, "unsynced"), ids.Union(oldIds), ct);
+                    var oldIds = GetUnsyncedIds(id);
+                    File.WriteAllLinesAsync(Path.Join(device.UserSyncDirectoryPath, id, "unsynced"), ids.Union(oldIds));
                 }
-                finally
-                {
-                    fileLock.Release();
-                }
-            });
+            }
         }
 
         public void RegisterDevice()
