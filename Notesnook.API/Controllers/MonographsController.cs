@@ -116,11 +116,13 @@ namespace Notesnook.API.Controllers
                 if (monograph.EncryptedContent?.Cipher.Length > MAX_DOC_SIZE || monograph.CompressedContent?.Length > MAX_DOC_SIZE)
                     return base.BadRequest("Monograph is too big. Max allowed size is 15mb.");
 
-                monograph.Id = existingMonograph?.Id;
-                monograph.ItemId = existingMonograph?.ItemId;
+                if (existingMonograph != null)
+                {
+                    monograph.Id = existingMonograph?.Id;
+                }
                 monograph.Deleted = false;
                 await Monographs.Collection.ReplaceOneAsync(
-                    CreateMonographFilter(userId, existingMonograph),
+                    CreateMonographFilter(userId, monograph),
                     monograph,
                     new ReplaceOptions { IsUpsert = true }
                 );
@@ -204,7 +206,7 @@ namespace Notesnook.API.Controllers
         public async Task<IActionResult> GetMonographAsync([FromRoute] string id)
         {
             var monograph = await FindMonographAsync(id);
-            if (monograph == null)
+            if (monograph == null || monograph.Deleted)
             {
                 return NotFound(new
                 {
@@ -265,7 +267,8 @@ namespace Notesnook.API.Controllers
                 {
                     ItemId = id,
                     Id = monograph.Id,
-                    Deleted = true
+                    Deleted = true,
+                    UserId = monograph.UserId
                 }
             );
 
