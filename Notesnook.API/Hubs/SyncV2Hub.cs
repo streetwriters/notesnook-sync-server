@@ -257,13 +257,6 @@ namespace Notesnook.API.Hubs
                     if (!await Clients.Caller.SendVaultKey(userSettings.VaultKey).WaitAsync(TimeSpan.FromMinutes(10))) throw new HubException("Client rejected vault key.");
                 }
 
-                var userMonographs = await Repositories.Monographs.Collection.Find(m => m.UserId == userId).ToListAsync();
-                var unsyncedMonographIds = ids.Where((id) => id.EndsWith(":monograph")).Select((id) => id.Split(":")[0]).ToArray();
-                userMonographs = isResetSync ? userMonographs : userMonographs.Where(m => unsyncedMonographIds.Contains(m.ItemId ?? m.Id)).ToList();
-                if (userMonographs.Count > 0)
-                {
-                    if (!await Clients.Caller.SendMonographs(userMonographs).WaitAsync(TimeSpan.FromMinutes(10))) throw new HubException("Client rejected monographs.");
-                }
 
                 await foreach (var chunk in chunks)
                 {
@@ -276,6 +269,15 @@ namespace Notesnook.API.Hubs
                         deviceService.WritePendingIds(ids);
                     }
                 }
+
+                var unsyncedMonographs = ids.Where((id) => id.EndsWith(":monograph")).ToHashSet();
+                var unsyncedMonographIds = unsyncedMonographs.Select((id) => id.Split(":")[0]).ToArray();
+                var userMonographs = isResetSync
+                    ? await Repositories.Monographs.FindAsync(m => m.UserId == userId)
+                    : await Repositories.Monographs.FindAsync(m => m.UserId == userId && unsyncedMonographIds.Contains(m.ItemId));
+
+                if (userMonographs.Any() && !await Clients.Caller.SendMonographs(userMonographs).WaitAsync(TimeSpan.FromMinutes(10)))
+                    throw new HubException("Client rejected monographs.");
 
                 deviceService.Reset();
 
