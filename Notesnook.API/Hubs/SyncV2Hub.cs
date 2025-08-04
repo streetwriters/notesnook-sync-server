@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Diagnostics.Metrics;
 using System.Linq;
 using System.Security.Claims;
 using System.Text.Json.Serialization;
@@ -28,8 +27,6 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
-using MongoDB.Bson;
-using MongoDB.Bson.Serialization;
 using MongoDB.Driver;
 using Notesnook.API.Authorization;
 using Notesnook.API.Interfaces;
@@ -43,6 +40,7 @@ namespace Notesnook.API.Hubs
     {
         Task<bool> SendItems(SyncTransferItemV2 transferItem);
         Task<bool> SendVaultKey(EncryptedData vaultKey);
+        Task<bool> SendMonographs(IEnumerable<Monograph> monographs);
         Task PushCompleted();
     }
 
@@ -259,6 +257,7 @@ namespace Notesnook.API.Hubs
                     if (!await Clients.Caller.SendVaultKey(userSettings.VaultKey).WaitAsync(TimeSpan.FromMinutes(10))) throw new HubException("Client rejected vault key.");
                 }
 
+
                 await foreach (var chunk in chunks)
                 {
                     if (!await Clients.Caller.SendItems(chunk).WaitAsync(TimeSpan.FromMinutes(10))) throw new HubException("Client rejected sent items.");
@@ -270,6 +269,15 @@ namespace Notesnook.API.Hubs
                         deviceService.WritePendingIds(ids);
                     }
                 }
+
+                var unsyncedMonographs = ids.Where((id) => id.EndsWith(":monograph")).ToHashSet();
+                var unsyncedMonographIds = unsyncedMonographs.Select((id) => id.Split(":")[0]).ToArray();
+                var userMonographs = isResetSync
+                    ? await Repositories.Monographs.FindAsync(m => m.UserId == userId)
+                    : await Repositories.Monographs.FindAsync(m => m.UserId == userId && unsyncedMonographIds.Contains(m.ItemId));
+
+                if (userMonographs.Any() && !await Clients.Caller.SendMonographs(userMonographs).WaitAsync(TimeSpan.FromMinutes(10)))
+                    throw new HubException("Client rejected monographs.");
 
                 deviceService.Reset();
 

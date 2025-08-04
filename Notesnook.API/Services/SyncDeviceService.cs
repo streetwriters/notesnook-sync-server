@@ -194,6 +194,21 @@ namespace Notesnook.API.Services
             }
         }
 
+        public void AddIdsToAllDevices(List<string> ids)
+        {
+            foreach (var id in ListDevices())
+            {
+                if (IsSyncReset(id)) return;
+                lock (id)
+                {
+                    if (!IsDeviceRegistered(id)) Directory.CreateDirectory(Path.Join(device.UserSyncDirectoryPath, id));
+
+                    var oldIds = GetUnsyncedIds(id);
+                    File.WriteAllLinesAsync(Path.Join(device.UserSyncDirectoryPath, id, "unsynced"), ids.Union(oldIds));
+                }
+            }
+        }
+
         public void RegisterDevice()
         {
             lock (device.UserId)
