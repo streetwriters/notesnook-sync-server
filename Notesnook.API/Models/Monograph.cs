@@ -88,7 +88,7 @@ namespace Notesnook.API.Models
         public byte[] CompressedContent { get; set; }
 
         [JsonPropertyName("password")]
-        public string Password { get; set; }
+        public EncryptedData Password { get; set; }
 
         [JsonPropertyName("deleted")]
         public bool Deleted { get; set; }

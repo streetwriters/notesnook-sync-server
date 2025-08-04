@@ -25,10 +25,8 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.SignalR;
 using MongoDB.Bson;
 using MongoDB.Driver;
-using Notesnook.API.Hubs;
 using Notesnook.API.Models;
 using Notesnook.API.Services;
 using Streetwriters.Common;
@@ -104,7 +102,11 @@ namespace Notesnook.API.Controllers
                 var userId = this.User.FindFirstValue("sub");
                 if (userId == null) return Unauthorized();
 
-                if (await FindMonographAsync(userId, monograph) != null) return base.Conflict("This monograph is already published.");
+                var existingMonograph = await FindMonographAsync(userId, monograph);
+                if (existingMonograph != null && !existingMonograph.Deleted)
+                {
+                    return base.Conflict("This monograph is already published.");
+                }
 
                 if (monograph.EncryptedContent == null)
                     monograph.CompressedContent = monograph.Content.CompressBrotli();
@@ -114,9 +116,25 @@ namespace Notesnook.API.Controllers
                 if (monograph.EncryptedContent?.Cipher.Length > MAX_DOC_SIZE || monograph.CompressedContent?.Length > MAX_DOC_SIZE)
                     return base.BadRequest("Monograph is too big. Max allowed size is 15mb.");
 
-                await Monographs.InsertAsync(monograph);
+                if (existingMonograph != null)
+                {
+                    monograph.Id = existingMonograph.Id;
+                    monograph.ItemId = existingMonograph.ItemId;
+                    monograph.Deleted = false;
+                    await Monographs.Collection.ReplaceOneAsync(
+                        CreateMonographFilter(userId, existingMonograph),
+                        monograph
+                    );
+                }
+                else
+                {
+                    await Monographs.InsertAsync(monograph);
+                }
 
-                SyncMonograph(monograph.ItemId ?? monograph.Id, deviceId);
+                if (deviceId != null)
+                {
+                    await SyncMonograph(monograph.ItemId ?? monograph.Id, deviceId);
+                }
 
                 return Ok(new
                 {
@@ -158,11 +176,14 @@ namespace Notesnook.API.Controllers
                     .Set(m => m.EncryptedContent, monograph.EncryptedContent)
                     .Set(m => m.SelfDestruct, monograph.SelfDestruct)
                     .Set(m => m.Title, monograph.Title)
+                    .Set(m => m.Password, monograph.Password)
                 );
                 if (!result.IsAcknowledged) return BadRequest();
 
-
-                SyncMonograph(monograph.ItemId ?? monograph.Id, deviceId);
+                if (deviceId != null)
+                {
+                    await SyncMonograph(monograph.ItemId ?? monograph.Id, deviceId);
+                }
 
                 return Ok(new
                 {
@@ -225,7 +246,8 @@ namespace Notesnook.API.Controllers
                     Builders<Monograph>.Update
                     .Set(m => m.Deleted, true)
                 );
-                SyncMonograph(id, null);
+
+                await SyncMonograph(id);
             }
 
             return Content(SVG_PIXEL, "image/svg+xml");
@@ -234,44 +256,71 @@ namespace Notesnook.API.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteAsync([FromQuery] string deviceId, [FromRoute] string id)
         {
+            var monograph = await FindMonographAsync(id);
+            if (monograph == null)
+            {
+                return NotFound(new
+                {
+                    error = "invalid_id",
+                    error_description = $"No such monograph found."
+                });
+            }
+
+            monograph.Title = null;
+            monograph.EncryptedContent = null;
+            monograph.CompressedContent = null;
+            monograph.Password = null;
+            monograph.DatePublished = default;
+            monograph.Deleted = true;
+
             var userId = this.User.FindFirstValue("sub");
-            await Monographs.Collection.UpdateOneAsync(
-                    CreateMonographFilter(userId, new Monograph { ItemId = id }),
-                    Builders<Monograph>.Update
-                    .Set(m => m.Deleted, true)
+            await Monographs.Collection.ReplaceOneAsync(
+                CreateMonographFilter(userId, new Monograph { ItemId = id }),
+                monograph
             );
-            SyncMonograph(id, deviceId);
+
+            if (deviceId != null)
+            {
+                await SyncMonograph(id, deviceId);
+            }
+
             return Ok();
         }
 
-        private void SyncMonograph(string monographId, string deviceId)
+        private async Task SyncMonograph(string monographId, string deviceId)
+        {
+            var userId = this.User.FindFirstValue("sub");
+
+            await new SyncDeviceService(new SyncDevice(ref userId, ref deviceId)).AddIdsToOtherDevicesAsync(new List<string> { $"{monographId}:monograph" });
+
+            await RaiseTriggerSyncSSE();
+        }
+
+        private async Task SyncMonograph(string monographId)
+        {
+            var userId = this.User.FindFirstValue("sub");
+
+            var emptyString = string.Empty;
+            await new SyncDeviceService(new SyncDevice(ref userId, ref emptyString)).AddIdsToAllDevicesAsync(new List<string> { $"{monographId}:monograph" });
+
+            await RaiseTriggerSyncSSE();
+        }
+
+        private async Task RaiseTriggerSyncSSE()
         {
             var userId = this.User.FindFirstValue("sub");
             var jti = this.User.FindFirstValue("jti");
 
-            Task.Run(async () =>
+            await WampServers.MessengerServer.PublishMessageAsync(MessengerServerTopics.SendSSETopic, new SendSSEMessage
             {
-                if (deviceId == null)
+                SendToAll = true,
+                OriginTokenId = jti,
+                UserId = userId,
+                Message = new Message
                 {
-                    var emptyString = string.Empty;
-                    await new SyncDeviceService(new SyncDevice(ref userId, ref emptyString)).AddIdsToAllDevicesAsync(new List<string> { $"{monographId}:monograph" });
+                    Type = "triggerSync",
+                    Data = JsonSerializer.Serialize(new { reason = "Monographs updated." })
                 }
-                else
-                {
-                    await new SyncDeviceService(new SyncDevice(ref userId, ref deviceId)).AddIdsToOtherDevicesAsync(new List<string> { $"{monographId}:monograph" });
-                }
-
-                await WampServers.MessengerServer.PublishMessageAsync(MessengerServerTopics.SendSSETopic, new SendSSEMessage
-                {
-                    SendToAll = true,
-                    OriginTokenId = this.User.FindFirstValue("jti"),
-                    UserId = userId,
-                    Message = new Message
-                    {
-                        Type = "triggerSync",
-                        Data = JsonSerializer.Serialize(new { reason = "Monographs updated." })
-                    }
-                });
             });
         }
     }
