@@ -150,7 +150,11 @@ namespace Notesnook.API.Controllers
                 var userId = this.User.FindFirstValue("sub");
                 if (userId == null) return Unauthorized();
 
-                if (await FindMonographAsync(userId, monograph) == null) return NotFound();
+                var existingMonograph = await FindMonographAsync(userId, monograph);
+                if (existingMonograph != null || existingMonograph.Deleted)
+                {
+                    return NotFound();
+                }
 
                 if (monograph.EncryptedContent?.Cipher.Length > MAX_DOC_SIZE || monograph.CompressedContent?.Length > MAX_DOC_SIZE)
                     return base.BadRequest("Monograph is too big. Max allowed size is 15mb.");
@@ -194,10 +198,15 @@ namespace Notesnook.API.Controllers
             var userId = this.User.FindFirstValue("sub");
             if (userId == null) return Unauthorized();
 
-            var monographs = (await Monographs.Collection.FindAsync(Builders<Monograph>.Filter.Eq("UserId", userId), new FindOptions<Monograph, ObjectWithId>
-            {
-                Projection = Builders<Monograph>.Projection.Include("_id").Include("ItemId"),
-            })).ToEnumerable();
+            var monographs = (await Monographs.Collection.FindAsync(
+                    Builders<Monograph>.Filter.And(
+                        Builders<Monograph>.Filter.Eq("UserId", userId),
+                        Builders<Monograph>.Filter.Eq("Deleted", false)
+                    )
+               , new FindOptions<Monograph, ObjectWithId>
+               {
+                   Projection = Builders<Monograph>.Projection.Include("_id").Include("ItemId"),
+               })).ToEnumerable();
             return Ok(monographs.Select((m) => m.ItemId ?? m.Id));
         }
 
@@ -251,7 +260,7 @@ namespace Notesnook.API.Controllers
         public async Task<IActionResult> DeleteAsync([FromQuery] string deviceId, [FromRoute] string id)
         {
             var monograph = await FindMonographAsync(id);
-            if (monograph == null)
+            if (monograph == null || monograph.Deleted)
             {
                 return NotFound(new
                 {
