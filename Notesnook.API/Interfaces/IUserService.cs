@@ -17,10 +17,9 @@ You should have received a copy of the Affero GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-using System.Threading;
 using System.Threading.Tasks;
+using Notesnook.API.Models;
 using Notesnook.API.Models.Responses;
-using Streetwriters.Common.Interfaces;
 
 namespace Notesnook.API.Interfaces
 {
@@ -31,6 +30,6 @@ namespace Notesnook.API.Interfaces
         Task DeleteUserAsync(string userId, string jti, string password);
         Task<bool> ResetUserAsync(string userId, bool removeAttachments);
         Task<UserResponse> GetUserAsync(string userId);
-        Task SetUserAttachmentsKeyAsync(string userId, IEncrypted key);
+        Task SetUserKeysAsync(string userId, UserKeys keys);
     }
 }

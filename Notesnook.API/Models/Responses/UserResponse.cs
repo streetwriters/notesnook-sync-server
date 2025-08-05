@@ -12,6 +12,9 @@ namespace Notesnook.API.Models.Responses
         [JsonPropertyName("attachmentsKey")]
         public EncryptedData AttachmentsKey { get; set; }
 
+        [JsonPropertyName("monographPasswordsKey")]
+        public EncryptedData MonographPasswordsKey { get; set; }
+
         [JsonPropertyName("subscription")]
         public ISubscription Subscription { get; set; }
 
