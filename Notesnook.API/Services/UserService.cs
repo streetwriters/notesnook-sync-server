@@ -128,6 +128,7 @@ namespace Notesnook.API.Services
                 MFA = user.MFA,
                 PhoneNumber = user.PhoneNumber,
                 AttachmentsKey = userSettings.AttachmentsKey,
+                MonographPasswordsKey = userSettings.MonographPasswordsKey,
                 Salt = userSettings.Salt,
                 Subscription = subscription,
                 Success = true,
@@ -135,10 +136,19 @@ namespace Notesnook.API.Services
             };
         }
 
-        public async Task SetUserAttachmentsKeyAsync(string userId, IEncrypted key)
+        public async Task SetUserKeysAsync(string userId, UserKeys keys)
         {
             var userSettings = await Repositories.UsersSettings.FindOneAsync((u) => u.UserId == userId) ?? throw new Exception("User not found.");
-            userSettings.AttachmentsKey = (EncryptedData)key;
+
+            if (keys.AttachmentsKey != null)
+            {
+                userSettings.AttachmentsKey = keys.AttachmentsKey;
+            }
+            if (keys.MonographPasswordsKey != null)
+            {
+                userSettings.MonographPasswordsKey = keys.MonographPasswordsKey;
+            }
+
             await Repositories.UsersSettings.UpdateAsync(userSettings.Id, userSettings);
         }
 
@@ -226,6 +236,7 @@ namespace Notesnook.API.Services
             var userSettings = await Repositories.UsersSettings.FindOneAsync((s) => s.UserId == userId);
 
             userSettings.AttachmentsKey = null;
+            userSettings.MonographPasswordsKey = null;
             userSettings.VaultKey = null;
             userSettings.LastSynced = 0;
 
