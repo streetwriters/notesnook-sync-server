@@ -59,30 +59,11 @@ services:
       validate:
         condition: service_completed_successfully
     healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongosh mongodb://localhost:27017 --quiet
+      test: echo 'try { rs.status() } catch (err) { rs.initiate() }' | echo 'db.runCommand("ping").ok' | mongosh mongodb://localhost:27017 --quiet
       interval: 40s
       timeout: 30s
       retries: 3
       start_period: 60s
-  # the notesnook sync server requires transactions which only work
-  # with a MongoDB replica set.
-  # This job just runs `rs.initiate()` on our mongodb instance
-  # upgrading it to a replica set. This is only required once but we running
-  # it multiple times is no issue.
-  initiate-rs0:
-    image: mongo:7.0.12
-    networks:
-      - notesnook
-    depends_on:
-      - notesnook-db
-    entrypoint: /bin/sh
-    command:
-      - -c
-      - |
-        mongosh mongodb://notesnook-db:27017 <<EOF
-          rs.initiate();
-          rs.status();
-        EOF
 
   notesnook-s3:
     image: minio/minio:RELEASE.2024-07-29T22-14-52Z
