@@ -243,6 +243,7 @@ namespace Notesnook.API.Services
             return client.GetPreSignedURL(new GetPreSignedUrlRequest
             {
                 BucketName = GetBucketName(S3ClientMode.INTERNAL),
+                Expires = System.DateTime.Now.AddHours(1),
                 Verb = HttpVerb.PUT,
                 Key = objectName,
                 PartNumber = partNumber,
