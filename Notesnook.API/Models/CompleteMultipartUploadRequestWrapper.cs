@@ -9,13 +9,6 @@ public class CompleteMultipartUploadRequestWrapper
     public List<PartETagWrapper> PartETags { get; set; }
     public string UploadId { get; set; }
 
-    /// <summary>
-    /// Default constructor.
-    /// </summary>
-    public CompleteMultipartUploadRequestWrapper()
-    {
-    }
-
     public CompleteMultipartUploadRequest ToRequest()
     {
         CompleteMultipartUploadRequest completeMultipartUploadRequest = new CompleteMultipartUploadRequest();
