@@ -74,8 +74,12 @@ namespace Notesnook.API.Controllers
             var userId = User.FindFirstValue("sub");
             try
             {
-                if (user.AttachmentsKey != null)
-                    await UserService.SetUserAttachmentsKeyAsync(userId, user.AttachmentsKey);
+                var keys = new UserKeys
+                {
+                    AttachmentsKey = user.AttachmentsKey,
+                    MonographPasswordsKey = user.MonographPasswordsKey
+                };
+                await UserService.SetUserKeysAsync(userId, keys);
                 return Ok();
             }
             catch (Exception ex)

@@ -48,8 +48,8 @@ namespace Streetwriters.Identity.Validation
         private IHttpContextAccessor HttpContextAccessor { get; set; }
         private ITokenValidator TokenValidator { get; set; }
         private ITokenGenerationService TokenGenerationService { get; set; }
-        private IEmailSender EmailSender { get; set; }
-        public MFAGrantValidator(UserManager<User> userManager, SignInManager<User> signInManager, IMFAService mfaService, IHttpContextAccessor httpContextAccessor, ITokenValidator tokenValidator, ITokenGenerationService tokenGenerationService, IEmailSender emailSender)
+        private ITemplatedEmailSender EmailSender { get; set; }
+        public MFAGrantValidator(UserManager<User> userManager, SignInManager<User> signInManager, IMFAService mfaService, IHttpContextAccessor httpContextAccessor, ITokenValidator tokenValidator, ITokenGenerationService tokenGenerationService, ITemplatedEmailSender emailSender)
         {
             UserManager = userManager;
             SignInManager = signInManager;
@@ -101,7 +101,7 @@ namespace Streetwriters.Identity.Validation
             context.Result.ErrorDescription = "Please provide a valid multi-factor authentication code.";
 
             if (string.IsNullOrEmpty(mfaCode)) return;
-            if (string.IsNullOrEmpty(mfaMethod) || !MFAService.IsValidMFAMethod(mfaMethod))
+            if (string.IsNullOrEmpty(mfaMethod) || (!MFAService.IsValidMFAMethod(mfaMethod, user) && mfaMethod != MFAMethods.RecoveryCode))
             {
                 context.Result.ErrorDescription = "Please provide a valid multi-factor authentication method.";
                 return;

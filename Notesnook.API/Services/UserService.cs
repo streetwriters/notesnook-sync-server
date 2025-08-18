@@ -128,6 +128,7 @@ namespace Notesnook.API.Services
                 MFA = user.MFA,
                 PhoneNumber = user.PhoneNumber,
                 AttachmentsKey = userSettings.AttachmentsKey,
+                MonographPasswordsKey = userSettings.MonographPasswordsKey,
                 Salt = userSettings.Salt,
                 Subscription = subscription,
                 Success = true,
@@ -135,16 +136,25 @@ namespace Notesnook.API.Services
             };
         }
 
-        public async Task SetUserAttachmentsKeyAsync(string userId, IEncrypted key)
+        public async Task SetUserKeysAsync(string userId, UserKeys keys)
         {
             var userSettings = await Repositories.UsersSettings.FindOneAsync((u) => u.UserId == userId) ?? throw new Exception("User not found.");
-            userSettings.AttachmentsKey = (EncryptedData)key;
+
+            if (keys.AttachmentsKey != null)
+            {
+                userSettings.AttachmentsKey = keys.AttachmentsKey;
+            }
+            if (keys.MonographPasswordsKey != null)
+            {
+                userSettings.MonographPasswordsKey = keys.MonographPasswordsKey;
+            }
+
             await Repositories.UsersSettings.UpdateAsync(userSettings.Id, userSettings);
         }
 
         public async Task DeleteUserAsync(string userId)
         {
-            new SyncDeviceService(new SyncDevice(ref userId, ref userId)).ResetDevices();
+            new SyncDeviceService(new SyncDevice(userId, userId)).ResetDevices();
 
             var cc = new CancellationTokenSource();
 
@@ -204,7 +214,7 @@ namespace Notesnook.API.Services
 
         public async Task<bool> ResetUserAsync(string userId, bool removeAttachments)
         {
-            new SyncDeviceService(new SyncDevice(ref userId, ref userId)).ResetDevices();
+            new SyncDeviceService(new SyncDevice(userId, userId)).ResetDevices();
 
             var cc = new CancellationTokenSource();
 
@@ -226,6 +236,7 @@ namespace Notesnook.API.Services
             var userSettings = await Repositories.UsersSettings.FindOneAsync((s) => s.UserId == userId);
 
             userSettings.AttachmentsKey = null;
+            userSettings.MonographPasswordsKey = null;
             userSettings.VaultKey = null;
             userSettings.LastSynced = 0;
 

@@ -39,9 +39,9 @@ namespace Streetwriters.Identity.Services
         const string SMS_ID_CLAIM = "mfa:sms:id";
 
         private UserManager<User> UserManager { get; set; }
-        private IEmailSender EmailSender { get; set; }
+        private ITemplatedEmailSender EmailSender { get; set; }
         private ISMSSender SMSSender { get; set; }
-        public MFAService(UserManager<User> _userManager, IEmailSender emailSender, ISMSSender smsSender)
+        public MFAService(UserManager<User> _userManager, ITemplatedEmailSender emailSender, ISMSSender smsSender)
         {
             UserManager = _userManager;
             EmailSender = emailSender;
@@ -121,6 +121,14 @@ namespace Streetwriters.Identity.Services
             return method == MFAMethods.App || method == MFAMethods.Email || method == MFAMethods.SMS || method == MFAMethods.RecoveryCode;
         }
 
+        public bool IsValidMFAMethod(string method, User user)
+        {
+            var primaryMethod = GetPrimaryMethod(user);
+            var secondaryMethod = GetSecondaryMethod(user);
+            if (!IsValidMFAMethod(method)) return false;
+            return method == primaryMethod || (!string.IsNullOrEmpty(secondaryMethod) && method == secondaryMethod);
+        }
+
         private Task RemoveSecondaryMethodAsync(User user)
         {
             return this.RemoveClaimAsync(user, MFAService.SECONDARY_METHOD_CLAIM);
@@ -157,8 +165,8 @@ namespace Streetwriters.Identity.Services
         public async Task SendOTPAsync(User user, IClient client, MultiFactorSetupForm form, bool isSetup = false)
         {
             var method = form.Type;
-            if (method != MFAMethods.Email && method != MFAMethods.SMS) throw new Exception("Invalid method.");
-
+            if ((method != MFAMethods.Email && method != MFAMethods.SMS) || !IsValidMFAMethod(method))
+                throw new Exception("Invalid method.");
 
             if (isSetup &&
                 method == MFAMethods.SMS &&

@@ -40,9 +40,9 @@ namespace Streetwriters.Identity.Validation
         private IMFAService MFAService { get; set; }
         private IHttpContextAccessor HttpContextAccessor { get; set; }
         private ITokenValidator TokenValidator { get; set; }
-        private IEmailSender EmailSender { get; set; }
+        private ITemplatedEmailSender EmailSender { get; set; }
 
-        public MFAPasswordGrantValidator(UserManager<User> userManager, SignInManager<User> signInManager, IMFAService mfaService, IHttpContextAccessor httpContextAccessor, ITokenValidator tokenValidator, IEmailSender emailSender)
+        public MFAPasswordGrantValidator(UserManager<User> userManager, SignInManager<User> signInManager, IMFAService mfaService, IHttpContextAccessor httpContextAccessor, ITokenValidator tokenValidator, ITemplatedEmailSender emailSender)
         {
             UserManager = userManager;
             SignInManager = signInManager;

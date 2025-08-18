@@ -34,6 +34,7 @@ namespace Streetwriters.Identity.Interfaces
         string GetSecondaryMethod(User user);
         Task<int> GetRemainingValidCodesAsync(User user);
         bool IsValidMFAMethod(string method);
+        bool IsValidMFAMethod(string method, User user);
         Task<AuthenticatorDetails> GetAuthenticatorDetailsAsync(User user, IClient client);
         Task SendOTPAsync(User user, IClient client, MultiFactorSetupForm form, bool isSetup = false);
         Task<bool> VerifyOTPAsync(User user, string code, string method);

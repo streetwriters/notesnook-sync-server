@@ -17,17 +17,11 @@ You should have received a copy of the Affero GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-using Streetwriters.Identity.Interfaces;
-
-namespace Streetwriters.Identity.Models
+namespace Notesnook.API.Models
 {
-    public class EmailTemplate : IEmailTemplate
-    {
-        public int? Id { get; set; }
-        public object Data { get; set; }
-        public long? SendAt { get; set; }
-        public string Subject { get; set; }
-        public string Html { get; set; }
-        public string Text { get; set; }
-    }
+  public class UserKeys
+  {
+    public EncryptedData AttachmentsKey { get; set; }
+    public EncryptedData MonographPasswordsKey { get; set; }
+  }
 }

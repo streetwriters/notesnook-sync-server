@@ -25,6 +25,7 @@ using AspNetCore.Identity.Mongo.Model;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Streetwriters.Common;
 using Streetwriters.Common.Enums;
 using Streetwriters.Common.Models;
@@ -39,7 +40,7 @@ namespace Streetwriters.Identity.Controllers
     [Route("signup")]
     public class SignupController : IdentityControllerBase
     {
-        public SignupController(UserManager<User> _userManager, IEmailSender _emailSender,
+        public SignupController(UserManager<User> _userManager, ITemplatedEmailSender _emailSender,
         SignInManager<User> _signInManager, RoleManager<MongoRole> _roleManager, IMFAService _mfaService) : base(_userManager, _emailSender, _signInManager, _roleManager, _mfaService)
         { }
 
@@ -51,6 +52,7 @@ namespace Streetwriters.Identity.Controllers
 
         [HttpPost]
         [AllowAnonymous]
+        [EnableRateLimiting("strict")]
         public async Task<IActionResult> Signup([FromForm] SignupForm form)
         {
             if (Constants.DISABLE_SIGNUPS)

@@ -26,8 +26,11 @@ namespace Streetwriters.Identity.Services
 {
     public class Argon2PasswordHasher<TUser> : IPasswordHasher<TUser> where TUser : User
     {
+        const long MAX_PASSWORD_LENGTH = 1024 * 2;
         public string HashPassword(TUser user, string password)
         {
+            if (password.Length > MAX_PASSWORD_LENGTH)
+                throw new Exception("Password is too long.");
             ArgumentNullException.ThrowIfNullOrEmpty(password, nameof(password));
             return PasswordHelper.CreatePasswordHash(password);
         }

@@ -31,6 +31,7 @@ using IdentityServer4.Stores;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Streetwriters.Common;
 using Streetwriters.Common.Enums;
 using Streetwriters.Common.Interfaces;
@@ -52,10 +53,8 @@ namespace Streetwriters.Identity.Controllers
     {
         private IPersistedGrantStore PersistedGrantStore { get; set; }
         private ITokenGenerationService TokenGenerationService { get; set; }
-        private IUserClaimsPrincipalFactory<User> PrincipalFactory { get; set; }
-        private IdentityServerOptions ISOptions { get; set; }
         private IUserAccountService UserAccountService { get; set; }
-        public AccountController(UserManager<User> _userManager, IEmailSender _emailSender,
+        public AccountController(UserManager<User> _userManager, ITemplatedEmailSender _emailSender,
         SignInManager<User> _signInManager, RoleManager<MongoRole> _roleManager, IPersistedGrantStore store,
         ITokenGenerationService tokenGenerationService, IMFAService _mfaService, IUserAccountService userAccountService) : base(_userManager, _emailSender, _signInManager, _roleManager, _mfaService)
         {
@@ -114,6 +113,7 @@ namespace Streetwriters.Identity.Controllers
         }
 
         [HttpPost("verify")]
+        [EnableRateLimiting("strict")]
         public async Task<IActionResult> SendVerificationEmail([FromForm] string newEmail)
         {
             var client = Clients.FindClientById(User.FindFirstValue("client_id"));
@@ -147,6 +147,7 @@ namespace Streetwriters.Identity.Controllers
 
         [HttpPost("recover")]
         [AllowAnonymous]
+        [EnableRateLimiting("strict")]
         public async Task<IActionResult> ResetUserPassword([FromForm] ResetPasswordForm form)
         {
             var client = Clients.FindClientById(form.ClientId);

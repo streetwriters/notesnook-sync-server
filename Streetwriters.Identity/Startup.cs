@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
 using System.IO;
+using System.Threading.RateLimiting;
 using AspNetCore.Identity.Mongo;
 using IdentityServer4.MongoDB.Entities;
 using IdentityServer4.MongoDB.Interfaces;
@@ -32,6 +33,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -43,6 +45,7 @@ using Streetwriters.Common.Extensions;
 using Streetwriters.Common.Interfaces;
 using Streetwriters.Common.Messages;
 using Streetwriters.Common.Models;
+using Streetwriters.Common.Services;
 using Streetwriters.Identity.Helpers;
 using Streetwriters.Identity.Interfaces;
 using Streetwriters.Identity.Jobs;
@@ -69,6 +72,7 @@ namespace Streetwriters.Identity
             var connectionString = Constants.MONGODB_CONNECTION_STRING;
 
             services.AddTransient<IEmailSender, EmailSender>();
+            services.AddTransient<ITemplatedEmailSender, TemplatedEmailSender>();
             services.AddTransient<ISMSSender, SMSSender>();
             services.AddTransient<IPasswordHasher<User>, Argon2PasswordHasher<User>>();
 
@@ -129,6 +133,18 @@ namespace Streetwriters.Identity
             services.Configure<DataProtectionTokenProviderOptions>(options =>
             {
                 options.TokenLifespan = TimeSpan.FromHours(2);
+            });
+
+            services.AddRateLimiter(options =>
+            {
+                options.AddSlidingWindowLimiter("strict", options =>
+                {
+                    options.PermitLimit = 30;
+                    options.Window = TimeSpan.FromSeconds(60);
+                    options.SegmentsPerWindow = 10;
+                    options.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+                    options.QueueLimit = 0;
+                });
             });
 
             services.AddAuthorization(options =>
@@ -197,6 +213,7 @@ namespace Streetwriters.Identity
             app.UseRouting();
 
             app.UseIdentityServer();
+            app.UseRateLimiter();
 
             app.UseAuthorization();
             app.UseAuthentication();
