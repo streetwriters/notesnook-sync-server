@@ -59,7 +59,7 @@ services:
       validate:
         condition: service_completed_successfully
     healthcheck:
-      test: echo 'try { rs.status() } catch (err) { rs.initiate() }' | echo 'db.runCommand("ping").ok' | mongosh mongodb://localhost:27017 --quiet
+      test: echo 'try { rs.status() } catch (err) { rs.initiate() }; db.runCommand("ping").ok' | mongosh mongodb://localhost:27017 --quiet
       interval: 40s
       timeout: 30s
       retries: 3
@@ -212,3 +212,4 @@ networks:
 volumes:
   dbdata:
   s3data:
+
