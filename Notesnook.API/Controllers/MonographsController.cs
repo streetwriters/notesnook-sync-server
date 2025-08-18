@@ -201,7 +201,7 @@ namespace Notesnook.API.Controllers
             var monographs = (await Monographs.Collection.FindAsync(
                     Builders<Monograph>.Filter.And(
                         Builders<Monograph>.Filter.Eq("UserId", userId),
-                        Builders<Monograph>.Filter.Eq("Deleted", false)
+                        Builders<Monograph>.Filter.Ne("Deleted", true)
                     )
                , new FindOptions<Monograph, ObjectWithId>
                {
