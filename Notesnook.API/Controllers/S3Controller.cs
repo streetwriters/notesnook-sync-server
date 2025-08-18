@@ -83,8 +83,7 @@ namespace Notesnook.API.Controllers
             var userId = this.User.FindFirstValue("sub");
             try
             {
-                CompleteMultipartUploadRequest request = uploadRequestWrapper.ToRequest();
-                await S3Service.CompleteMultipartUploadAsync(userId, request);
+                await S3Service.CompleteMultipartUploadAsync(userId, uploadRequestWrapper.ToRequest());
                 return Ok();
             }
             catch (Exception ex) { return BadRequest(ex.Message); }
