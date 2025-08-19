@@ -54,6 +54,7 @@ namespace Notesnook.API.Controllers
         private static FilterDefinition<Monograph> CreateMonographFilter(string userId, Monograph monograph)
         {
             var userIdFilter = Builders<Monograph>.Filter.Eq("UserId", userId);
+            monograph.ItemId ??= monograph.Id;
             return ObjectId.TryParse(monograph.ItemId, out ObjectId id)
             ? Builders<Monograph>.Filter
                 .And(userIdFilter,
@@ -246,7 +247,8 @@ namespace Notesnook.API.Controllers
                     {
                         ItemId = id,
                         Id = monograph.Id,
-                        Deleted = true
+                        Deleted = true,
+                        UserId = monograph.UserId
                     }
                 );
 
