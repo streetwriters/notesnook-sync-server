@@ -48,11 +48,13 @@ using Notesnook.API.Authorization;
 using Notesnook.API.Extensions;
 using Notesnook.API.Hubs;
 using Notesnook.API.Interfaces;
+using Notesnook.API.Jobs;
 using Notesnook.API.Models;
 using Notesnook.API.Repositories;
 using Notesnook.API.Services;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
+using Quartz;
 using Streetwriters.Common;
 using Streetwriters.Common.Extensions;
 using Streetwriters.Common.Messages;
@@ -216,6 +218,23 @@ namespace Notesnook.API
                     .WithMetrics((builder) => builder
                             .AddMeter("Notesnook.API.Metrics.Sync")
                             .AddPrometheusExporter());
+
+            services.AddQuartzHostedService(q =>
+            {
+                q.WaitForJobsToComplete = false;
+                q.AwaitApplicationStarted = true;
+                q.StartDelay = TimeSpan.FromMinutes(1);
+            }).AddQuartz(q =>
+            {
+                q.UseMicrosoftDependencyInjectionJobFactory();
+
+                var jobKey = new JobKey("DeviceCleanupJob");
+                q.AddJob<DeviceCleanupJob>(opts => opts.WithIdentity(jobKey));
+                q.AddTrigger(opts => opts
+                    .ForJob(jobKey)
+                    .WithIdentity("DeviceCleanup-trigger")
+                    .WithSimpleSchedule((s) => s.RepeatForever().WithInterval(TimeSpan.FromDays(30))));
+            });
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
