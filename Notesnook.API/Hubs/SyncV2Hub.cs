@@ -187,6 +187,16 @@ namespace Notesnook.API.Hubs
 
         public async Task<SyncV2Metadata> RequestFetch(string deviceId)
         {
+            return await HandleRequestFetch(deviceId, false);
+        }
+
+        public async Task<SyncV2Metadata> RequestFetchV2(string deviceId)
+        {
+            return await HandleRequestFetch(deviceId, true);
+        }
+
+        private async Task<SyncV2Metadata> HandleRequestFetch(string deviceId, bool includeMonographs)
+        {
             var userId = Context.User.FindFirstValue("sub");
             if (string.IsNullOrEmpty(userId)) throw new HubException("Please login to sync.");
 
@@ -251,14 +261,17 @@ namespace Notesnook.API.Hubs
                     }
                 }
 
-                // var unsyncedMonographs = ids.Where((id) => id.EndsWith(":monograph")).ToHashSet();
-                // var unsyncedMonographIds = unsyncedMonographs.Select((id) => id.Split(":")[0]).ToArray();
-                // var userMonographs = isResetSync
-                //     ? await Repositories.Monographs.FindAsync(m => m.UserId == userId)
-                //     : await Repositories.Monographs.FindAsync(m => m.UserId == userId && unsyncedMonographIds.Contains(m.ItemId));
+                if (includeMonographs)
+                {
+                    var unsyncedMonographs = ids.Where((id) => id.EndsWith(":monograph")).ToHashSet();
+                    var unsyncedMonographIds = unsyncedMonographs.Select((id) => id.Split(":")[0]).ToArray();
+                    var userMonographs = isResetSync
+                        ? await Repositories.Monographs.FindAsync(m => m.UserId == userId)
+                        : await Repositories.Monographs.FindAsync(m => m.UserId == userId && unsyncedMonographIds.Contains(m.ItemId));
 
-                // if (userMonographs.Any() && !await Clients.Caller.SendMonographs(userMonographs).WaitAsync(TimeSpan.FromMinutes(10)))
-                //     throw new HubException("Client rejected monographs.");
+                    if (userMonographs.Any() && !await Clients.Caller.SendMonographs(userMonographs).WaitAsync(TimeSpan.FromMinutes(10)))
+                        throw new HubException("Client rejected monographs.");
+                }
 
                 deviceService.Reset();
 
