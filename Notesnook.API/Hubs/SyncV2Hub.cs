@@ -263,14 +263,17 @@ namespace Notesnook.API.Hubs
 
                 if (includeMonographs)
                 {
+                    var isSyncingMonographsForFirstTime = !device.HasInitialMonographsSync;
                     var unsyncedMonographs = ids.Where((id) => id.EndsWith(":monograph")).ToHashSet();
                     var unsyncedMonographIds = unsyncedMonographs.Select((id) => id.Split(":")[0]).ToArray();
-                    var userMonographs = isResetSync
+                    var userMonographs = isResetSync || isSyncingMonographsForFirstTime
                         ? await Repositories.Monographs.FindAsync(m => m.UserId == userId)
                         : await Repositories.Monographs.FindAsync(m => m.UserId == userId && unsyncedMonographIds.Contains(m.ItemId));
 
                     if (userMonographs.Any() && !await Clients.Caller.SendMonographs(userMonographs).WaitAsync(TimeSpan.FromMinutes(10)))
                         throw new HubException("Client rejected monographs.");
+
+                    device.HasInitialMonographsSync = true;
                 }
 
                 deviceService.Reset();

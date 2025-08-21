@@ -44,6 +44,16 @@ namespace Notesnook.API.Services
             set => SetMetadata("LastAccessTime", value.ToString());
         }
 
+        /// <summary>
+        /// Indicates if the monographs have been synced for the first time
+        /// ever on a device.
+        /// </summary>
+        public readonly bool HasInitialMonographsSync
+        {
+            get => !string.IsNullOrEmpty(GetMetadata("HasInitialMonographsSync"));
+            set => SetMetadata("HasInitialMonographsSync", value.ToString());
+        }
+
         private static string CreateFilePath(string userId, string? deviceId = null, string? metadataKey = null)
         {
             return Path.Join("sync", userId, deviceId, metadataKey);
