@@ -145,6 +145,14 @@ namespace Streetwriters.Identity
                     options.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
                     options.QueueLimit = 0;
                 });
+                options.AddSlidingWindowLimiter("super_strict", options =>
+                {
+                    options.PermitLimit = 1;
+                    options.Window = TimeSpan.FromMinutes(1);
+                    options.SegmentsPerWindow = 1;
+                    options.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+                    options.QueueLimit = 2;
+                });
             });
 
             services.AddAuthorization(options =>

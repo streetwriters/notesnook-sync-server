@@ -24,6 +24,7 @@ using System.Text;
 using System.Text.Encodings.Web;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
+using Streetwriters.Common;
 using Streetwriters.Common.Enums;
 using Streetwriters.Common.Interfaces;
 using Streetwriters.Common.Models;
@@ -185,6 +186,7 @@ namespace Streetwriters.Identity.Services
                 case "sms":
                     await UserManager.SetPhoneNumberAsync(user, form.PhoneNumber);
                     var id = await SMSSender.SendOTPAsync(form.PhoneNumber, client);
+                    await Slogger<MFAService>.Info("SendOTPAsync", user.Id.ToString(), id);
                     await this.ReplaceClaimAsync(user, MFAService.SMS_ID_CLAIM, id);
                     break;
 

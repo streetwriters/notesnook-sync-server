@@ -91,7 +91,7 @@ namespace Streetwriters.Identity.Controllers
         [HttpPost("send")]
         [Authorize("mfa")]
         [Authorize(LocalApi.PolicyName)]
-        [EnableRateLimiting("strict")]
+        [EnableRateLimiting("super_strict")]
         public async Task<IActionResult> RequestCode([FromForm] string type)
         {
             var client = Clients.FindClientById(User.FindFirstValue("client_id"));
