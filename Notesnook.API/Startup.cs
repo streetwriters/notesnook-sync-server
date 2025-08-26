@@ -166,8 +166,10 @@ namespace Notesnook.API
             services.AddScoped<IUnitOfWork, UnitOfWork>();
 
             services.AddRepository<UserSettings>("user_settings", "notesnook")
-                    .AddRepository<Monograph>("monographs", "notesnook")
                     .AddRepository<Announcement>("announcements", "notesnook");
+
+            services.AddSingleton((provider) => MongoDbContext.GetMongoCollection<Monograph>(provider.GetService<MongoDB.Driver.IMongoClient>(), "notesnook", "monographs"));
+            services.AddScoped<IMonographRepository, MonographRepository>();
 
             services.AddMongoCollection(Collections.SettingsKey)
                     .AddMongoCollection(Collections.AttachmentsKey)
@@ -185,6 +187,8 @@ namespace Notesnook.API
             services.AddScoped<ISyncItemsRepositoryAccessor, SyncItemsRepositoryAccessor>();
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<IS3Service, S3Service>();
+            services.AddScoped<ISyncDeviceServiceWrapper, SyncDeviceServiceWrapper>();
+            services.AddScoped<IMessengerService, MessengerService>();
 
             services.AddControllers();
 
