@@ -42,7 +42,7 @@ namespace Notesnook.API.Accessors
         public SyncItemsRepository Vaults { get; }
         public SyncItemsRepository Tags { get; }
         public Repository<UserSettings> UsersSettings { get; }
-        public Repository<Monograph> Monographs { get; }
+        public IMonographRepository Monographs { get; }
 
         public SyncItemsRepositoryAccessor(IDbContext dbContext,
 
@@ -71,7 +71,7 @@ namespace Notesnook.API.Accessors
         [FromKeyedServices(Collections.TagsKey)]
         IMongoCollection<SyncItem> tags,
 
-        Repository<UserSettings> usersSettings, Repository<Monograph> monographs)
+        Repository<UserSettings> usersSettings, IMonographRepository monographs)
         {
             UsersSettings = usersSettings;
             Monographs = monographs;

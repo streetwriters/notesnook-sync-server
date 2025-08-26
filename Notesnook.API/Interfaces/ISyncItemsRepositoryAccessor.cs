@@ -19,7 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using Notesnook.API.Models;
 using Notesnook.API.Repositories;
-using Streetwriters.Common.Models;
 using Streetwriters.Data.Repositories;
 
 namespace Notesnook.API.Interfaces
@@ -39,6 +38,6 @@ namespace Notesnook.API.Interfaces
         SyncItemsRepository Vaults { get; }
         SyncItemsRepository Tags { get; }
         Repository<UserSettings> UsersSettings { get; }
-        Repository<Monograph> Monographs { get; }
+        IMonographRepository Monographs { get; }
     }
 }
