@@ -148,6 +148,17 @@ namespace Notesnook.API.Services
             {
                 userSettings.MonographPasswordsKey = keys.MonographPasswordsKey;
             }
+            if (keys.InboxKeys != null)
+            {
+                if (keys.InboxKeys.Public == null || keys.InboxKeys.Private == null)
+                {
+                    userSettings.InboxKeys = null;
+                }
+                else
+                {
+                    userSettings.InboxKeys = keys.InboxKeys;
+                }
+            }
 
             await Repositories.UsersSettings.UpdateAsync(userSettings.Id, userSettings);
         }
