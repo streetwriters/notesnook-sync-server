@@ -77,7 +77,8 @@ namespace Notesnook.API.Controllers
                 var keys = new UserKeys
                 {
                     AttachmentsKey = user.AttachmentsKey,
-                    MonographPasswordsKey = user.MonographPasswordsKey
+                    MonographPasswordsKey = user.MonographPasswordsKey,
+                    InboxKeys = user.InboxKeys
                 };
                 await UserService.SetUserKeysAsync(userId, keys);
                 return Ok();

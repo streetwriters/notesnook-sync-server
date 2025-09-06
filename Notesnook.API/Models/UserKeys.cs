@@ -23,5 +23,12 @@ namespace Notesnook.API.Models
   {
     public EncryptedData AttachmentsKey { get; set; }
     public EncryptedData MonographPasswordsKey { get; set; }
+    public InboxKeys InboxKeys { get; set; }
+  }
+
+  public class InboxKeys
+  {
+    public string Public { get; set; }
+    public EncryptedData Private { get; set; }
   }
 }
