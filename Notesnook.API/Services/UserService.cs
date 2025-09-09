@@ -129,6 +129,7 @@ namespace Notesnook.API.Services
                 PhoneNumber = user.PhoneNumber,
                 AttachmentsKey = userSettings.AttachmentsKey,
                 MonographPasswordsKey = userSettings.MonographPasswordsKey,
+                InboxKeys = userSettings.InboxKeys,
                 Salt = userSettings.Salt,
                 Subscription = subscription,
                 Success = true,
