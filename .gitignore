@@ -246,7 +246,7 @@ _Pvt_Extensions
 .paket/paket.exe
 paket-files/
 
-# FAKE - F# Make
+# FAKE - F# Makes
 .fake/
 
 # JetBrains Rider
@@ -263,5 +263,7 @@ __pycache__/
 keys/
 dist/
 keystore/
-.env.local
+.env
+.env.*
+!.env.example
 Notesnook.API/sync/
