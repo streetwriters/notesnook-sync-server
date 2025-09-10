@@ -277,7 +277,6 @@ namespace Notesnook.API
 
             app.UseEndpoints(endpoints =>
             {
-                endpoints.MapPrometheusScrapingEndpoint();
                 endpoints.MapControllers();
                 endpoints.MapHealthChecks("/health");
                 endpoints.MapHub<SyncHub>("/hubs/sync", options =>
