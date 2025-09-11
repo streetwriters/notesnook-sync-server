@@ -40,5 +40,6 @@ namespace Notesnook.API.Interfaces
         SyncItemsRepository Tags { get; }
         Repository<UserSettings> UsersSettings { get; }
         Repository<Monograph> Monographs { get; }
+        Repository<InboxApiKey> InboxApiKey { get; }
     }
 }

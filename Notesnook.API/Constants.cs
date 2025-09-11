@@ -14,5 +14,6 @@ namespace Notesnook.API
         public const string TagsKey = "tags";
         public const string ColorsKey = "colors";
         public const string VaultsKey = "vaults";
+        public const string InboxApiKeysKey = "inbox_api_keys";
     }
 }
