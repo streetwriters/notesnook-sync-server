@@ -154,6 +154,7 @@ namespace Notesnook.API.Services
                 if (keys.InboxKeys.Public == null || keys.InboxKeys.Private == null)
                 {
                     userSettings.InboxKeys = null;
+                    await Repositories.InboxApiKey.DeleteManyAsync(t => t.UserId == userId);
                 }
                 else
                 {
@@ -184,6 +185,7 @@ namespace Notesnook.API.Services
             Repositories.Vaults.DeleteByUserId(userId);
             Repositories.UsersSettings.Delete((u) => u.UserId == userId);
             Repositories.Monographs.DeleteMany((m) => m.UserId == userId);
+            Repositories.InboxApiKey.DeleteMany((t) => t.UserId == userId);
 
             var result = await unit.Commit();
             await Slogger<UserService>.Info(nameof(DeleteUserAsync), "User data deleted", userId, result.ToString());
@@ -243,6 +245,7 @@ namespace Notesnook.API.Services
             Repositories.Tags.DeleteByUserId(userId);
             Repositories.Vaults.DeleteByUserId(userId);
             Repositories.Monographs.DeleteMany((m) => m.UserId == userId);
+            Repositories.InboxApiKey.DeleteMany((t) => t.UserId == userId);
             if (!await unit.Commit()) return false;
 
             var userSettings = await Repositories.UsersSettings.FindOneAsync((s) => s.UserId == userId);
