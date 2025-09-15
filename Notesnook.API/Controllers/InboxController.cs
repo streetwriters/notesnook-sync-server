@@ -22,6 +22,7 @@ using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Notesnook.API.Extensions;
 using Notesnook.API.Models;
 using Streetwriters.Common;
 using Streetwriters.Data.Repositories;
@@ -66,10 +67,6 @@ namespace Notesnook.API.Controllers
                 {
                     return BadRequest(new { error = "Api key name is required." });
                 }
-                if (string.IsNullOrWhiteSpace(request.Key))
-                {
-                    return BadRequest(new { error = "Api key is required." });
-                }
                 if (request.DateCreated <= 0)
                 {
                     return BadRequest(new { error = "Valid creation date is required." });
@@ -89,11 +86,11 @@ namespace Notesnook.API.Controllers
                 {
                     UserId = userId,
                     Name = request.Name,
-                    Key = request.Key,
                     DateCreated = request.DateCreated,
                     ExpiryDate = request.ExpiryDate,
                     LastUsedAt = 0
                 };
+                inboxApiKey.SetKey();
                 await InboxApiKey.InsertAsync(inboxApiKey);
                 return Ok(inboxApiKey);
             }

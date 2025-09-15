@@ -25,6 +25,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
+using Notesnook.API.Extensions;
 using Notesnook.API.Interfaces;
 using Notesnook.API.Models;
 using Notesnook.API.Models.Responses;
@@ -159,6 +160,16 @@ namespace Notesnook.API.Services
                 else
                 {
                     userSettings.InboxKeys = keys.InboxKeys;
+                    var defaultInboxKey = new InboxApiKey
+                    {
+                        UserId = userId,
+                        Name = "Default",
+                        DateCreated = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                        ExpiryDate = DateTimeOffset.UtcNow.AddMonths(1).ToUnixTimeMilliseconds(),
+                        LastUsedAt = 0
+                    };
+                    defaultInboxKey.SetKey();
+                    await Repositories.InboxApiKey.InsertAsync(defaultInboxKey);
                 }
             }
 
