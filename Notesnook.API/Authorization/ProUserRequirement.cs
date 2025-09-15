@@ -35,11 +35,17 @@ namespace Notesnook.API.Authorization
             ["/s3"] = "upload attachments",
             ["/s3/multipart"] = "upload attachments",
         };
-        private readonly string[] allowedClaims = ["trial", "premium", "premium_canceled"];
+        private static readonly string[] proClaims = ["premium", "premium_canceled"];
+        private static readonly string[] trialClaims = ["trial"];
+        public static bool IsUserPro(ClaimsPrincipal user)
+        => user.Claims.Any((c) => c.Type == "notesnook:status" && proClaims.Contains(c.Value));
+        public static bool IsUserTrialing(ClaimsPrincipal user)
+        => user.Claims.Any((c) => c.Type == "notesnook:status" && trialClaims.Contains(c.Value));
+
         protected override Task HandleRequirementAsync(AuthorizationHandlerContext context, ProUserRequirement requirement)
         {
             PathString path = context.Resource is DefaultHttpContext httpContext ? httpContext.Request.Path : null;
-            var isProOrTrial = context.User.Claims.Any((c) => c.Type == "notesnook:status" && allowedClaims.Contains(c.Value));
+            var isProOrTrial = IsUserPro(context.User) || IsUserTrialing(context.User);
             if (isProOrTrial) context.Succeed(requirement);
             else
             {

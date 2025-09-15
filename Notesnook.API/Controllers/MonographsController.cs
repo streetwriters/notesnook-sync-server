@@ -23,10 +23,13 @@ using System.Linq;
 using System.Security.Claims;
 using System.Text.Json;
 using System.Threading.Tasks;
+using AngleSharp;
+using AngleSharp.Dom;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MongoDB.Bson;
 using MongoDB.Driver;
+using Notesnook.API.Authorization;
 using Notesnook.API.Models;
 using Notesnook.API.Services;
 using Streetwriters.Common;
@@ -110,7 +113,7 @@ namespace Notesnook.API.Controllers
                 }
 
                 if (monograph.EncryptedContent == null)
-                    monograph.CompressedContent = monograph.Content.CompressBrotli();
+                    monograph.CompressedContent = (await CleanupContentAsync(monograph.Content)).CompressBrotli();
                 monograph.UserId = userId;
                 monograph.DatePublished = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
@@ -161,7 +164,7 @@ namespace Notesnook.API.Controllers
                     return base.BadRequest("Monograph is too big. Max allowed size is 15mb.");
 
                 if (monograph.EncryptedContent == null)
-                    monograph.CompressedContent = monograph.Content.CompressBrotli();
+                    monograph.CompressedContent = (await CleanupContentAsync(monograph.Content)).CompressBrotli();
                 else
                     monograph.Content = null;
 
@@ -320,6 +323,22 @@ namespace Notesnook.API.Controllers
                     Data = JsonSerializer.Serialize(new { reason = "Monographs updated." })
                 }
             });
+        }
+
+        private async Task<string> CleanupContentAsync(string content)
+        {
+            if (!Constants.IS_SELF_HOSTED && !ProUserRequirement.IsUserPro(User))
+            {
+                var config = Configuration.Default.WithDefaultLoader();
+                var context = BrowsingContext.New(config);
+                var document = await context.OpenAsync(r => r.Content(content));
+                foreach (var element in document.QuerySelectorAll("a,iframe,img,object,svg,button,link"))
+                {
+                    element.Remove();
+                }
+                return document.ToHtml();
+            }
+            return content;
         }
     }
 }
