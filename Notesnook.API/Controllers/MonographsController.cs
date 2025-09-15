@@ -330,32 +330,47 @@ namespace Notesnook.API.Controllers
 
         private async Task<string> CleanupContentAsync(string content)
         {
-            if (!Constants.IS_SELF_HOSTED && !ProUserRequirement.IsUserPro(User))
+            try
             {
-                var config = Configuration.Default.WithDefaultLoader();
-                var context = BrowsingContext.New(config);
-                var document = await context.OpenAsync(r => r.Content(content));
-                foreach (var element in document.QuerySelectorAll("a,iframe,img,object,svg,button,link"))
+                var json = JsonSerializer.Deserialize<MonographContent>(content);
+                var html = json.Data;
+                if (!Constants.IS_SELF_HOSTED && !ProUserRequirement.IsUserPro(User))
                 {
-                    element.Remove();
+                    var config = Configuration.Default.WithDefaultLoader();
+                    var context = BrowsingContext.New(config);
+                    var document = await context.OpenAsync(r => r.Content(html));
+                    foreach (var element in document.QuerySelectorAll("a,iframe,img,object,svg,button,link"))
+                    {
+                        element.Remove();
+                    }
+                    html = document.ToHtml();
                 }
-                return document.ToHtml();
-            }
 
-            if (ProUserRequirement.IsUserPro(User))
-            {
-                var config = Configuration.Default.WithDefaultLoader();
-                var context = BrowsingContext.New(config);
-                var document = await context.OpenAsync(r => r.Content(content));
-                foreach (var element in document.QuerySelectorAll("a"))
+                if (ProUserRequirement.IsUserPro(User))
                 {
-                    var href = element.GetAttribute("href");
-                    if (string.IsNullOrEmpty(href)) continue;
-                    if (!await urlAnalyzer.IsURLSafeAsync(href)) element.RemoveAttribute("href");
+                    var config = Configuration.Default.WithDefaultLoader();
+                    var context = BrowsingContext.New(config);
+                    var document = await context.OpenAsync(r => r.Content(html));
+                    foreach (var element in document.QuerySelectorAll("a"))
+                    {
+                        var href = element.GetAttribute("href");
+                        if (string.IsNullOrEmpty(href)) continue;
+                        if (!await urlAnalyzer.IsURLSafeAsync(href)) element.RemoveAttribute("href");
+                    }
+                    html = document.ToHtml();
                 }
-                return document.ToHtml();
+
+                return JsonSerializer.Serialize<MonographContent>(new MonographContent
+                {
+                    Type = json.Type,
+                    Data = html
+                });
             }
-            return content;
+            catch (Exception ex)
+            {
+                await Slogger<MonographsController>.Error("CleanupContentAsync", ex.ToString());
+                return content;
+            }
         }
     }
 }
