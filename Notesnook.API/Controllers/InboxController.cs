@@ -67,10 +67,6 @@ namespace Notesnook.API.Controllers
                 {
                     return BadRequest(new { error = "Api key name is required." });
                 }
-                if (request.DateCreated <= 0)
-                {
-                    return BadRequest(new { error = "Valid creation date is required." });
-                }
                 if (request.ExpiryDate <= -1)
                 {
                     return BadRequest(new { error = "Valid expiry date is required." });
@@ -86,7 +82,7 @@ namespace Notesnook.API.Controllers
                 {
                     UserId = userId,
                     Name = request.Name,
-                    DateCreated = request.DateCreated,
+                    DateCreated = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
                     ExpiryDate = request.ExpiryDate,
                     LastUsedAt = 0
                 };

@@ -17,7 +17,7 @@ You should have received a copy of the Affero GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-using System.Security.Cryptography;
+using NanoidDotNet;
 using Notesnook.API.Models;
 
 namespace Notesnook.API.Extensions;
@@ -26,7 +26,7 @@ public static class InboxApiKeyHelper
 {
     public static void SetKey(this InboxApiKey key)
     {
-        var random = RandomNumberGenerator.GetString("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789", 64);
+        var random = Nanoid.Generate(size: 64);
         key.Key = "nn__" + random;
     }
 }
