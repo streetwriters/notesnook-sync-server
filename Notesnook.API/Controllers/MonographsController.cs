@@ -33,6 +33,7 @@ using Notesnook.API.Authorization;
 using Notesnook.API.Models;
 using Notesnook.API.Services;
 using Streetwriters.Common;
+using Streetwriters.Common.Interfaces;
 using Streetwriters.Common.Messages;
 using Streetwriters.Data.Interfaces;
 using Streetwriters.Data.Repositories;
@@ -46,12 +47,14 @@ namespace Notesnook.API.Controllers
     {
         const string SVG_PIXEL = "<svg xmlns='http://www.w3.org/2000/svg' width='1' height='1'><circle r='9'/></svg>";
         private Repository<Monograph> Monographs { get; set; }
+        private readonly IURLAnalyzer urlAnalyzer;
         private readonly IUnitOfWork unit;
         private const int MAX_DOC_SIZE = 15 * 1024 * 1024;
-        public MonographsController(Repository<Monograph> monographs, IUnitOfWork unitOfWork)
+        public MonographsController(Repository<Monograph> monographs, IUnitOfWork unitOfWork, IURLAnalyzer analyzer)
         {
             Monographs = monographs;
             unit = unitOfWork;
+            urlAnalyzer = analyzer;
         }
 
         private static FilterDefinition<Monograph> CreateMonographFilter(string userId, Monograph monograph)
@@ -335,6 +338,20 @@ namespace Notesnook.API.Controllers
                 foreach (var element in document.QuerySelectorAll("a,iframe,img,object,svg,button,link"))
                 {
                     element.Remove();
+                }
+                return document.ToHtml();
+            }
+
+            if (ProUserRequirement.IsUserPro(User))
+            {
+                var config = Configuration.Default.WithDefaultLoader();
+                var context = BrowsingContext.New(config);
+                var document = await context.OpenAsync(r => r.Content(content));
+                foreach (var element in document.QuerySelectorAll("a"))
+                {
+                    var href = element.GetAttribute("href");
+                    if (string.IsNullOrEmpty(href)) continue;
+                    if (!await urlAnalyzer.IsURLSafeAsync(href)) element.RemoveAttribute("href");
                 }
                 return document.ToHtml();
             }

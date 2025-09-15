@@ -70,6 +70,7 @@ namespace Streetwriters.Common
         public static string SSE_CERT_KEY_PATH => Environment.GetEnvironmentVariable("SSE_CERT_KEY_PATH");
 
         // internal
+        public static string WEBRISK_API_URI => Environment.GetEnvironmentVariable("WEBRISK_API_URI");
         public static string MONGODB_CONNECTION_STRING => Environment.GetEnvironmentVariable("MONGODB_CONNECTION_STRING");
         public static string MONGODB_DATABASE_NAME => Environment.GetEnvironmentVariable("MONGODB_DATABASE_NAME");
         public static int SUBSCRIPTIONS_SERVER_PORT => int.Parse(Environment.GetEnvironmentVariable("SUBSCRIPTIONS_SERVER_PORT") ?? "80");

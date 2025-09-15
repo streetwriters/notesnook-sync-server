@@ -57,8 +57,10 @@ using OpenTelemetry.Resources;
 using Quartz;
 using Streetwriters.Common;
 using Streetwriters.Common.Extensions;
+using Streetwriters.Common.Interfaces;
 using Streetwriters.Common.Messages;
 using Streetwriters.Common.Models;
+using Streetwriters.Common.Services;
 using Streetwriters.Data;
 using Streetwriters.Data.DbContexts;
 using Streetwriters.Data.Interfaces;
@@ -185,6 +187,7 @@ namespace Notesnook.API
             services.AddScoped<ISyncItemsRepositoryAccessor, SyncItemsRepositoryAccessor>();
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<IS3Service, S3Service>();
+            services.AddScoped<IURLAnalyzer, URLAnalyzer>();
 
             services.AddControllers();
 
