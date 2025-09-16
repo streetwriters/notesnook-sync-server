@@ -169,7 +169,8 @@ namespace Notesnook.API
 
             services.AddRepository<UserSettings>("user_settings", "notesnook")
                     .AddRepository<Monograph>("monographs", "notesnook")
-                    .AddRepository<Announcement>("announcements", "notesnook");
+                    .AddRepository<Announcement>("announcements", "notesnook")
+                    .AddRepository<InboxApiKey>(Collections.InboxApiKeysKey, "notesnook");
 
             services.AddMongoCollection(Collections.SettingsKey)
                     .AddMongoCollection(Collections.AttachmentsKey)
@@ -182,7 +183,8 @@ namespace Notesnook.API
                     .AddMongoCollection(Collections.ShortcutsKey)
                     .AddMongoCollection(Collections.TagsKey)
                     .AddMongoCollection(Collections.ColorsKey)
-                    .AddMongoCollection(Collections.VaultsKey);
+                    .AddMongoCollection(Collections.VaultsKey)
+                    .AddMongoCollection(Collections.InboxApiKeysKey);
 
             services.AddScoped<ISyncItemsRepositoryAccessor, SyncItemsRepositoryAccessor>();
             services.AddScoped<IUserService, UserService>();

@@ -18,9 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 using System;
-using System.IO;
 using System.Net.Http;
-using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -154,10 +152,20 @@ namespace Notesnook.API.Services
                 if (keys.InboxKeys.Public == null || keys.InboxKeys.Private == null)
                 {
                     userSettings.InboxKeys = null;
+                    await Repositories.InboxApiKey.DeleteManyAsync(t => t.UserId == userId);
                 }
                 else
                 {
                     userSettings.InboxKeys = keys.InboxKeys;
+                    var defaultInboxKey = new InboxApiKey
+                    {
+                        UserId = userId,
+                        Name = "Default",
+                        DateCreated = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                        ExpiryDate = DateTimeOffset.UtcNow.AddYears(1).ToUnixTimeMilliseconds(),
+                        LastUsedAt = 0
+                    };
+                    await Repositories.InboxApiKey.InsertAsync(defaultInboxKey);
                 }
             }
 
@@ -184,6 +192,7 @@ namespace Notesnook.API.Services
             Repositories.Vaults.DeleteByUserId(userId);
             Repositories.UsersSettings.Delete((u) => u.UserId == userId);
             Repositories.Monographs.DeleteMany((m) => m.UserId == userId);
+            Repositories.InboxApiKey.DeleteMany((t) => t.UserId == userId);
 
             var result = await unit.Commit();
             await Slogger<UserService>.Info(nameof(DeleteUserAsync), "User data deleted", userId, result.ToString());
@@ -243,6 +252,7 @@ namespace Notesnook.API.Services
             Repositories.Tags.DeleteByUserId(userId);
             Repositories.Vaults.DeleteByUserId(userId);
             Repositories.Monographs.DeleteMany((m) => m.UserId == userId);
+            Repositories.InboxApiKey.DeleteMany((t) => t.UserId == userId);
             if (!await unit.Commit()) return false;
 
             var userSettings = await Repositories.UsersSettings.FindOneAsync((s) => s.UserId == userId);

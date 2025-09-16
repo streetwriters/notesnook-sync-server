@@ -84,6 +84,11 @@ namespace Streetwriters.Data.Repositories
             return all.ToList();
         }
 
+        public virtual async Task<long> CountAsync(Expression<Func<TEntity, bool>> filterExpression)
+        {
+            return await Collection.CountDocumentsAsync(filterExpression);
+        }
+
         public virtual void Update(string id, TEntity obj)
         {
             dbContext.AddCommand((handle, ct) => Collection.ReplaceOneAsync(handle, Builders<TEntity>.Filter.Eq("_id", ObjectId.Parse(id)), obj, cancellationToken: ct));
