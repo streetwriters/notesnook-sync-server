@@ -20,11 +20,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 using System.Text.Json.Serialization;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
+using NanoidDotNet;
 
 namespace Notesnook.API.Models
 {
     public class InboxApiKey
     {
+        public InboxApiKey()
+        {
+            var random = Nanoid.Generate(size: 64);
+            Key = "nn__" + random;
+        }
+
         [BsonId]
         [BsonIgnoreIfDefault]
         [BsonRepresentation(BsonType.ObjectId)]

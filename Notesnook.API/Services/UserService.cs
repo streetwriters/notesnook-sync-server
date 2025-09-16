@@ -18,14 +18,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 using System;
-using System.IO;
 using System.Net.Http;
-using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
-using Notesnook.API.Extensions;
 using Notesnook.API.Interfaces;
 using Notesnook.API.Models;
 using Notesnook.API.Models.Responses;
@@ -165,10 +162,9 @@ namespace Notesnook.API.Services
                         UserId = userId,
                         Name = "Default",
                         DateCreated = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                        ExpiryDate = DateTimeOffset.UtcNow.AddMonths(1).ToUnixTimeMilliseconds(),
+                        ExpiryDate = DateTimeOffset.UtcNow.AddYears(1).ToUnixTimeMilliseconds(),
                         LastUsedAt = 0
                     };
-                    defaultInboxKey.SetKey();
                     await Repositories.InboxApiKey.InsertAsync(defaultInboxKey);
                 }
             }

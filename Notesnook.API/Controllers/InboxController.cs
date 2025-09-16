@@ -22,7 +22,6 @@ using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Notesnook.API.Extensions;
 using Notesnook.API.Models;
 using Streetwriters.Common;
 using Streetwriters.Data.Repositories;
@@ -86,7 +85,6 @@ namespace Notesnook.API.Controllers
                     ExpiryDate = request.ExpiryDate,
                     LastUsedAt = 0
                 };
-                inboxApiKey.SetKey();
                 await InboxApiKey.InsertAsync(inboxApiKey);
                 return Ok(inboxApiKey);
             }
