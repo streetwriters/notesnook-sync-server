@@ -69,17 +69,11 @@ namespace Notesnook.API.Controllers
         }
 
         [HttpPatch]
-        public async Task<IActionResult> UpdateUser([FromBody] UserResponse user)
+        public async Task<IActionResult> UpdateUser([FromBody] UserKeys keys)
         {
             var userId = User.FindFirstValue("sub");
             try
             {
-                var keys = new UserKeys
-                {
-                    AttachmentsKey = user.AttachmentsKey,
-                    MonographPasswordsKey = user.MonographPasswordsKey,
-                    InboxKeys = user.InboxKeys
-                };
                 await UserService.SetUserKeysAsync(userId, keys);
                 return Ok();
             }
