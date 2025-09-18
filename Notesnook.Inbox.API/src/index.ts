@@ -1,5 +1,6 @@
 import express from "express";
 import _sodium from "libsodium-wrappers-sumo";
+import { z } from "zod";
 
 const NOTESNOOK_API_SERVER_URL = process.env.NOTESNOOK_API_SERVER_URL;
 if (!NOTESNOOK_API_SERVER_URL) {
@@ -8,15 +9,15 @@ if (!NOTESNOOK_API_SERVER_URL) {
 
 let sodium: typeof _sodium;
 
-interface RawInboxItem {
-  title: string;
-  pinned?: boolean;
-  favorite?: boolean;
-  readonly?: boolean;
-  archived?: boolean;
-  notebookIds?: string[];
-  tagIds?: string[];
-}
+const RawInboxItemSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  pinned: z.boolean().optional(),
+  favorite: z.boolean().optional(),
+  readonly: z.boolean().optional(),
+  archived: z.boolean().optional(),
+  notebookIds: z.array(z.string()).optional(),
+  tagIds: z.array(z.string()).optional(),
+});
 
 interface EncryptedInboxItem {
   iv: string;
@@ -76,6 +77,17 @@ app.post("/inbox", async (req, res) => {
     if (!apiKey) {
       return res.status(401).json({ error: "unauthorized" });
     }
+    if (!req.body.item) {
+      return res.status(400).json({ error: "item is required" });
+    }
+
+    const validationResult = RawInboxItemSchema.safeParse(req.body.item);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        error: "invalid item",
+        details: validationResult.error.issues,
+      });
+    }
 
     const inboxPublicKey = await getInboxPublicEncryptionKey(apiKey);
     if (!inboxPublicKey) {
@@ -83,11 +95,7 @@ app.post("/inbox", async (req, res) => {
     }
     console.log("[info] fetched inbox public key:", inboxPublicKey);
 
-    const item: RawInboxItem = req.body.item;
-    if (!item || typeof item !== "object") {
-      return res.status(400).json({ error: "invalid item" });
-    }
-
+    const item = validationResult.data;
     const encryptedItem = encryptData(JSON.stringify(item), inboxPublicKey);
     console.log("[info] encrypted item:", encryptedItem);
     await postEncryptedInboxItem(apiKey, encryptedItem);

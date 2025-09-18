@@ -21,7 +21,8 @@
   },
   "dependencies": {
     "express": "^5.1.0",
-    "libsodium-wrappers-sumo": "^0.7.15"
+    "libsodium-wrappers-sumo": "^0.7.15",
+    "zod": "^4.1.9"
   },
   "devDependencies": {
     "@types/libsodium-wrappers-sumo": "^0.7.8",
