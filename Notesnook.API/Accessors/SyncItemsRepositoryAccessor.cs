@@ -44,6 +44,7 @@ namespace Notesnook.API.Accessors
         public Repository<UserSettings> UsersSettings { get; }
         public Repository<Monograph> Monographs { get; }
         public Repository<InboxApiKey> InboxApiKey { get; }
+        public SyncItemsRepository InboxItems { get; }
 
         public SyncItemsRepositoryAccessor(IDbContext dbContext,
 
@@ -71,6 +72,8 @@ namespace Notesnook.API.Accessors
         IMongoCollection<SyncItem> vaults,
         [FromKeyedServices(Collections.TagsKey)]
         IMongoCollection<SyncItem> tags,
+        [FromKeyedServices(Collections.InboxItems)]
+        IMongoCollection<SyncItem> inboxItems,
 
         Repository<UserSettings> usersSettings, Repository<Monograph> monographs,
         Repository<InboxApiKey> inboxApiKey)
@@ -90,6 +93,7 @@ namespace Notesnook.API.Accessors
             Colors = new SyncItemsRepository(dbContext, colors);
             Vaults = new SyncItemsRepository(dbContext, vaults);
             Tags = new SyncItemsRepository(dbContext, tags);
+            InboxItems = new SyncItemsRepository(dbContext, inboxItems);
         }
     }
 }
