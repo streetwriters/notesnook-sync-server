@@ -22,6 +22,7 @@ using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using NanoidDotNet;
 using Notesnook.API.Authorization;
 using Notesnook.API.Interfaces;
 using Notesnook.API.Models;
@@ -156,19 +157,20 @@ namespace Notesnook.API.Controllers
             var userId = User.FindFirstValue("sub");
             try
             {
-                if (string.IsNullOrWhiteSpace(request.Algorithm))
+                if (request.Algorithm != "xsal-x25519-7")
                 {
-                    return BadRequest(new { error = "Inbox item algorithm is required." });
+                    return BadRequest(new { error = "Only xsal-x25519-7 algorithm is supported." });
                 }
-                if (string.IsNullOrWhiteSpace(request.Cipher) || string.IsNullOrWhiteSpace(request.IV))
+                if (string.IsNullOrWhiteSpace(request.Cipher))
                 {
-                    return BadRequest(new { error = "Inbox item cipher and iv are required." });
+                    return BadRequest(new { error = "Inbox item cipher is required." });
                 }
                 if (request.Length <= 0)
                 {
                     return BadRequest(new { error = "Valid inbox item length is required." });
                 }
 
+                request.ItemId = Nanoid.Generate(size: 24);
                 request.UserId = userId;
                 request.Version = 6.1;
                 await InboxItems.InsertAsync(request);

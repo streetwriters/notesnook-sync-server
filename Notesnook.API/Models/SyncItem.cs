@@ -52,7 +52,6 @@ namespace Notesnook.API.Models
         [JsonPropertyName("iv")]
         [DataMember(Name = "iv")]
         [MessagePack.Key("iv")]
-        [Required]
         public string IV
         {
             get; set;
@@ -111,7 +110,7 @@ namespace Notesnook.API.Models
         public string Algorithm
         {
             get; set;
-        } = Algorithms.Default;
+        }
     }
 
     public class SyncItemBsonSerializer : SerializerBase<SyncItem>
