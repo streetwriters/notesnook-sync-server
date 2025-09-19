@@ -1,5 +1,5 @@
 import express from "express";
-import _sodium from "libsodium-wrappers-sumo";
+import _sodium, { base64_variants } from "libsodium-wrappers-sumo";
 import { z } from "zod";
 
 const NOTESNOOK_API_SERVER_URL = process.env.NOTESNOOK_API_SERVER_URL;
@@ -17,10 +17,19 @@ const RawInboxItemSchema = z.object({
   archived: z.boolean().optional(),
   notebookIds: z.array(z.string()).optional(),
   tagIds: z.array(z.string()).optional(),
+  type: z.enum(["note"]),
+  source: z.string(),
+  version: z.literal(1),
+  content: z
+    .object({
+      type: z.enum(["html"]),
+      data: z.string(),
+    })
+    .optional(),
 });
 
 interface EncryptedInboxItem {
-  iv: string;
+  iv: null;
   alg: string;
   cipher: string;
   length: number;
@@ -32,8 +41,9 @@ function encryptData(data: string, publicKey: string): EncryptedInboxItem {
     const dataBytes = sodium.from_string(data);
     const ciphertext = sodium.crypto_box_seal(dataBytes, recipientPublicKey);
     return {
-      iv: "iv",
-      alg: "X25519 and XSalsa20-Poly1305",
+      // iv is explicitely set to null because crypto_box_seal does not require nonce
+      iv: null,
+      alg: `xsal-x25519-${base64_variants.URLSAFE_NO_PADDING}`,
       cipher: sodium.to_base64(ciphertext),
       length: dataBytes.length,
     };
