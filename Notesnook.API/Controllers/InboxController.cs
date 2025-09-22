@@ -152,18 +152,30 @@ namespace Notesnook.API.Controllers
 
         [HttpPost("items")]
         [Authorize(Policy = InboxApiKeyAuthenticationDefaults.AuthenticationScheme)]
-        public async Task<IActionResult> CreateInboxItemAsync([FromBody] SyncItem request)
+        public async Task<IActionResult> CreateInboxItemAsync([FromBody] InboxSyncItem request)
         {
             var userId = User.FindFirstValue("sub");
             try
             {
-                if (request.Algorithm != "xsal-x25519-7")
+                if (request.Password.Algorithm != Algorithms.XSAL_X25519_7)
                 {
-                    return BadRequest(new { error = "Only xsal-x25519-7 algorithm is supported." });
+                    return BadRequest(new { error = $"Only {Algorithms.XSAL_X25519_7} is supported for inbox item password." });
                 }
-                if (string.IsNullOrWhiteSpace(request.Cipher))
+                if (string.IsNullOrWhiteSpace(request.Password.Cipher))
                 {
-                    return BadRequest(new { error = "Inbox item cipher is required." });
+                    return BadRequest(new { error = "Inbox item password cipher is required." });
+                }
+                if (request.Password.Length <= 0)
+                {
+                    return BadRequest(new { error = "Valid inbox item password length is required." });
+                }
+                if (request.Algorithm != Algorithms.Default)
+                {
+                    return BadRequest(new { error = $"Only {Algorithms.Default} is supported for inbox item." });
+                }
+                if (string.IsNullOrWhiteSpace(request.Cipher) || string.IsNullOrWhiteSpace(request.IV))
+                {
+                    return BadRequest(new { error = "Inbox item cipher and iv is required." });
                 }
                 if (request.Length <= 0)
                 {

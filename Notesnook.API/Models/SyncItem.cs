@@ -52,6 +52,7 @@ namespace Notesnook.API.Models
         [JsonPropertyName("iv")]
         [DataMember(Name = "iv")]
         [MessagePack.Key("iv")]
+        [Required]
         public string IV
         {
             get; set;
