@@ -29,23 +29,46 @@ const RawInboxItemSchema = z.object({
 });
 
 interface EncryptedInboxItem {
-  iv: null;
+  password: Omit<EncryptedInboxItem, "password" | "iv">;
+  iv: string;
   alg: string;
   cipher: string;
   length: number;
 }
 
-function encryptData(data: string, publicKey: string): EncryptedInboxItem {
+function encrypt(rawData: string, publicKey: string): EncryptedInboxItem {
   try {
-    const recipientPublicKey = sodium.from_base64(publicKey);
-    const dataBytes = sodium.from_string(data);
-    const ciphertext = sodium.crypto_box_seal(dataBytes, recipientPublicKey);
+    const password = sodium.crypto_aead_xchacha20poly1305_ietf_keygen();
+    const nonce = sodium.randombytes_buf(
+      sodium.crypto_aead_xchacha20poly1305_ietf_NPUBBYTES
+    );
+    const data = sodium.from_string(rawData);
+    const cipher = sodium.crypto_aead_xchacha20poly1305_ietf_encrypt(
+      data,
+      null,
+      null,
+      nonce,
+      password
+    );
+    const inboxPublicKey = sodium.from_base64(
+      publicKey,
+      base64_variants.URLSAFE_NO_PADDING
+    );
+    const encryptedPassword = sodium.crypto_box_seal(password, inboxPublicKey);
+
     return {
-      // iv is explicitely set to null because crypto_box_seal does not require nonce
-      iv: null,
-      alg: `xsal-x25519-${base64_variants.URLSAFE_NO_PADDING}`,
-      cipher: sodium.to_base64(ciphertext),
-      length: dataBytes.length,
+      password: {
+        cipher: sodium.to_base64(
+          encryptedPassword,
+          base64_variants.URLSAFE_NO_PADDING
+        ),
+        alg: `xsal-x25519-${base64_variants.URLSAFE_NO_PADDING}`,
+        length: password.length,
+      },
+      iv: sodium.to_base64(nonce, base64_variants.URLSAFE_NO_PADDING),
+      alg: `xcha-argon2i13-${base64_variants.URLSAFE_NO_PADDING}`,
+      cipher: sodium.to_base64(cipher, base64_variants.URLSAFE_NO_PADDING),
+      length: data.length,
     };
   } catch (error) {
     throw new Error(`encryption failed: ${error}`);
@@ -106,7 +129,7 @@ app.post("/inbox", async (req, res) => {
     console.log("[info] fetched inbox public key:", inboxPublicKey);
 
     const item = validationResult.data;
-    const encryptedItem = encryptData(JSON.stringify(item), inboxPublicKey);
+    const encryptedItem = encrypt(JSON.stringify(item), inboxPublicKey);
     console.log("[info] encrypted item:", encryptedItem);
     await postEncryptedInboxItem(apiKey, encryptedItem);
     return res.status(200).json({ message: "inbox item posted" });
