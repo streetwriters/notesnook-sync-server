@@ -84,6 +84,12 @@ async function getInboxPublicEncryptionKey(apiKey: string) {
       },
     }
   );
+  if (!response.ok) {
+    throw new Error(
+      `failed to fetch inbox public encryption key: ${await response.text()}`
+    );
+  }
+
   const data = (await response.json()) as unknown as any;
   return (data?.key as string) || null;
 }
@@ -92,7 +98,7 @@ async function postEncryptedInboxItem(
   apiKey: string,
   item: EncryptedInboxItem
 ) {
-  await fetch(`${NOTESNOOK_API_SERVER_URL}inbox/items`, {
+  const response = await fetch(`${NOTESNOOK_API_SERVER_URL}inbox/items`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -100,6 +106,9 @@ async function postEncryptedInboxItem(
     },
     body: JSON.stringify({ ...item }),
   });
+  if (!response.ok) {
+    throw new Error(`failed to post inbox item: ${await response.text()}`);
+  }
 }
 
 const app = express();
@@ -134,8 +143,18 @@ app.post("/inbox", async (req, res) => {
     await postEncryptedInboxItem(apiKey, encryptedItem);
     return res.status(200).json({ message: "inbox item posted" });
   } catch (error) {
-    console.log("[error] inbox endpoint error:", error);
-    return res.status(500).json({ error: "internal server error" });
+    if (error instanceof Error) {
+      console.log("[error]", error.message);
+      return res
+        .status(500)
+        .json({ error: "internal server error", description: error.message });
+    } else {
+      console.log("[error] unknown error occured:", error);
+      return res.status(500).json({
+        error: "internal server error",
+        description: `unknown error occured: ${error}`,
+      });
+    }
   }
 });
 
