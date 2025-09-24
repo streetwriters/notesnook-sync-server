@@ -22,7 +22,7 @@ using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using NanoidDotNet;
+using MongoDB.Bson;
 using Notesnook.API.Authorization;
 using Notesnook.API.Interfaces;
 using Notesnook.API.Models;
@@ -157,21 +157,25 @@ namespace Notesnook.API.Controllers
             var userId = User.FindFirstValue("sub");
             try
             {
-                if (request.Password.Algorithm != Algorithms.XSAL_X25519_7)
+                if (request.Key.Algorithm != Algorithms.XSAL_X25519_7)
                 {
                     return BadRequest(new { error = $"Only {Algorithms.XSAL_X25519_7} is supported for inbox item password." });
                 }
-                if (string.IsNullOrWhiteSpace(request.Password.Cipher))
+                if (string.IsNullOrWhiteSpace(request.Key.Cipher))
                 {
                     return BadRequest(new { error = "Inbox item password cipher is required." });
                 }
-                if (request.Password.Length <= 0)
+                if (request.Key.Length <= 0)
                 {
                     return BadRequest(new { error = "Valid inbox item password length is required." });
                 }
                 if (request.Algorithm != Algorithms.Default)
                 {
                     return BadRequest(new { error = $"Only {Algorithms.Default} is supported for inbox item." });
+                }
+                if (request.Version <= 0)
+                {
+                    return BadRequest(new { error = "Valid inbox item version is required." });
                 }
                 if (string.IsNullOrWhiteSpace(request.Cipher) || string.IsNullOrWhiteSpace(request.IV))
                 {
@@ -182,9 +186,8 @@ namespace Notesnook.API.Controllers
                     return BadRequest(new { error = "Valid inbox item length is required." });
                 }
 
-                request.ItemId = Nanoid.Generate(size: 24);
                 request.UserId = userId;
-                request.Version = 6.1;
+                request.ItemId = ObjectId.GenerateNewId().ToString();
                 await InboxItems.InsertAsync(request);
                 return Ok();
             }

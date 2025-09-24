@@ -27,18 +27,18 @@ namespace Notesnook.API.Models
     [MessagePack.MessagePackObject]
     public class InboxSyncItem : SyncItem
     {
-        [DataMember(Name = "password")]
-        [JsonPropertyName("password")]
-        [MessagePack.Key("password")]
+        [DataMember(Name = "key")]
+        [JsonPropertyName("key")]
+        [MessagePack.Key("key")]
         [Required]
-        public EncryptedPassword Password
+        public EncryptedKey Key
         {
             get; set;
         }
     }
 
     [MessagePack.MessagePackObject]
-    public class EncryptedPassword
+    public class EncryptedKey
     {
         [DataMember(Name = "alg")]
         [JsonPropertyName("alg")]
