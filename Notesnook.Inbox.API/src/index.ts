@@ -29,7 +29,8 @@ const RawInboxItemSchema = z.object({
 });
 
 interface EncryptedInboxItem {
-  password: Omit<EncryptedInboxItem, "password" | "iv">;
+  v: 1;
+  key: Omit<EncryptedInboxItem, "key" | "iv" | "v">;
   iv: string;
   alg: string;
   cipher: string;
@@ -57,7 +58,8 @@ function encrypt(rawData: string, publicKey: string): EncryptedInboxItem {
     const encryptedPassword = sodium.crypto_box_seal(password, inboxPublicKey);
 
     return {
-      password: {
+      v: 1,
+      key: {
         cipher: sodium.to_base64(
           encryptedPassword,
           base64_variants.URLSAFE_NO_PADDING
