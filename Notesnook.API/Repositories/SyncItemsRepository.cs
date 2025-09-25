@@ -46,7 +46,7 @@ namespace Notesnook.API.Repositories
             this.collectionName = collection.CollectionNamespace.CollectionName;
         }
 
-        private readonly List<string> ALGORITHMS = [Algorithms.Default];
+        private readonly List<string> ALGORITHMS = [Algorithms.Default, Algorithms.XSAL_X25519_7];
         private bool IsValidAlgorithm(string algorithm)
         {
             return ALGORITHMS.Contains(algorithm);

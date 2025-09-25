@@ -119,6 +119,11 @@ namespace Notesnook.API
                     policy.Requirements.Add(new SyncRequirement());
                     policy.Requirements.Add(new ProUserRequirement());
                 });
+                options.AddPolicy(InboxApiKeyAuthenticationDefaults.AuthenticationScheme, policy =>
+                {
+                    policy.AuthenticationSchemes.Add(InboxApiKeyAuthenticationDefaults.AuthenticationScheme);
+                    policy.RequireAuthenticatedUser();
+                });
 
                 options.DefaultPolicy = options.GetPolicy("Notesnook");
             }).AddSingleton<IAuthorizationMiddlewareResultHandler, AuthorizationResultTransformer>(); ;
@@ -152,7 +157,11 @@ namespace Notesnook.API
                 options.SaveToken = true;
                 options.EnableCaching = true;
                 options.CacheDuration = TimeSpan.FromMinutes(30);
-            });
+            })
+            .AddScheme<InboxApiKeyAuthenticationSchemeOptions, InboxApiKeyAuthenticationHandler>(
+                InboxApiKeyAuthenticationDefaults.AuthenticationScheme,
+                options => { }
+            );
 
             // Serializer.RegisterSerializer(new SyncItemBsonSerializer());
             if (!BsonClassMap.IsClassMapRegistered(typeof(UserSettings)))
@@ -184,6 +193,7 @@ namespace Notesnook.API
                     .AddMongoCollection(Collections.TagsKey)
                     .AddMongoCollection(Collections.ColorsKey)
                     .AddMongoCollection(Collections.VaultsKey)
+                    .AddMongoCollection(Collections.InboxItems)
                     .AddMongoCollection(Collections.InboxApiKeysKey);
 
             services.AddScoped<ISyncItemsRepositoryAccessor, SyncItemsRepositoryAccessor>();
