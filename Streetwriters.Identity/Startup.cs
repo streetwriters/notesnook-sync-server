@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
 using System.IO;
+using System.Security.Claims;
 using System.Threading.RateLimiting;
 using AspNetCore.Identity.Mongo;
 using IdentityServer4.MongoDB.Entities;
@@ -31,6 +32,7 @@ using IdentityServer4.Stores;
 using IdentityServer4.Validation;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
@@ -137,6 +139,7 @@ namespace Streetwriters.Identity
 
             services.AddRateLimiter(options =>
             {
+                options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
                 options.AddSlidingWindowLimiter("strict", options =>
                 {
                     options.PermitLimit = 30;
@@ -145,25 +148,27 @@ namespace Streetwriters.Identity
                     options.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
                     options.QueueLimit = 0;
                 });
-                options.AddSlidingWindowLimiter("super_strict", options =>
+
+                options.AddPolicy("super_strict", (context) =>
                 {
-                    options.PermitLimit = 1;
-                    options.Window = TimeSpan.FromMinutes(1);
-                    options.SegmentsPerWindow = 1;
-                    options.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
-                    options.QueueLimit = 2;
+                    var key = context.User?.FindFirstValue("sub") ?? "default";
+                    return RateLimitPartition.GetSlidingWindowLimiter(key, (key) => new SlidingWindowRateLimiterOptions
+                    {
+                        PermitLimit = 6,
+                        Window = TimeSpan.FromMinutes(1),
+                        SegmentsPerWindow = 2,
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                        QueueLimit = int.MaxValue,
+                        AutoReplenishment = true
+                    });
                 });
             });
 
-            services.AddAuthorization(options =>
+            services.AddAuthorizationBuilder().AddPolicy("mfa", policy =>
             {
-                options.AddPolicy("mfa", policy =>
-                {
-                    policy.AddAuthenticationSchemes("Bearer+jwt");
-                    policy.RequireClaim("scope", Config.MFA_GRANT_TYPE_SCOPE);
-                });
+                policy.AddAuthenticationSchemes("Bearer+jwt");
+                policy.RequireClaim("scope", Config.MFA_GRANT_TYPE_SCOPE);
             });
-
 
             services.AddLocalApiAuthentication();
             services.AddAuthentication()
@@ -174,7 +179,7 @@ namespace Streetwriters.Identity
                 options.RequireHttpsMetadata = false;
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
-                    ValidTypes = new[] { "at+jwt" },
+                    ValidTypes = ["at+jwt"],
                     ValidateAudience = false,
                     ValidateIssuerSigningKey = true,
                     ValidateIssuer = true,
