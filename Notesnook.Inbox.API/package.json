@@ -1,0 +1,33 @@
+{
+  "name": "notesnook-inbox-api",
+  "version": "1.0.0",
+  "description": "Notesnook Inbox API server",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "bun build src/index.ts --outdir dist --target bun",
+    "start": "bun run dist/index.js",
+    "dev": "bun --watch src/index.ts"
+  },
+  "keywords": [
+    "notesnook",
+    "inbox",
+    "api"
+  ],
+  "license": "GPL-3.0-or-later",
+  "author": {
+    "name": "Streetwriters (Private) Limited",
+    "email": "support@streetwriters.co",
+    "url": "https://streetwriters.co"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "libsodium-wrappers-sumo": "^0.7.15",
+    "zod": "^4.1.9"
+  },
+  "devDependencies": {
+    "@types/libsodium-wrappers-sumo": "^0.7.8",
+    "@types/express": "^5.0.3",
+    "@types/node": "^24.5.2",
+    "typescript": "^5.9.2"
+  }
+}
