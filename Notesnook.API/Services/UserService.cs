@@ -23,6 +23,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
+using Notesnook.API.Helpers;
 using Notesnook.API.Interfaces;
 using Notesnook.API.Models;
 using Notesnook.API.Models.Responses;
@@ -71,6 +72,7 @@ namespace Notesnook.API.Services
             await Repositories.UsersSettings.InsertAsync(new UserSettings
             {
                 UserId = response.UserId,
+                StorageLimit = new Limit { UpdatedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), Value = 0 },
                 LastSynced = 0,
                 Salt = GetSalt()
             });
@@ -119,6 +121,14 @@ namespace Notesnook.API.Services
             }
 
             var userSettings = await Repositories.UsersSettings.FindOneAsync((u) => u.UserId == user.UserId) ?? throw new Exception("User settings not found.");
+
+            // reset user's attachment limit every month
+            if (userSettings.StorageLimit == null || DateTimeOffset.UtcNow.Month > DateTimeOffset.FromUnixTimeMilliseconds(userSettings.StorageLimit.UpdatedAt).Month)
+            {
+                userSettings.StorageLimit ??= new Limit { UpdatedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), Value = 0 };
+                await Repositories.UsersSettings.UpsertAsync(userSettings, (u) => u.UserId == user.UserId);
+            }
+
             return new UserResponse
             {
                 UserId = user.UserId,
@@ -132,6 +142,8 @@ namespace Notesnook.API.Services
                 InboxKeys = userSettings.InboxKeys,
                 Salt = userSettings.Salt,
                 Subscription = subscription,
+                StorageUsed = userSettings.StorageLimit.Value,
+                TotalStorage = StorageHelper.GetStorageLimitForPlan(subscription),
                 Success = true,
                 StatusCode = 200
             };
@@ -262,6 +274,7 @@ namespace Notesnook.API.Services
             userSettings.AttachmentsKey = null;
             userSettings.MonographPasswordsKey = null;
             userSettings.VaultKey = null;
+            userSettings.InboxKeys = null;
             userSettings.LastSynced = 0;
 
             await Repositories.UsersSettings.UpsertAsync(userSettings, (s) => s.UserId == userId);

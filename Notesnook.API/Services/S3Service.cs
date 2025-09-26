@@ -28,9 +28,13 @@ using Amazon.Runtime;
 using Amazon.S3;
 using Amazon.S3.Model;
 using Microsoft.Extensions.Options;
+using Notesnook.API.Helpers;
 using Notesnook.API.Interfaces;
 using Notesnook.API.Models;
 using Streetwriters.Common;
+using Streetwriters.Common.Enums;
+using Streetwriters.Common.Interfaces;
+using Streetwriters.Common.Models;
 
 namespace Notesnook.API.Services
 {
@@ -45,6 +49,7 @@ namespace Notesnook.API.Services
         private readonly string BUCKET_NAME = Constants.S3_BUCKET_NAME ?? "";
         private readonly string INTERNAL_BUCKET_NAME = Constants.S3_INTERNAL_BUCKET_NAME ?? "";
         private AmazonS3Client S3Client { get; }
+        private ISyncItemsRepositoryAccessor Repositories { get; }
 
         // When running in a dockerized environment the sync server doesn't have access
         // to the host's S3 Service URL. It can only talk to S3 server via its own internal
@@ -57,8 +62,9 @@ namespace Notesnook.API.Services
         private AmazonS3Client S3InternalClient { get; }
         private HttpClient httpClient = new HttpClient();
 
-        public S3Service()
+        public S3Service(ISyncItemsRepositoryAccessor syncItemsRepositoryAccessor)
         {
+            Repositories = syncItemsRepositoryAccessor;
             var config = new AmazonS3Config
             {
 #if (DEBUG || STAGING)
@@ -145,12 +151,6 @@ namespace Notesnook.API.Services
 
             var request = new HttpRequestMessage(HttpMethod.Head, url);
             var response = await httpClient.SendAsync(request);
-            const long MAX_SIZE = 513 * 1024 * 1024; // 512 MB
-            if (!Constants.IS_SELF_HOSTED && response.Content.Headers.ContentLength >= MAX_SIZE)
-            {
-                await this.DeleteObjectAsync(userId, name);
-                throw new Exception("File size exceeds the maximum allowed size.");
-            }
             return response.Content.Headers.ContentLength ?? 0;
         }
 
@@ -202,15 +202,55 @@ namespace Notesnook.API.Services
             if (!IsSuccessStatusCode(((int)response.HttpStatusCode))) throw new Exception("Failed to abort multipart upload.");
         }
 
+        private async Task<long> GetMultipartUploadSizeAsync(string userId, string key, string uploadId)
+        {
+            var objectName = GetFullObjectName(userId, key);
+            var parts = await GetS3Client(S3ClientMode.INTERNAL).ListPartsAsync(GetBucketName(S3ClientMode.INTERNAL), objectName, uploadId);
+            long totalSize = 0;
+            foreach (var part in parts.Parts)
+            {
+                totalSize += part.Size;
+            }
+            return totalSize;
+        }
+
         public async Task CompleteMultipartUploadAsync(string userId, CompleteMultipartUploadRequest uploadRequest)
         {
             var objectName = GetFullObjectName(userId, uploadRequest.Key);
             if (userId == null || objectName == null) throw new Exception("Could not abort multipart upload.");
 
+            var subscriptionService = await WampServers.SubscriptionServer.GetServiceAsync<IUserSubscriptionService>(SubscriptionServerTopics.UserSubscriptionServiceTopic);
+            var subscription = await subscriptionService.GetUserSubscriptionAsync(Clients.Notesnook.Id, userId);
+
+            long fileSize = await GetMultipartUploadSizeAsync(userId, uploadRequest.Key, uploadRequest.UploadId);
+            if (StorageHelper.IsFileSizeExceeded(subscription, fileSize))
+            {
+                await this.AbortMultipartUploadAsync(userId, uploadRequest.Key, uploadRequest.UploadId);
+                throw new Exception("Max file size exceeded.");
+            }
+
+            var userSettings = await Repositories.UsersSettings.FindOneAsync((u) => u.UserId == userId);
+            if (userSettings == null)
+            {
+                await this.AbortMultipartUploadAsync(userId, uploadRequest.Key, uploadRequest.UploadId);
+                throw new Exception("User settings not found.");
+            }
+
+            userSettings.StorageLimit ??= new Limit { Value = 0, UpdatedAt = 0 };
+            userSettings.StorageLimit.Value += fileSize;
+            if (StorageHelper.IsStorageLimitReached(subscription, userSettings.StorageLimit))
+            {
+                await this.AbortMultipartUploadAsync(userId, uploadRequest.Key, uploadRequest.UploadId);
+                throw new Exception("Storage limit reached.");
+            }
+
             uploadRequest.Key = objectName;
             uploadRequest.BucketName = GetBucketName(S3ClientMode.INTERNAL);
             var response = await GetS3Client(S3ClientMode.INTERNAL).CompleteMultipartUploadAsync(uploadRequest);
             if (!IsSuccessStatusCode(((int)response.HttpStatusCode))) throw new Exception("Failed to complete multipart upload.");
+
+            userSettings.StorageLimit.UpdatedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            await Repositories.UsersSettings.UpsertAsync(userSettings, (u) => u.UserId == userId);
         }
 
         private string? GetPresignedURL(string userId, string name, HttpVerb httpVerb, S3ClientMode mode = S3ClientMode.EXTERNAL)

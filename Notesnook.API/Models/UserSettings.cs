@@ -38,10 +38,10 @@ namespace Notesnook.API.Models
         public string UserId { get; set; }
         public long LastSynced { get; set; }
         public string Salt { get; set; }
-        public EncryptedData VaultKey { get; set; }
-        public EncryptedData AttachmentsKey { get; set; }
-        public EncryptedData MonographPasswordsKey { get; set; }
-        public InboxKeys InboxKeys { get; set; }
+        public EncryptedData? VaultKey { get; set; }
+        public EncryptedData? AttachmentsKey { get; set; }
+        public EncryptedData? MonographPasswordsKey { get; set; }
+        public InboxKeys? InboxKeys { get; set; }
         public Limit StorageLimit { get; set; }
 
         [BsonId]
