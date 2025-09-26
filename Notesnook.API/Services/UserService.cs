@@ -77,11 +77,12 @@ namespace Notesnook.API.Services
 
             if (!Constants.IS_SELF_HOSTED)
             {
-                await WampServers.SubscriptionServer.PublishMessageAsync(SubscriptionServerTopics.CreateSubscriptionTopic, new CreateSubscriptionMessage
+                await WampServers.SubscriptionServer.PublishMessageAsync(SubscriptionServerTopics.CreateSubscriptionV2Topic, new CreateSubscriptionMessageV2
                 {
                     AppId = ApplicationType.NOTESNOOK,
                     Provider = SubscriptionProvider.STREETWRITERS,
-                    Type = SubscriptionType.BASIC,
+                    Status = SubscriptionStatus.ACTIVE,
+                    Plan = SubscriptionPlan.FREE,
                     UserId = response.UserId,
                     StartTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
                 });
@@ -96,14 +97,15 @@ namespace Notesnook.API.Services
 
             var user = await userService.GetUserAsync(Clients.Notesnook.Id, userId) ?? throw new Exception("User not found.");
 
-            ISubscription subscription = null;
+            Subscription? subscription = null;
             if (Constants.IS_SELF_HOSTED)
             {
                 subscription = new Subscription
                 {
                     AppId = ApplicationType.NOTESNOOK,
                     Provider = SubscriptionProvider.STREETWRITERS,
-                    Type = SubscriptionType.PREMIUM,
+                    Plan = SubscriptionPlan.BELIEVER,
+                    Status = SubscriptionStatus.ACTIVE,
                     UserId = user.UserId,
                     StartDate = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
                     // this date doesn't matter as the subscription is static.
