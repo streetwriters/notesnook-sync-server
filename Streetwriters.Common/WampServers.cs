@@ -66,6 +66,20 @@ namespace Streetwriters.Common
                 throw ex;
             }
         }
+
+        public async Task PublishMessagesAsync<V>(string topic, IEnumerable<V> messages)
+        {
+            try
+            {
+                IWampRealmProxy channel = await GetChannelAsync(topic);
+                WampHelper.PublishMessages(channel, topic, messages);
+            }
+            catch (Exception ex)
+            {
+                await Slogger<WampServer<T>>.Error(nameof(PublishMessagesAsync), ex.ToString());
+                throw ex;
+            }
+        }
     }
 
     public class WampServers
