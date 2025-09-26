@@ -31,7 +31,7 @@ namespace Notesnook.API.Interfaces
         Task DeleteObjectAsync(string userId, string name);
         Task DeleteDirectoryAsync(string userId);
         Task<long> GetObjectSizeAsync(string userId, string name);
-        string GetUploadObjectUrl(string userId, string name);
+        string? GetUploadObjectUrl(string userId, string name);
         string GetDownloadObjectUrl(string userId, string name);
         Task<MultipartUploadMeta> StartMultipartUploadAsync(string userId, string name, int parts, string uploadId = null);
         Task AbortMultipartUploadAsync(string userId, string name, string uploadId);

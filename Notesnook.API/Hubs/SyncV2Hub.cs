@@ -74,10 +74,10 @@ namespace Notesnook.API.Hubs
             var result = new SyncRequirement().IsAuthorized(Context.User, new PathString("/hubs/sync/v2"));
             if (!result.Succeeded)
             {
-                var reason = result.AuthorizationFailure.FailureReasons.FirstOrDefault();
+                var reason = result.AuthorizationFailure?.FailureReasons.FirstOrDefault();
                 throw new HubException(reason?.Message ?? "Unauthorized");
             }
-            var id = Context.User.FindFirstValue("sub");
+            var id = Context.User?.FindFirstValue("sub") ?? throw new HubException("User not found.");
             await Groups.AddToGroupAsync(Context.ConnectionId, id);
             await base.OnConnectedAsync();
         }
@@ -103,13 +103,11 @@ namespace Notesnook.API.Hubs
 
         public async Task<int> PushItems(string deviceId, SyncTransferItemV2 pushItem)
         {
-            var userId = Context.User.FindFirstValue("sub");
-            if (string.IsNullOrEmpty(userId)) throw new HubException("Please login to sync.");
+            var userId = Context.User?.FindFirstValue("sub") ?? throw new HubException("Please login to sync.");
 
             SyncEventCounterSource.Log.PushV2();
 
-            var stopwatch = new Stopwatch();
-            stopwatch.Start();
+            var stopwatch = Stopwatch.StartNew();
             try
             {
 
@@ -123,14 +121,13 @@ namespace Notesnook.API.Hubs
             }
             finally
             {
-                stopwatch.Stop();
                 SyncEventCounterSource.Log.RecordPushDuration(stopwatch.ElapsedMilliseconds);
             }
         }
 
         public async Task<bool> PushCompleted()
         {
-            var userId = Context.User.FindFirstValue("sub");
+            var userId = Context.User?.FindFirstValue("sub") ?? throw new HubException("User not found.");
             await Clients.OthersInGroup(userId).PushCompleted();
             return true;
         }
@@ -197,8 +194,7 @@ namespace Notesnook.API.Hubs
 
         private async Task<SyncV2Metadata> HandleRequestFetch(string deviceId, bool includeMonographs)
         {
-            var userId = Context.User.FindFirstValue("sub");
-            if (string.IsNullOrEmpty(userId)) throw new HubException("Please login to sync.");
+            var userId = Context.User?.FindFirstValue("sub") ?? throw new HubException("Please login to sync.");
 
             SyncEventCounterSource.Log.FetchV2();
 
@@ -214,8 +210,7 @@ namespace Notesnook.API.Hubs
                 !isResetSync)
                 return new SyncV2Metadata { Synced = true };
 
-            var stopwatch = new Stopwatch();
-            stopwatch.Start();
+            var stopwatch = Stopwatch.StartNew();
             try
             {
                 string[] ids = deviceService.FetchUnsyncedIds();
@@ -285,7 +280,6 @@ namespace Notesnook.API.Hubs
             }
             finally
             {
-                stopwatch.Stop();
                 SyncEventCounterSource.Log.RecordFetchDuration(stopwatch.ElapsedMilliseconds);
             }
         }

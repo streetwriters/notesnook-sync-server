@@ -155,11 +155,9 @@ namespace Notesnook.API.Services
         }
 
 
-        public string GetUploadObjectUrl(string userId, string name)
+        public string? GetUploadObjectUrl(string userId, string name)
         {
-            var url = this.GetPresignedURL(userId, name, HttpVerb.PUT);
-            if (url == null) return null;
-            return url;
+            return this.GetPresignedURL(userId, name, HttpVerb.PUT);
         }
 
         public string GetDownloadObjectUrl(string userId, string name)
@@ -215,7 +213,7 @@ namespace Notesnook.API.Services
             if (!IsSuccessStatusCode(((int)response.HttpStatusCode))) throw new Exception("Failed to complete multipart upload.");
         }
 
-        private string GetPresignedURL(string userId, string name, HttpVerb httpVerb, S3ClientMode mode = S3ClientMode.EXTERNAL)
+        private string? GetPresignedURL(string userId, string name, HttpVerb httpVerb, S3ClientMode mode = S3ClientMode.EXTERNAL)
         {
             var objectName = GetFullObjectName(userId, name);
             if (userId == null || objectName == null) return null;
