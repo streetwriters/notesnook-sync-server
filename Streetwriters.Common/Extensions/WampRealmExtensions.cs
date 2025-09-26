@@ -18,6 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 using System;
+using System.Reactive.Disposables;
+using System.Threading;
 using Microsoft.AspNetCore.Builder;
 using Streetwriters.Common.Interfaces;
 using WampSharp.AspNetCore.WebSockets.Server;
@@ -37,6 +39,28 @@ namespace Streetwriters.Common.Extensions
         public static IDisposable Subscribe<T>(this IWampHostedRealm realm, string topicName, IMessageHandler<T> handler)
         {
             return realm.Services.GetSubject<T>(topicName).Subscribe<T>(async (message) => await handler.Process(message));
+        }
+
+        public static IDisposable SubscribeWithSemaphore<T>(this IWampHostedRealm realm, string topicName, IMessageHandler<T> handler)
+        {
+            var semaphore = new SemaphoreSlim(1, 1);
+            var subscriber = realm.Services.GetSubject<T>(topicName).Subscribe<T>(async (message) =>
+            {
+                await semaphore.WaitAsync();
+                try
+                {
+                    await handler.Process(message);
+                }
+                finally
+                {
+                    semaphore.Release();
+                }
+            });
+            return Disposable.Create(() =>
+            {
+                subscriber.Dispose();
+                semaphore.Dispose();
+            });
         }
     }
 }
