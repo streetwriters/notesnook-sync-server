@@ -109,6 +109,7 @@ namespace Streetwriters.Common
         public const string UserSubscriptionServiceTopic = "co.streetwriters.subscriptions.subscriptions";
 
         public const string CreateSubscriptionTopic = "co.streetwriters.subscriptions.create";
+        public const string CreateSubscriptionV2Topic = "co.streetwriters.subscriptions.v2.create";
         public const string DeleteSubscriptionTopic = "co.streetwriters.subscriptions.delete";
     }
 
