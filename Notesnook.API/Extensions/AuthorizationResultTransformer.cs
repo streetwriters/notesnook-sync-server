@@ -17,8 +17,11 @@ You should have received a copy of the Affero GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+using System;
 using System.Linq;
 using System.Net;
+using System.Net.WebSockets;
+using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
@@ -42,12 +45,9 @@ namespace Notesnook.API.Extensions
             AuthorizationPolicy authorizationPolicy,
             PolicyAuthorizationResult policyAuthorizationResult)
         {
-            var isWebsocket = httpContext.Request.Headers.Upgrade == "websocket";
-
-            if (!isWebsocket && policyAuthorizationResult.Forbidden && policyAuthorizationResult.AuthorizationFailure != null)
+            if (policyAuthorizationResult.Forbidden && policyAuthorizationResult.AuthorizationFailure != null)
             {
                 var error = string.Join("\n", policyAuthorizationResult.AuthorizationFailure.FailureReasons.Select((r) => r.Message));
-
                 if (!string.IsNullOrEmpty(error))
                 {
                     httpContext.Response.StatusCode = (int)HttpStatusCode.Unauthorized;
@@ -55,17 +55,8 @@ namespace Notesnook.API.Extensions
                     await httpContext.Response.WriteAsync(JsonSerializer.Serialize(new { error }));
                     return;
                 }
-
-                await _handler.HandleAsync(requestDelegate, httpContext, authorizationPolicy, policyAuthorizationResult);
             }
-            else if (isWebsocket)
-            {
-                await _handler.HandleAsync(requestDelegate, httpContext, authorizationPolicy, PolicyAuthorizationResult.Success());
-            }
-            else
-            {
-                await _handler.HandleAsync(requestDelegate, httpContext, authorizationPolicy, policyAuthorizationResult);
-            }
+            await _handler.HandleAsync(requestDelegate, httpContext, authorizationPolicy, policyAuthorizationResult);
         }
     }
 }

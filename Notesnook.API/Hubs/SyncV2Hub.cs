@@ -44,7 +44,7 @@ namespace Notesnook.API.Hubs
         Task PushCompleted();
     }
 
-    [Authorize("Sync")]
+    [Authorize]
     public class SyncV2Hub : Hub<ISyncV2HubClient>
     {
         private ISyncItemsRepositoryAccessor Repositories { get; }
