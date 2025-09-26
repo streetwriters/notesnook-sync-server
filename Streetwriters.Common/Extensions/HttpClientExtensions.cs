@@ -37,19 +37,21 @@ namespace Streetwriters.Common.Extensions
                 request.Content = content;
             }
 
-            foreach (var header in headers)
+            if (headers != null)
             {
-                if (header.Key == "Content-Type" || header.Key == "Content-Length")
+                foreach (var header in headers)
                 {
-                    if (request.Content != null)
-                        request.Content.Headers.TryAddWithoutValidation(header.Key, header.Value.AsEnumerable());
-                    continue;
+                    if (header.Key == "Content-Type" || header.Key == "Content-Length")
+                    {
+                        request.Content?.Headers.TryAddWithoutValidation(header.Key, header.Value.AsEnumerable());
+                        continue;
+                    }
+                    request.Headers.TryAddWithoutValidation(header.Key, header.Value.AsEnumerable());
                 }
-                request.Headers.TryAddWithoutValidation(header.Key, header.Value.AsEnumerable());
             }
 
             var response = await httpClient.SendAsync(request);
-            if (response.Content.Headers.ContentLength > 0)
+            if (response.Content.Headers.ContentLength > 0 && response.Content.Headers.ContentType.ToString().Contains("application/json"))
             {
                 var res = await response.Content.ReadFromJsonAsync<T>();
                 res.Success = response.IsSuccessStatusCode;
@@ -58,7 +60,7 @@ namespace Streetwriters.Common.Extensions
             }
             else
             {
-                return new T { Success = response.IsSuccessStatusCode, StatusCode = (int)response.StatusCode };
+                return new T { Success = response.IsSuccessStatusCode, StatusCode = (int)response.StatusCode, Content = response.Content };
             }
         }
 
