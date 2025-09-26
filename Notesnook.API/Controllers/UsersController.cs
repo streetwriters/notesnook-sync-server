@@ -58,7 +58,7 @@ namespace Notesnook.API.Controllers
             try
             {
                 UserResponse response = await UserService.GetUserAsync(userId);
-                if (!response.Success) return BadRequest(response);
+                if (!response.Success) return BadRequest();
                 return Ok(response);
             }
             catch (Exception ex)
