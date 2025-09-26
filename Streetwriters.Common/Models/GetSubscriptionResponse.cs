@@ -7,13 +7,10 @@ namespace Streetwriters.Common.Models
     using System.Text.Json.Serialization;
     using System.Globalization;
 
-    public partial class GetSubscriptionResponse
+    public partial class GetSubscriptionResponse : PaddleResponse
     {
         [JsonPropertyName("data")]
         public Data Data { get; set; }
-
-        [JsonPropertyName("meta")]
-        public Meta Meta { get; set; }
     }
 
     public partial class Data
@@ -213,11 +210,5 @@ namespace Streetwriters.Common.Models
 
         [JsonPropertyName("cancel")]
         public Uri Cancel { get; set; }
-    }
-
-    public partial class Meta
-    {
-        [JsonPropertyName("request_id")]
-        public string RequestId { get; set; }
     }
 }

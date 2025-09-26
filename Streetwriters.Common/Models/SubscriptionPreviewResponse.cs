@@ -7,13 +7,10 @@ namespace Streetwriters.Common.Models
     using System.Text.Json.Serialization;
     using System.Globalization;
 
-    public partial class SubscriptionPreviewResponse
+    public partial class SubscriptionPreviewResponse : PaddleResponse
     {
         [JsonPropertyName("data")]
         public SubscriptionPreviewData Data { get; set; }
-
-        [JsonPropertyName("meta")]
-        public Meta Meta { get; set; }
     }
 
     public partial class SubscriptionPreviewData
