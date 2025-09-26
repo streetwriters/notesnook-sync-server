@@ -25,7 +25,7 @@ using Streetwriters.Common.Interfaces;
 
 namespace Streetwriters.Common.Messages
 {
-    public class CreateSubscriptionMessage
+    public class CreateSubscriptionMessageV2
     {
         [JsonPropertyName("userId")]
         public string UserId { get; set; }
@@ -36,8 +36,11 @@ namespace Streetwriters.Common.Messages
         [JsonPropertyName("appId")]
         public ApplicationType AppId { get; set; }
 
-        [JsonPropertyName("type")]
-        public SubscriptionType Type { get; set; }
+        [JsonPropertyName("plan")]
+        public SubscriptionPlan Plan { get; set; }
+
+        [JsonPropertyName("status")]
+        public SubscriptionStatus Status { get; set; }
 
         [JsonPropertyName("start")]
         public long StartTime { get; set; }
@@ -48,19 +51,19 @@ namespace Streetwriters.Common.Messages
         [JsonPropertyName("orderId")]
         public string OrderId { get; set; }
 
-        [JsonPropertyName("updateURL")]
-        public string UpdateURL { get; set; }
-
-        [JsonPropertyName("cancelURL")]
-        public string CancelURL { get; set; }
-
         [JsonPropertyName("subscriptionId")]
         public string SubscriptionId { get; set; }
 
         [JsonPropertyName("productId")]
         public string ProductId { get; set; }
 
-        [JsonPropertyName("extend")]
-        public bool Extend { get; set; }
+        [JsonPropertyName("timestamp")]
+        public long Timestamp { get; set; }
+
+        [JsonPropertyName("trialExpiry")]
+        public long TrialExpiryTime { get; set; }
+
+        [JsonPropertyName("googlePurchaseToken")]
+        public string? GooglePurchaseToken { get; set; }
     }
 }
