@@ -50,9 +50,9 @@ namespace Notesnook.API.Authorization
             return Task.CompletedTask;
         }
 
-        public PolicyAuthorizationResult IsAuthorized(ClaimsPrincipal User, PathString requestPath)
+        public PolicyAuthorizationResult IsAuthorized(ClaimsPrincipal? User, PathString requestPath)
         {
-            var id = User.FindFirstValue("sub");
+            var id = User?.FindFirstValue("sub");
 
             if (string.IsNullOrEmpty(id))
             {
