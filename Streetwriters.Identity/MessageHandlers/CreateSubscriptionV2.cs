@@ -28,22 +28,21 @@ using Streetwriters.Identity.Services;
 
 namespace Streetwriters.Identity.MessageHandlers
 {
-    public class CreateSubscription
+    public class CreateSubscriptionV2
     {
-        public static async Task Process(CreateSubscriptionMessage message, UserManager<User> userManager)
+        public static async Task Process(CreateSubscriptionMessageV2 message, UserManager<User> userManager)
         {
             var user = await userManager.FindByIdAsync(message.UserId);
             var client = Clients.FindClientByAppId(message.AppId);
             if (client == null || user == null) return;
 
             IdentityUserClaim<string> statusClaim = user.Claims.FirstOrDefault((c) => c.ClaimType == UserService.GetClaimKey(client.Id));
-            Claim subscriptionClaim = UserService.SubscriptionTypeToClaim(client.Id, message.Type);
+            Claim subscriptionClaim = UserService.SubscriptionPlanToClaim(client.Id, message.Plan);
             if (statusClaim?.ClaimValue == subscriptionClaim.Value) return;
             if (statusClaim != null)
                 await userManager.ReplaceClaimAsync(user, statusClaim.ToClaim(), subscriptionClaim);
-            // we no longer accept legacy subscriptions.
-            // else
-            //     await userManager.AddClaimAsync(user, subscriptionClaim);
+            else
+                await userManager.AddClaimAsync(user, subscriptionClaim);
         }
 
     }

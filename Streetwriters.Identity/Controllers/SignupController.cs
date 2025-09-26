@@ -109,7 +109,7 @@ namespace Streetwriters.Identity.Controllers
                     await UserManager.AddToRoleAsync(user, client.Id);
                     if (Constants.IS_SELF_HOSTED)
                     {
-                        await UserManager.AddClaimAsync(user, UserService.SubscriptionTypeToClaim(client.Id, Common.Enums.SubscriptionType.PREMIUM));
+                        await UserManager.AddClaimAsync(user, UserService.SubscriptionPlanToClaim(client.Id, SubscriptionPlan.BELIEVER));
                     }
                     else
                     {
