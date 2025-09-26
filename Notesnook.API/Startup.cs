@@ -137,9 +137,13 @@ namespace Notesnook.API
                 options.DiscoveryPolicy.RequireHttps = false;
                 options.TokenRetriever = new Func<HttpRequest, string>(req =>
                 {
+                    if (req.Path == "/hubs/sync/v2")
+                    {
+                        var fromQuery = TokenRetrieval.FromQueryString();   //needed for signalr and ws/wss conections to be authed via jwt
+                        return fromQuery(req);
+                    }
                     var fromHeader = TokenRetrieval.FromAuthorizationHeader();
-                    var fromQuery = TokenRetrieval.FromQueryString();   //needed for signalr and ws/wss conections to be authed via jwt
-                    return fromHeader(req) ?? fromQuery(req);
+                    return fromHeader(req);
                 });
 
                 options.Events.OnTokenValidated = (context) =>
