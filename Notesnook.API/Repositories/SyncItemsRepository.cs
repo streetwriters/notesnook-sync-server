@@ -114,6 +114,9 @@ namespace Notesnook.API.Repositories
                 throw new Exception($"Corrupted item \"{item.ItemId}\" in collection \"{this.collectionName}\". Please report this error to support@streetwriters.co.");
             }
 
+            if (item.ItemId == null)
+                throw new Exception($"Item does not have an ItemId.");
+
             item.DateSynced = dateSynced;
             item.UserId = userId;
 
@@ -147,6 +150,9 @@ namespace Notesnook.API.Repositories
                     Slogger<SyncHub>.Error("Upsert", "Corrupted", item.ItemId, item.Length.ToString(), item.Cipher);
                     throw new Exception($"Corrupted item \"{item.ItemId}\" in collection \"{this.collectionName}\". Please report this error to support@streetwriters.co.");
                 }
+
+                if (item.ItemId == null)
+                    throw new Exception($"Item does not have an ItemId.");
 
                 var filter = Builders<SyncItem>.Filter.And(
                     userIdFilter,
