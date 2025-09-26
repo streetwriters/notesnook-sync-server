@@ -80,26 +80,26 @@ namespace Streetwriters.Common.Services
             return response.IsSuccessStatusCode;
         }
 
-        public async Task<SubscriptionPreviewResponse?> PreviewSubscriptionChangeAsync(string subscriptionId, string newProductId)
+        public async Task<SubscriptionPreviewResponse?> PreviewSubscriptionChangeAsync(string subscriptionId, string newProductId, bool isTrialing)
         {
             var url = $"{PADDLE_BASE_URI}/subscriptions/{subscriptionId}/preview";
             var response = await httpClient.PatchAsync(url, JsonContent.Create(new
             {
-                proration_billing_mode = "prorated_immediately",
+                proration_billing_mode = isTrialing ? "do_not_bill" : "prorated_immediately",
                 items = new[] { new { price_id = newProductId, quantity = 1 } }
             }));
             return await response.Content.ReadFromJsonAsync<SubscriptionPreviewResponse>();
         }
 
-        public async Task<bool> ChangeSubscriptionAsync(string subscriptionId, string newProductId)
+        public async Task<PaddleResponse?> ChangeSubscriptionAsync(string subscriptionId, string newProductId, bool isTrialing)
         {
             var url = $"{PADDLE_BASE_URI}/subscriptions/{subscriptionId}";
             var response = await httpClient.PatchAsync(url, JsonContent.Create(new
             {
-                proration_billing_mode = "prorated_immediately",
+                proration_billing_mode = isTrialing ? "do_not_bill" : "prorated_immediately",
                 items = new[] { new { price_id = newProductId, quantity = 1 } }
             }));
-            return response.IsSuccessStatusCode;
+            return await response.Content.ReadFromJsonAsync<PaddleResponse>();
         }
 
         public async Task<bool> CancelSubscriptionAsync(string subscriptionId)
@@ -124,6 +124,15 @@ namespace Streetwriters.Common.Services
                 {"scheduled_change", null}
             }));
             return response.IsSuccessStatusCode;
+        }
+
+        public async Task<GetCustomerResponse?> FindCustomerFromTransactionAsync(string transactionId)
+        {
+            var transaction = await GetTransactionAsync(transactionId);
+            if (transaction == null) return null;
+            var url = $"{PADDLE_BASE_URI}/customers/{transaction.Transaction.CustomerId}";
+            var response = await httpClient.GetFromJsonAsync<GetCustomerResponse>(url);
+            return response;
         }
     }
 }

@@ -7,13 +7,10 @@ namespace Streetwriters.Common.Models
     using System.Text.Json.Serialization;
     using System.Globalization;
 
-    public partial class ListTransactionsResponseV2
+    public partial class ListTransactionsResponseV2 : PaddleResponse
     {
         [JsonPropertyName("data")]
         public TransactionV2[] Transactions { get; set; }
-
-        [JsonPropertyName("meta")]
-        public Meta Meta { get; set; }
     }
 
     public partial class TransactionV2
@@ -496,12 +493,6 @@ namespace Streetwriters.Common.Models
     //     [JsonPropertyName("cardholder_name")]
     //     public string CardholderName { get; set; }
     // }
-
-    public partial class Meta
-    {
-        [JsonPropertyName("pagination")]
-        public Pagination Pagination { get; set; }
-    }
 
     public partial class Pagination
     {
