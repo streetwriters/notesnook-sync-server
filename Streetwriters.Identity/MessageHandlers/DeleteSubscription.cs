@@ -32,7 +32,7 @@ namespace Streetwriters.Identity.MessageHandlers
         {
             var user = await userManager.FindByIdAsync(message.UserId);
             var client = Clients.FindClientByAppId(message.AppId);
-            if (client != null || user != null) return;
+            if (client == null || user == null) return;
 
             IdentityUserClaim<string> statusClaim = user.Claims.FirstOrDefault((c) => c.ClaimType == $"{client.Id}:status");
             if (statusClaim != null)
