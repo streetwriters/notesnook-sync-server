@@ -244,6 +244,17 @@ namespace Streetwriters.Identity
                         await MessageHandlers.CreateSubscription.Process(message, userManager);
                     }
                 });
+
+                realm.Subscribe(SubscriptionServerTopics.CreateSubscriptionV2Topic, async (CreateSubscriptionMessageV2 message) =>
+               {
+                   using (var serviceScope = app.ApplicationServices.CreateScope())
+                   {
+                       var services = serviceScope.ServiceProvider;
+                       var userManager = services.GetRequiredService<UserManager<User>>();
+                       await MessageHandlers.CreateSubscriptionV2.Process(message, userManager);
+                   }
+               });
+
                 realm.Subscribe(SubscriptionServerTopics.DeleteSubscriptionTopic, async (DeleteSubscriptionMessage message) =>
                 {
                     using (var serviceScope = app.ApplicationServices.CreateScope())
