@@ -24,6 +24,12 @@ using System.Threading.Tasks;
 using System.Security.Claims;
 using Notesnook.API.Interfaces;
 using System;
+using System.Net.Http;
+using Streetwriters.Common.Extensions;
+using Streetwriters.Common.Models;
+using Notesnook.API.Helpers;
+using Streetwriters.Common;
+using Streetwriters.Common.Interfaces;
 using Notesnook.API.Models;
 
 namespace Notesnook.API.Controllers
@@ -31,27 +37,55 @@ namespace Notesnook.API.Controllers
     [ApiController]
     [Route("s3")]
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    [Authorize("Sync")]
     public class S3Controller : ControllerBase
     {
+        private ISyncItemsRepositoryAccessor Repositories { get; }
         private IS3Service S3Service { get; set; }
-        public S3Controller(IS3Service s3Service)
+        public S3Controller(IS3Service s3Service, ISyncItemsRepositoryAccessor syncItemsRepositoryAccessor)
         {
             S3Service = s3Service;
+            Repositories = syncItemsRepositoryAccessor;
         }
 
         [HttpPut]
-        [Authorize("Pro")]
-        public IActionResult Upload([FromQuery] string name)
+        public async Task<IActionResult> Upload([FromQuery] string name)
         {
             var userId = this.User.FindFirstValue("sub");
+
+            if (!HttpContext.Request.Headers.ContentLength.HasValue) return BadRequest(new { error = "No Content-Length header found." });
+
+            long fileSize = HttpContext.Request.Headers.ContentLength.Value;
+            var subscriptionService = await WampServers.SubscriptionServer.GetServiceAsync<IUserSubscriptionService>(SubscriptionServerTopics.UserSubscriptionServiceTopic);
+            var subscription = await subscriptionService.GetUserSubscriptionAsync(Clients.Notesnook.Id, userId);
+
+            if (StorageHelper.IsFileSizeExceeded(subscription, fileSize))
+            {
+                return BadRequest(new { error = "Max file size exceeded." });
+            }
+
+            var userSettings = await Repositories.UsersSettings.FindOneAsync((u) => u.UserId == userId);
+            userSettings.StorageLimit ??= new Limit { Value = 0, UpdatedAt = 0 };
+            userSettings.StorageLimit.Value += fileSize;
+            if (StorageHelper.IsStorageLimitReached(subscription, userSettings.StorageLimit))
+                return BadRequest(new { error = "Storage limit exceeded." });
+
             var url = S3Service.GetUploadObjectUrl(userId, name);
-            if (url == null) return BadRequest("Could not create signed url.");
-            return Ok(url);
+            if (url == null) return BadRequest(new { error = "Could not create signed url." });
+
+            var httpClient = new HttpClient();
+            var content = new StreamContent(HttpContext.Request.BodyReader.AsStream());
+            var response = await httpClient.SendRequestAsync<Response>(url, null, HttpMethod.Put, content);
+            if (!response.Success) return BadRequest(await response.Content.ReadAsStringAsync());
+
+            userSettings.StorageLimit.UpdatedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            await Repositories.UsersSettings.UpsertAsync(userSettings, (u) => u.UserId == userId);
+
+            return Ok(response);
         }
 
 
         [HttpGet("multipart")]
-        [Authorize("Pro")]
         public async Task<IActionResult> MultipartUpload([FromQuery] string name, [FromQuery] int parts, [FromQuery] string uploadId)
         {
             var userId = this.User.FindFirstValue("sub");
@@ -64,7 +98,6 @@ namespace Notesnook.API.Controllers
         }
 
         [HttpDelete("multipart")]
-        [Authorize("Pro")]
         public async Task<IActionResult> AbortMultipartUpload([FromQuery] string name, [FromQuery] string uploadId)
         {
             var userId = this.User.FindFirstValue("sub");
@@ -77,7 +110,6 @@ namespace Notesnook.API.Controllers
         }
 
         [HttpPost("multipart")]
-        [Authorize("Pro")]
         public async Task<IActionResult> CompleteMultipartUpload([FromBody] CompleteMultipartUploadRequestWrapper uploadRequestWrapper)
         {
             var userId = this.User.FindFirstValue("sub");
@@ -90,7 +122,6 @@ namespace Notesnook.API.Controllers
         }
 
         [HttpGet]
-        [Authorize("Sync")]
         public IActionResult Download([FromQuery] string name)
         {
             var userId = this.User.FindFirstValue("sub");
@@ -100,7 +131,6 @@ namespace Notesnook.API.Controllers
         }
 
         [HttpHead]
-        [Authorize("Sync")]
         public async Task<IActionResult> Info([FromQuery] string name)
         {
             var userId = this.User.FindFirstValue("sub");
@@ -110,7 +140,6 @@ namespace Notesnook.API.Controllers
         }
 
         [HttpDelete]
-        [Authorize("Sync")]
         public async Task<IActionResult> DeleteAsync([FromQuery] string name)
         {
             try
