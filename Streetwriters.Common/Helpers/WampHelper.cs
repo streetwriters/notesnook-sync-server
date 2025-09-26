@@ -17,6 +17,7 @@ You should have received a copy of the Affero GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+using System.Collections.Generic;
 using System.Reactive.Subjects;
 using System.Threading.Tasks;
 using Streetwriters.Common.Messages;
@@ -42,6 +43,13 @@ namespace Streetwriters.Common.Helpers
         {
             var subject = realm.Services.GetSubject<T>(topicName);
             subject.OnNext(message);
+        }
+
+        public static void PublishMessages<T>(IWampRealmProxy realm, string topicName, IEnumerable<T> messages)
+        {
+            var subject = realm.Services.GetSubject<T>(topicName);
+            foreach (var message in messages)
+                subject.OnNext(message);
         }
     }
 }
