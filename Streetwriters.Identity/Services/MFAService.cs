@@ -169,10 +169,12 @@ namespace Streetwriters.Identity.Services
             if ((method != MFAMethods.Email && method != MFAMethods.SMS) || !IsValidMFAMethod(method))
                 throw new Exception("Invalid method.");
 
+            var userPlan = UserService.GetUserSubscriptionPlan(client.Id, user);
             if (isSetup &&
                 method == MFAMethods.SMS &&
-                !UserService.IsUserPremium(client.Id, user))
-                throw new Exception("Due to the high costs of SMS, currently 2FA via SMS is only available for Pro users.");
+                !UserService.IsUserPremium(client.Id, user) &&
+                userPlan != SubscriptionPlan.BELIEVER && userPlan != SubscriptionPlan.PRO)
+                throw new Exception("Due to the high costs of SMS, 2FA via SMS is only available on Pro & Believer plans.");
 
             // if (!user.EmailConfirmed) throw new Exception("Please confirm your email before activating 2FA by email.");
             await GetAuthenticatorDetailsAsync(user, client);

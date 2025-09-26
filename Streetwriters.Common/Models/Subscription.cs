@@ -17,6 +17,7 @@ You should have received a copy of the Affero GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+using System;
 using System.ComponentModel.DataAnnotations;
 using System.Runtime.Serialization;
 using System.Text.Json.Serialization;
@@ -63,6 +64,7 @@ namespace Streetwriters.Common.Models
 
         [BsonRepresentation(BsonType.Int32)]
         [JsonPropertyName("type")]
+        [Obsolete("Use SubscriptionPlan and SubscriptionStatus instead.")]
         public SubscriptionType Type { get; set; }
 
         [JsonPropertyName("cancelURL")]
@@ -71,10 +73,30 @@ namespace Streetwriters.Common.Models
         [JsonPropertyName("updateURL")]
         public string UpdateURL { get; set; }
 
+        [JsonPropertyName("googlePurchaseToken")]
+        public string? GooglePurchaseToken { get; set; }
+
         [JsonPropertyName("productId")]
         public string ProductId { get; set; }
 
         [JsonIgnore]
         public int TrialExtensionCount { get; set; }
+
+        [JsonPropertyName("trialExpiry")]
+        public long TrialExpiryDate { get; set; }
+
+        [JsonPropertyName("trialsAvailed")]
+        public SubscriptionPlan[] TrialsAvailed { get; set; }
+
+        [JsonPropertyName("updatedAt")]
+        public long UpdatedAt { get; set; }
+
+        [BsonRepresentation(BsonType.Int32)]
+        [JsonPropertyName("plan")]
+        public SubscriptionPlan Plan { get; set; }
+
+        [BsonRepresentation(BsonType.Int32)]
+        [JsonPropertyName("status")]
+        public SubscriptionStatus Status { get; set; }
     }
 }

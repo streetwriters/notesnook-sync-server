@@ -49,7 +49,26 @@ namespace Streetwriters.Identity.Services
             }
         }
 
-
+        public static SubscriptionPlan GetUserSubscriptionPlan(string clientId, User user)
+        {
+            var claimKey = GetClaimKey(clientId);
+            var status = user.Claims.FirstOrDefault((c) => c.ClaimType == claimKey).ClaimValue;
+            switch (status)
+            {
+                case "free":
+                    return SubscriptionPlan.FREE;
+                case "believer":
+                    return SubscriptionPlan.BELIEVER;
+                case "education":
+                    return SubscriptionPlan.EDUCATION;
+                case "essential":
+                    return SubscriptionPlan.ESSENTIAL;
+                case "pro":
+                    return SubscriptionPlan.PRO;
+                default:
+                    return SubscriptionPlan.FREE;
+            }
+        }
 
         public static bool IsUserPremium(string clientId, User user)
         {
@@ -72,6 +91,25 @@ namespace Streetwriters.Identity.Services
                     return new Claim(claimKey, "premium_canceled");
                 case SubscriptionType.PREMIUM_EXPIRED:
                     return new Claim(claimKey, "premium_expired");
+            }
+            return null;
+        }
+
+        public static Claim SubscriptionPlanToClaim(string clientId, SubscriptionPlan plan)
+        {
+            var claimKey = GetClaimKey(clientId);
+            switch (plan)
+            {
+                case SubscriptionPlan.FREE:
+                    return new Claim(claimKey, "free");
+                case SubscriptionPlan.BELIEVER:
+                    return new Claim(claimKey, "believer");
+                case SubscriptionPlan.EDUCATION:
+                    return new Claim(claimKey, "education");
+                case SubscriptionPlan.ESSENTIAL:
+                    return new Claim(claimKey, "essential");
+                case SubscriptionPlan.PRO:
+                    return new Claim(claimKey, "pro");
             }
             return null;
         }
