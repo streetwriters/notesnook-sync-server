@@ -7,18 +7,14 @@ namespace Streetwriters.Common.Models
     using System.Text.Json.Serialization;
     using System.Globalization;
 
-    public partial class GetTransactionInvoiceResponse
+    public class GetTransactionInvoiceResponse : PaddleResponse
     {
         [JsonPropertyName("data")]
         public Invoice Invoice { get; set; }
-
-        [JsonPropertyName("meta")]
-        public Meta Meta { get; set; }
     }
 
     public partial class Invoice
     {
-
         [JsonPropertyName("url")]
         public string Url { get; set; }
     }

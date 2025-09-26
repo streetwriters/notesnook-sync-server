@@ -7,9 +7,15 @@ namespace Streetwriters.Common.Models
     using System.Text.Json.Serialization;
     using System.Globalization;
 
-    public partial class GetTransactionResponse : PaddleResponse
+    public partial class GetCustomerResponse : PaddleResponse
     {
         [JsonPropertyName("data")]
-        public TransactionV2 Transaction { get; set; }
+        public PaddleCustomer Customer { get; set; }
+    }
+
+    public class PaddleCustomer
+    {
+        [JsonPropertyName("email")]
+        public string Email { get; set; }
     }
 }
