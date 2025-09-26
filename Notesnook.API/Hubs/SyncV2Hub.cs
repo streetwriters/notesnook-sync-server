@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 using System;
+using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -49,7 +50,7 @@ namespace Notesnook.API.Hubs
     {
         private ISyncItemsRepositoryAccessor Repositories { get; }
         private readonly IUnitOfWork unit;
-        private readonly string[] CollectionKeys = [
+        private static readonly string[] CollectionKeys = [
             "settingitem",
             "attachment",
             "note",
@@ -62,11 +63,40 @@ namespace Notesnook.API.Hubs
             "vault",
             "relation", // relations must sync at the end to prevent invalid state
         ];
+        private readonly FrozenDictionary<string, Action<IEnumerable<SyncItem>, string, long>> UpsertActionsMap;
+        private readonly Func<string, string[], bool, int, Task<IAsyncCursor<SyncItem>>>[] Collections;
 
         public SyncV2Hub(ISyncItemsRepositoryAccessor syncItemsRepositoryAccessor, IUnitOfWork unitOfWork)
         {
             Repositories = syncItemsRepositoryAccessor;
             unit = unitOfWork;
+
+            Collections = [
+                Repositories.Settings.FindItemsById,
+                Repositories.Attachments.FindItemsById,
+                Repositories.Notes.FindItemsById,
+                Repositories.Notebooks.FindItemsById,
+                Repositories.Contents.FindItemsById,
+                Repositories.Shortcuts.FindItemsById,
+                Repositories.Reminders.FindItemsById,
+                Repositories.Colors.FindItemsById,
+                Repositories.Tags.FindItemsById,
+                Repositories.Vaults.FindItemsById,
+                Repositories.Relations.FindItemsById,
+            ];
+            UpsertActionsMap = new Dictionary<string, Action<IEnumerable<SyncItem>, string, long>> {
+                { "settingitem", Repositories.Settings.UpsertMany },
+                { "attachment", Repositories.Attachments.UpsertMany },
+                { "note", Repositories.Notes.UpsertMany },
+                { "notebook", Repositories.Notebooks.UpsertMany },
+                { "content", Repositories.Contents.UpsertMany },
+                { "shortcut", Repositories.Shortcuts.UpsertMany },
+                { "reminder", Repositories.Reminders.UpsertMany },
+                { "relation", Repositories.Relations.UpsertMany },
+                { "color", Repositories.Colors.UpsertMany },
+                { "vault", Repositories.Vaults.UpsertMany },
+                { "tag", Repositories.Tags.UpsertMany },
+            }.ToFrozenDictionary();
         }
 
         public override async Task OnConnectedAsync()
@@ -82,24 +112,6 @@ namespace Notesnook.API.Hubs
             await base.OnConnectedAsync();
         }
 
-        private Action<IEnumerable<SyncItem>, string, long> MapTypeToUpsertAction(string type)
-        {
-            return type switch
-            {
-                "settingitem" => Repositories.Settings.UpsertMany,
-                "attachment" => Repositories.Attachments.UpsertMany,
-                "note" => Repositories.Notes.UpsertMany,
-                "notebook" => Repositories.Notebooks.UpsertMany,
-                "content" => Repositories.Contents.UpsertMany,
-                "shortcut" => Repositories.Shortcuts.UpsertMany,
-                "reminder" => Repositories.Reminders.UpsertMany,
-                "relation" => Repositories.Relations.UpsertMany,
-                "color" => Repositories.Colors.UpsertMany,
-                "vault" => Repositories.Vaults.UpsertMany,
-                "tag" => Repositories.Tags.UpsertMany,
-                _ => null,
-            };
-        }
 
         public async Task<int> PushItems(string deviceId, SyncTransferItemV2 pushItem)
         {
@@ -111,7 +123,7 @@ namespace Notesnook.API.Hubs
             try
             {
 
-                var UpsertItems = MapTypeToUpsertAction(pushItem.Type) ?? throw new Exception($"Invalid item type: {pushItem.Type}.");
+                var UpsertItems = UpsertActionsMap[pushItem.Type] ?? throw new Exception($"Invalid item type: {pushItem.Type}.");
                 UpsertItems(pushItem.Items, userId, 1);
 
                 if (!await unit.Commit()) return 0;
@@ -132,17 +144,17 @@ namespace Notesnook.API.Hubs
             return true;
         }
 
-        private static async IAsyncEnumerable<SyncTransferItemV2> PrepareChunks(Func<string, string[], bool, int, Task<IAsyncCursor<SyncItem>>>[] collections, string[] types, string userId, string[] ids, int size, bool resetSync, long maxBytes)
+        private async IAsyncEnumerable<SyncTransferItemV2> PrepareChunks(string userId, string[] ids, int size, bool resetSync, long maxBytes)
         {
             var itemsProcessed = 0;
-            for (int i = 0; i < collections.Length; i++)
+            for (int i = 0; i < Collections.Length; i++)
             {
-                var type = types[i];
+                var type = CollectionKeys[i];
 
                 var filteredIds = ids.Where((id) => id.EndsWith($":{type}")).Select((id) => id.Split(":")[0]).ToArray();
                 if (!resetSync && filteredIds.Length == 0) continue;
 
-                using var cursor = await collections[i](userId, filteredIds, resetSync, size);
+                using var cursor = await Collections[i](userId, filteredIds, resetSync, size);
 
                 var chunk = new List<SyncItem>();
                 long totalBytes = 0;
@@ -216,20 +228,6 @@ namespace Notesnook.API.Hubs
                 string[] ids = deviceService.FetchUnsyncedIds();
 
                 var chunks = PrepareChunks(
-                    collections: [
-                        Repositories.Settings.FindItemsById,
-                    Repositories.Attachments.FindItemsById,
-                    Repositories.Notes.FindItemsById,
-                    Repositories.Notebooks.FindItemsById,
-                    Repositories.Contents.FindItemsById,
-                    Repositories.Shortcuts.FindItemsById,
-                    Repositories.Reminders.FindItemsById,
-                    Repositories.Colors.FindItemsById,
-                    Repositories.Tags.FindItemsById,
-                    Repositories.Vaults.FindItemsById,
-                    Repositories.Relations.FindItemsById,
-                    ],
-                    types: CollectionKeys,
                     userId,
                     ids,
                     size: 1000,
@@ -291,25 +289,5 @@ namespace Notesnook.API.Hubs
         [MessagePack.Key("synced")]
         [JsonPropertyName("synced")]
         public bool Synced { get; set; }
-    }
-
-    [MessagePack.MessagePackObject]
-    public struct SyncV2TransferItem
-    {
-        [MessagePack.Key("items")]
-        [JsonPropertyName("items")]
-        public IEnumerable<SyncItem> Items { get; set; }
-
-        [MessagePack.Key("type")]
-        [JsonPropertyName("type")]
-        public string Type { get; set; }
-
-        [MessagePack.Key("final")]
-        [JsonPropertyName("final")]
-        public bool Final { get; set; }
-
-        [MessagePack.Key("vaultKey")]
-        [JsonPropertyName("vaultKey")]
-        public EncryptedData VaultKey { get; set; }
     }
 }
