@@ -334,7 +334,7 @@ namespace Notesnook.API.Controllers
             {
                 var json = JsonSerializer.Deserialize<MonographContent>(content);
                 var html = json.Data;
-                if (!Constants.IS_SELF_HOSTED && !ProUserRequirement.IsUserPro(User))
+                if (!Constants.IS_SELF_HOSTED && !User.IsUserSubscribed())
                 {
                     var config = Configuration.Default.WithDefaultLoader();
                     var context = BrowsingContext.New(config);
@@ -346,7 +346,7 @@ namespace Notesnook.API.Controllers
                     html = document.ToHtml();
                 }
 
-                if (ProUserRequirement.IsUserPro(User))
+                if (User.IsUserSubscribed())
                 {
                     var config = Configuration.Default.WithDefaultLoader();
                     var context = BrowsingContext.New(config);
