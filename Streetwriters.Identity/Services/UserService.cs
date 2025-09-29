@@ -28,7 +28,7 @@ namespace Streetwriters.Identity.Services
 {
     public class UserService
     {
-        public static SubscriptionType GetUserSubscriptionStatus(string clientId, User user)
+        private static SubscriptionType? GetUserSubscriptionStatus(string clientId, User user)
         {
             var claimKey = GetClaimKey(clientId);
             var status = user.Claims.FirstOrDefault((c) => c.ClaimType == claimKey).ClaimValue;
@@ -45,11 +45,11 @@ namespace Streetwriters.Identity.Services
                 case "premium_expired":
                     return SubscriptionType.PREMIUM_EXPIRED;
                 default:
-                    return SubscriptionType.BASIC;
+                    return null;
             }
         }
 
-        public static SubscriptionPlan GetUserSubscriptionPlan(string clientId, User user)
+        private static SubscriptionPlan? GetUserSubscriptionPlan(string clientId, User user)
         {
             var claimKey = GetClaimKey(clientId);
             var status = user.Claims.FirstOrDefault((c) => c.ClaimType == claimKey).ClaimValue;
@@ -66,14 +66,20 @@ namespace Streetwriters.Identity.Services
                 case "pro":
                     return SubscriptionPlan.PRO;
                 default:
-                    return SubscriptionPlan.FREE;
+                    return null;
             }
         }
 
-        public static bool IsUserPremium(string clientId, User user)
+        public static bool IsSMSMFAAllowed(string clientId, User user)
         {
-            var status = GetUserSubscriptionStatus(clientId, user);
-            return status == SubscriptionType.PREMIUM || status == SubscriptionType.PREMIUM_CANCELED;
+            var legacyStatus = GetUserSubscriptionStatus(clientId, user);
+            var status = GetUserSubscriptionPlan(clientId, user);
+            if (legacyStatus == null && status == null) return false;
+            return legacyStatus == SubscriptionType.PREMIUM ||
+                    legacyStatus == SubscriptionType.PREMIUM_CANCELED ||
+                    status == SubscriptionPlan.PRO ||
+                    status == SubscriptionPlan.EDUCATION ||
+                    status == SubscriptionPlan.BELIEVER;
         }
 
         public static Claim SubscriptionTypeToClaim(string clientId, SubscriptionType type)
