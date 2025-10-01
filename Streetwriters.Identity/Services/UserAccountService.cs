@@ -12,11 +12,11 @@ namespace Streetwriters.Identity.Services
 {
     public class UserAccountService(UserManager<User> userManager, IMFAService mfaService) : IUserAccountService
     {
-        public async Task<UserModel> GetUserAsync(string clientId, string userId)
+        public async Task<UserModel?> GetUserAsync(string clientId, string userId)
         {
             var user = await userManager.FindByIdAsync(userId);
             if (!await UserService.IsUserValidAsync(userManager, user, clientId))
-                throw new Exception($"Unable to find user with ID '{userId}'.");
+                return null;
 
             var claims = await userManager.GetClaimsAsync(user);
             var marketingConsentClaim = claims.FirstOrDefault((claim) => claim.Type == $"{clientId}:marketing_consent");
@@ -46,7 +46,7 @@ namespace Streetwriters.Identity.Services
         public async Task DeleteUserAsync(string clientId, string userId, string password)
         {
             var user = await userManager.FindByIdAsync(userId);
-            if (!await UserService.IsUserValidAsync(userManager, user, clientId)) throw new Exception($"User not found.");
+            if (!await UserService.IsUserValidAsync(userManager, user, clientId)) return;
 
             if (!await userManager.CheckPasswordAsync(user, password)) throw new Exception("Wrong password.");
 

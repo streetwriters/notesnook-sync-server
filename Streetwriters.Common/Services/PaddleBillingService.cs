@@ -58,7 +58,7 @@ namespace Streetwriters.Common.Services
             return await response.Content.ReadFromJsonAsync<ListTransactionsResponseV2>();
         }
 
-        public async Task<bool> RefundTransactionAsync(string transactionId, string transactionItemId, string reason = "")
+        public async Task<PaddleResponse?> RefundTransactionAsync(string transactionId, string transactionItemId, string reason = "")
         {
             var url = $"{PADDLE_BASE_URI}/adjustments";
             var response = await httpClient.PostAsync(url, JsonContent.Create(new Dictionary<string, object>
@@ -77,7 +77,7 @@ namespace Streetwriters.Common.Services
                 { "reason", reason },
                 { "transaction_id", transactionId }
             }));
-            return response.IsSuccessStatusCode;
+            return await response.Content.ReadFromJsonAsync<PaddleResponse>();
         }
 
         public async Task<SubscriptionPreviewResponse?> PreviewSubscriptionChangeAsync(string subscriptionId, string newProductId, bool isTrialing)
@@ -102,28 +102,28 @@ namespace Streetwriters.Common.Services
             return await response.Content.ReadFromJsonAsync<PaddleResponse>();
         }
 
-        public async Task<bool> CancelSubscriptionAsync(string subscriptionId)
+        public async Task<PaddleResponse?> CancelSubscriptionAsync(string subscriptionId)
         {
             var url = $"{PADDLE_BASE_URI}/subscriptions/{subscriptionId}/cancel";
             var response = await httpClient.PostAsync(url, JsonContent.Create(new { effective_from = "immediately" }));
-            return response.IsSuccessStatusCode;
+            return await response.Content.ReadFromJsonAsync<PaddleResponse>();
         }
 
-        public async Task<bool> PauseSubscriptionAsync(string subscriptionId)
+        public async Task<PaddleResponse?> PauseSubscriptionAsync(string subscriptionId)
         {
             var url = $"{PADDLE_BASE_URI}/subscriptions/{subscriptionId}/pause";
             var response = await httpClient.PostAsync(url, JsonContent.Create(new { }));
-            return response.IsSuccessStatusCode;
+            return await response.Content.ReadFromJsonAsync<PaddleResponse>();
         }
 
-        public async Task<bool> ResumeSubscriptionAsync(string subscriptionId)
+        public async Task<PaddleResponse?> ResumeSubscriptionAsync(string subscriptionId)
         {
             var url = $"{PADDLE_BASE_URI}/subscriptions/{subscriptionId}";
             var response = await httpClient.PatchAsync(url, JsonContent.Create(new Dictionary<string, string?>
             {
                 {"scheduled_change", null}
             }));
-            return response.IsSuccessStatusCode;
+            return await response.Content.ReadFromJsonAsync<PaddleResponse>();
         }
 
         public async Task<GetCustomerResponse?> FindCustomerFromTransactionAsync(string transactionId)
