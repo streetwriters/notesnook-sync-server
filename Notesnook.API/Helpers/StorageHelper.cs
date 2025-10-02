@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Notesnook.API.Models;
 using Streetwriters.Common.Enums;
@@ -33,6 +34,11 @@ namespace Notesnook.API.Helpers
             return MAX_STORAGE_PER_MONTH[subscription.Plan];
         }
 
+        public static long GetFileSizeLimitForPlan(Subscription subscription)
+        {
+            return MAX_FILE_SIZE[subscription.Plan];
+        }
+
         public static bool IsStorageLimitReached(Subscription subscription, Limit limit)
         {
             var storageLimit = GetStorageLimitForPlan(subscription);
@@ -44,6 +50,19 @@ namespace Notesnook.API.Helpers
         {
             var maxFileSize = MAX_FILE_SIZE[subscription.Plan];
             return fileSize > maxFileSize;
+        }
+
+        private static readonly string[] sizes = ["B", "KB", "MB", "GB", "TB"];
+        public static string FormatBytes(long size)
+        {
+            int order = 0;
+            while (size >= 1024 && order < sizes.Length - 1)
+            {
+                order++;
+                size = size / 1024;
+            }
+
+            return String.Format("{0:0.##} {1}", size, sizes[order]);
         }
     }
 }
