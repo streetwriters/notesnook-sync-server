@@ -160,14 +160,24 @@ namespace Notesnook.API.Services
             return this.GetPresignedURL(userId, name, HttpVerb.PUT);
         }
 
-        public string GetDownloadObjectUrl(string userId, string name)
+        public async Task<string?> GetDownloadObjectUrl(string userId, string name)
         {
+            var subscriptionService = await WampServers.SubscriptionServer.GetServiceAsync<IUserSubscriptionService>(SubscriptionServerTopics.UserSubscriptionServiceTopic);
+            var subscription = await subscriptionService.GetUserSubscriptionAsync(Clients.Notesnook.Id, userId);
+
+            var size = await GetObjectSizeAsync(userId, name);
+            if (StorageHelper.IsFileSizeExceeded(subscription, size))
+            {
+                var fileSizeLimit = StorageHelper.GetFileSizeLimitForPlan(subscription);
+                throw new Exception($"You cannot download files larger than {StorageHelper.FormatBytes(fileSizeLimit)} on this plan.");
+            }
+
             var url = this.GetPresignedURL(userId, name, HttpVerb.GET);
             if (url == null) return null;
             return url;
         }
 
-        public async Task<MultipartUploadMeta> StartMultipartUploadAsync(string userId, string name, int parts, string uploadId = null)
+        public async Task<MultipartUploadMeta> StartMultipartUploadAsync(string userId, string name, int parts, string? uploadId = null)
         {
             var objectName = GetFullObjectName(userId, name);
             if (userId == null || objectName == null) throw new Exception("Could not initiate multipart upload.");

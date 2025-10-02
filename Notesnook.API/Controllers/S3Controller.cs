@@ -86,7 +86,7 @@ namespace Notesnook.API.Controllers
 
 
         [HttpGet("multipart")]
-        public async Task<IActionResult> MultipartUpload([FromQuery] string name, [FromQuery] int parts, [FromQuery] string uploadId)
+        public async Task<IActionResult> MultipartUpload([FromQuery] string name, [FromQuery] int parts, [FromQuery] string? uploadId)
         {
             var userId = this.User.FindFirstValue("sub");
             try
@@ -122,12 +122,16 @@ namespace Notesnook.API.Controllers
         }
 
         [HttpGet]
-        public IActionResult Download([FromQuery] string name)
+        public async Task<IActionResult> Download([FromQuery] string name)
         {
-            var userId = this.User.FindFirstValue("sub");
-            var url = S3Service.GetDownloadObjectUrl(userId, name);
-            if (url == null) return BadRequest("Could not create signed url.");
-            return Ok(url);
+            try
+            {
+                var userId = this.User.FindFirstValue("sub");
+                var url = await S3Service.GetDownloadObjectUrl(userId, name);
+                if (url == null) return BadRequest("Could not create signed url.");
+                return Ok(url);
+            }
+            catch (Exception ex) { return BadRequest(ex.Message); }
         }
 
         [HttpHead]
