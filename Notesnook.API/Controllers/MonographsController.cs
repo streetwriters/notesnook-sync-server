@@ -294,7 +294,7 @@ namespace Notesnook.API.Controllers
             return Ok();
         }
 
-        private async Task MarkMonographForSyncAsync(string monographId, string deviceId)
+        private async Task MarkMonographForSyncAsync(string monographId, string? deviceId)
         {
             if (deviceId == null) return;
             var userId = this.User.FindFirstValue("sub");

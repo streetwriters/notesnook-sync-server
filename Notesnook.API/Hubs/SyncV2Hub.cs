@@ -22,6 +22,7 @@ using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Security.Claims;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
@@ -41,7 +42,7 @@ namespace Notesnook.API.Hubs
     {
         Task<bool> SendItems(SyncTransferItemV2 transferItem);
         Task<bool> SendVaultKey(EncryptedData vaultKey);
-        Task<bool> SendMonographs(IEnumerable<Monograph> monographs);
+        Task<bool> SendMonographs(IEnumerable<MonographMetadata> monographs);
         Task PushCompleted();
     }
 
@@ -259,11 +260,20 @@ namespace Notesnook.API.Hubs
                     var isSyncingMonographsForFirstTime = !device.HasInitialMonographsSync;
                     var unsyncedMonographs = ids.Where((id) => id.EndsWith(":monograph")).ToHashSet();
                     var unsyncedMonographIds = unsyncedMonographs.Select((id) => id.Split(":")[0]).ToArray();
-                    var userMonographs = isResetSync || isSyncingMonographsForFirstTime
-                        ? await Repositories.Monographs.FindAsync(m => m.UserId == userId)
-                        : await Repositories.Monographs.FindAsync(m => m.UserId == userId && unsyncedMonographIds.Contains(m.ItemId));
+                    Expression<Func<Monograph, bool>> filter = isResetSync || isSyncingMonographsForFirstTime
+                        ? (m => m.UserId == userId)
+                        : (m => m.UserId == userId && unsyncedMonographIds.Contains(m.ItemId));
+                    var userMonographs = await Repositories.Monographs.Collection.Find(filter).Project((m) => new MonographMetadata
+                    {
+                        DatePublished = m.DatePublished,
+                        Deleted = m.Deleted,
+                        Password = m.Password,
+                        SelfDestruct = m.SelfDestruct,
+                        Title = m.Title,
+                        ItemId = m.ItemId,
+                    }).ToListAsync();
 
-                    if (userMonographs.Any() && !await Clients.Caller.SendMonographs(userMonographs).WaitAsync(TimeSpan.FromMinutes(10)))
+                    if (userMonographs.Count > 0 && !await Clients.Caller.SendMonographs(userMonographs).WaitAsync(TimeSpan.FromMinutes(10)))
                         throw new HubException("Client rejected monographs.");
 
                     device.HasInitialMonographsSync = true;

@@ -24,68 +24,24 @@ using System.Runtime.Serialization;
 
 namespace Notesnook.API.Models
 {
-    public class ObjectWithId
+    public class MonographMetadata
     {
-        [BsonId]
-        [BsonIgnoreIfDefault]
-        [BsonRepresentation(BsonType.ObjectId)]
-        public string Id
-        {
-            get; set;
-        }
-
-        public string ItemId
-        {
-            get; set;
-        }
-    }
-
-    public class Monograph
-    {
-        public Monograph()
-        {
-            Id = ObjectId.GenerateNewId().ToString();
-        }
-
         [DataMember(Name = "id")]
         [JsonPropertyName("id")]
         [MessagePack.Key("id")]
-        public string ItemId
-        {
-            get; set;
-        }
-
-        [BsonId]
-        [BsonIgnoreIfDefault]
-        [BsonRepresentation(BsonType.ObjectId)]
-        [JsonIgnore]
-        [MessagePack.IgnoreMember]
-        public string Id
+        public required string ItemId
         {
             get; set;
         }
 
         [JsonPropertyName("title")]
-        public string Title { get; set; }
-
-        [JsonPropertyName("userId")]
-        public string? UserId { get; set; }
+        public required string Title { get; set; }
 
         [JsonPropertyName("selfDestruct")]
         public bool SelfDestruct { get; set; }
 
-        [JsonPropertyName("encryptedContent")]
-        public EncryptedData? EncryptedContent { get; set; }
-
         [JsonPropertyName("datePublished")]
         public long DatePublished { get; set; }
-
-        [JsonPropertyName("content")]
-        [BsonIgnore]
-        public string Content { get; set; }
-
-        [JsonIgnore]
-        public byte[]? CompressedContent { get; set; }
 
         [JsonPropertyName("password")]
         public EncryptedData? Password { get; set; }
