@@ -56,6 +56,13 @@ namespace Notesnook.API.Controllers
             if (!HttpContext.Request.Headers.ContentLength.HasValue) return BadRequest(new { error = "No Content-Length header found." });
 
             long fileSize = HttpContext.Request.Headers.ContentLength.Value;
+            if (fileSize == 0)
+            {
+                var uploadUrl = S3Service.GetUploadObjectUrl(userId, name);
+                if (uploadUrl == null) return BadRequest(new { error = "Could not create signed url." });
+                return Ok(uploadUrl);
+            }
+
             var subscriptionService = await WampServers.SubscriptionServer.GetServiceAsync<IUserSubscriptionService>(SubscriptionServerTopics.UserSubscriptionServiceTopic);
             var subscription = await subscriptionService.GetUserSubscriptionAsync(Clients.Notesnook.Id, userId);
 
