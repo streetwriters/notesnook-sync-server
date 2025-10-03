@@ -75,7 +75,7 @@ namespace Notesnook.API.Models
         public bool SelfDestruct { get; set; }
 
         [JsonPropertyName("encryptedContent")]
-        public EncryptedData EncryptedContent { get; set; }
+        public EncryptedData? EncryptedContent { get; set; }
 
         [JsonPropertyName("datePublished")]
         public long DatePublished { get; set; }
@@ -85,10 +85,10 @@ namespace Notesnook.API.Models
         public string Content { get; set; }
 
         [JsonIgnore]
-        public byte[] CompressedContent { get; set; }
+        public byte[]? CompressedContent { get; set; }
 
         [JsonPropertyName("password")]
-        public EncryptedData Password { get; set; }
+        public EncryptedData? Password { get; set; }
 
         [JsonPropertyName("deleted")]
         public bool Deleted { get; set; }

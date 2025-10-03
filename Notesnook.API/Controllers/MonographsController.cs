@@ -102,7 +102,7 @@ namespace Notesnook.API.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> PublishAsync([FromQuery] string deviceId, [FromBody] Monograph monograph)
+        public async Task<IActionResult> PublishAsync([FromQuery] string? deviceId, [FromBody] Monograph monograph)
         {
             try
             {
@@ -150,7 +150,7 @@ namespace Notesnook.API.Controllers
         }
 
         [HttpPatch]
-        public async Task<IActionResult> UpdateAsync([FromQuery] string deviceId, [FromBody] Monograph monograph)
+        public async Task<IActionResult> UpdateAsync([FromQuery] string? deviceId, [FromBody] Monograph monograph)
         {
             try
             {
@@ -265,7 +265,7 @@ namespace Notesnook.API.Controllers
         }
 
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteAsync([FromQuery] string deviceId, [FromRoute] string id)
+        public async Task<IActionResult> DeleteAsync([FromQuery] string? deviceId, [FromRoute] string id)
         {
             var monograph = await FindMonographAsync(id);
             if (monograph == null || monograph.Deleted)
