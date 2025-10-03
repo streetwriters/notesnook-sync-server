@@ -87,6 +87,7 @@ namespace Notesnook.API.Services
                     Plan = SubscriptionPlan.FREE,
                     UserId = response.UserId,
                     StartTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                    Timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
                 });
             }
 
