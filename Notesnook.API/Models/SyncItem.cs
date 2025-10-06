@@ -111,7 +111,7 @@ namespace Notesnook.API.Models
         public string Algorithm
         {
             get; set;
-        } = Algorithms.Default;
+        }
     }
 
     public class SyncItemBsonSerializer : SerializerBase<SyncItem>

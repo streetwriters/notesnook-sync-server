@@ -22,25 +22,36 @@ using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using MongoDB.Bson;
+using Notesnook.API.Authorization;
+using Notesnook.API.Interfaces;
 using Notesnook.API.Models;
+using Notesnook.API.Repositories;
 using Streetwriters.Common;
 using Streetwriters.Data.Repositories;
 
 namespace Notesnook.API.Controllers
 {
     [ApiController]
-    [Authorize]
     [Route("inbox")]
     public class InboxController : ControllerBase
     {
         private readonly Repository<InboxApiKey> InboxApiKey;
+        private readonly Repository<UserSettings> UserSetting;
+        private SyncItemsRepository InboxItems;
 
-        public InboxController(Repository<InboxApiKey> inboxApiKeysRepository)
+        public InboxController(
+            Repository<InboxApiKey> inboxApiKeysRepository,
+            Repository<UserSettings> userSettingsRepository,
+            ISyncItemsRepositoryAccessor syncItemsRepositoryAccessor)
         {
             InboxApiKey = inboxApiKeysRepository;
+            UserSetting = userSettingsRepository;
+            InboxItems = syncItemsRepositoryAccessor.InboxItems;
         }
 
         [HttpGet("api-keys")]
+        [Authorize(Policy = "Notesnook")]
         public async Task<IActionResult> GetApiKeysAsync()
         {
             var userId = User.FindFirstValue("sub");
@@ -57,6 +68,7 @@ namespace Notesnook.API.Controllers
         }
 
         [HttpPost("api-keys")]
+        [Authorize(Policy = "Notesnook")]
         public async Task<IActionResult> CreateApiKeyAsync([FromBody] InboxApiKey request)
         {
             var userId = User.FindFirstValue("sub");
@@ -96,6 +108,7 @@ namespace Notesnook.API.Controllers
         }
 
         [HttpDelete("api-keys/{apiKey}")]
+        [Authorize(Policy = "Notesnook")]
         public async Task<IActionResult> DeleteApiKeyAsync(string apiKey)
         {
             var userId = User.FindFirstValue("sub");
@@ -112,6 +125,75 @@ namespace Notesnook.API.Controllers
             catch (Exception ex)
             {
                 await Slogger<InboxController>.Error(nameof(DeleteApiKeyAsync), "Couldn't delete inbox api key.", userId, ex.ToString());
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
+        [HttpGet("public-encryption-key")]
+        [Authorize(Policy = InboxApiKeyAuthenticationDefaults.AuthenticationScheme)]
+        public async Task<IActionResult> GetPublicKeyAsync()
+        {
+            var userId = User.FindFirstValue("sub");
+            try
+            {
+                var userSetting = await UserSetting.FindOneAsync(u => u.UserId == userId);
+                if (string.IsNullOrWhiteSpace(userSetting?.InboxKeys?.Public))
+                {
+                    return BadRequest(new { error = "Inbox public key is not configured." });
+                }
+                return Ok(new { key = userSetting.InboxKeys.Public });
+            }
+            catch (Exception ex)
+            {
+                await Slogger<InboxController>.Error(nameof(GetPublicKeyAsync), "Couldn't get user's inbox's public key.", userId, ex.ToString());
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
+        [HttpPost("items")]
+        [Authorize(Policy = InboxApiKeyAuthenticationDefaults.AuthenticationScheme)]
+        public async Task<IActionResult> CreateInboxItemAsync([FromBody] InboxSyncItem request)
+        {
+            var userId = User.FindFirstValue("sub");
+            try
+            {
+                if (request.Key.Algorithm != Algorithms.XSAL_X25519_7)
+                {
+                    return BadRequest(new { error = $"Only {Algorithms.XSAL_X25519_7} is supported for inbox item password." });
+                }
+                if (string.IsNullOrWhiteSpace(request.Key.Cipher))
+                {
+                    return BadRequest(new { error = "Inbox item password cipher is required." });
+                }
+                if (request.Key.Length <= 0)
+                {
+                    return BadRequest(new { error = "Valid inbox item password length is required." });
+                }
+                if (request.Algorithm != Algorithms.Default)
+                {
+                    return BadRequest(new { error = $"Only {Algorithms.Default} is supported for inbox item." });
+                }
+                if (request.Version <= 0)
+                {
+                    return BadRequest(new { error = "Valid inbox item version is required." });
+                }
+                if (string.IsNullOrWhiteSpace(request.Cipher) || string.IsNullOrWhiteSpace(request.IV))
+                {
+                    return BadRequest(new { error = "Inbox item cipher and iv is required." });
+                }
+                if (request.Length <= 0)
+                {
+                    return BadRequest(new { error = "Valid inbox item length is required." });
+                }
+
+                request.UserId = userId;
+                request.ItemId = ObjectId.GenerateNewId().ToString();
+                await InboxItems.InsertAsync(request);
+                return Ok();
+            }
+            catch (Exception ex)
+            {
+                await Slogger<InboxController>.Error(nameof(CreateInboxItemAsync), "Couldn't create inbox item.", userId, ex.ToString());
                 return BadRequest(new { error = ex.Message });
             }
         }
