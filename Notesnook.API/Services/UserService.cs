@@ -118,7 +118,7 @@ namespace Notesnook.API.Services
             else
             {
                 var subscriptionService = await WampServers.SubscriptionServer.GetServiceAsync<IUserSubscriptionService>(SubscriptionServerTopics.UserSubscriptionServiceTopic);
-                subscription = await subscriptionService.GetUserSubscriptionAsync(Clients.Notesnook.Id, userId);
+                subscription = await subscriptionService.GetUserSubscriptionAsync(Clients.Notesnook.Id, userId) ?? throw new Exception("User subscription not found.");
             }
 
             var userSettings = await Repositories.UsersSettings.FindOneAsync((u) => u.UserId == user.UserId) ?? throw new Exception("User settings not found.");
