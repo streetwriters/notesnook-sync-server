@@ -43,6 +43,6 @@ namespace Streetwriters.Common.Messages
         public Message Message { get; set; }
 
         [JsonPropertyName("originTokenId")]
-        public string OriginTokenId { get; set; }
+        public string? OriginTokenId { get; set; }
     }
 }

@@ -28,7 +28,7 @@ using Streetwriters.Common.Interfaces;
 
 namespace Streetwriters.Common.Models
 {
-    public class Subscription : ISubscription
+    public class Subscription
     {
         public Subscription()
         {
@@ -41,16 +41,17 @@ namespace Streetwriters.Common.Models
         public string Id { get; set; }
 
         [JsonPropertyName("userId")]
-        public string UserId { get; set; }
+        public required string UserId { get; set; }
 
         [JsonIgnore]
-        public string OrderId { get; set; }
+        public string? OrderId { get; set; }
+
         [JsonIgnore]
-        public string SubscriptionId { get; set; }
+        public string? SubscriptionId { get; set; }
 
         [BsonRepresentation(BsonType.Int32)]
         [JsonPropertyName("appId")]
-        public ApplicationType AppId { get; set; }
+        public required ApplicationType AppId { get; set; }
 
         [JsonPropertyName("start")]
         public long StartDate { get; set; }
@@ -68,16 +69,16 @@ namespace Streetwriters.Common.Models
         public SubscriptionType Type { get; set; }
 
         [JsonPropertyName("cancelURL")]
-        public string CancelURL { get; set; }
+        public string? CancelURL { get; set; }
 
         [JsonPropertyName("updateURL")]
-        public string UpdateURL { get; set; }
+        public string? UpdateURL { get; set; }
 
         [JsonPropertyName("googlePurchaseToken")]
         public string? GooglePurchaseToken { get; set; }
 
         [JsonPropertyName("productId")]
-        public string ProductId { get; set; }
+        public string? ProductId { get; set; }
 
         [JsonIgnore]
         public int TrialExtensionCount { get; set; }
@@ -86,7 +87,7 @@ namespace Streetwriters.Common.Models
         public long TrialExpiryDate { get; set; }
 
         [JsonPropertyName("trialsAvailed")]
-        public SubscriptionPlan[] TrialsAvailed { get; set; }
+        public SubscriptionPlan[]? TrialsAvailed { get; set; }
 
         [JsonPropertyName("updatedAt")]
         public long UpdatedAt { get; set; }

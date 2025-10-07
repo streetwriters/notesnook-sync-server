@@ -20,7 +20,7 @@ namespace Notesnook.API.Models.Responses
         public InboxKeys? InboxKeys { get; set; }
 
         [JsonPropertyName("subscription")]
-        public ISubscription? Subscription { get; set; }
+        public Subscription? Subscription { get; set; }
 
         [JsonPropertyName("storageUsed")]
         public long StorageUsed { get; set; }
