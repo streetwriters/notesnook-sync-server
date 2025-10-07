@@ -38,9 +38,9 @@ namespace Notesnook.API.Interfaces
         SyncItemsRepository Colors { get; }
         SyncItemsRepository Vaults { get; }
         SyncItemsRepository Tags { get; }
-        SyncItemsRepository InboxItems { get; }
         Repository<UserSettings> UsersSettings { get; }
         Repository<Monograph> Monographs { get; }
         Repository<InboxApiKey> InboxApiKey { get; }
+        Repository<InboxSyncItem> InboxItems { get; }
     }
 }

@@ -43,6 +43,7 @@ namespace Notesnook.API.Hubs
         Task<bool> SendItems(SyncTransferItemV2 transferItem);
         Task<bool> SendVaultKey(EncryptedData vaultKey);
         Task<bool> SendMonographs(IEnumerable<MonographMetadata> monographs);
+        Task<bool> SendInboxItems(IEnumerable<InboxSyncItem> inboxItems);
         Task PushCompleted();
     }
 
@@ -197,15 +198,20 @@ namespace Notesnook.API.Hubs
 
         public async Task<SyncV2Metadata> RequestFetch(string deviceId)
         {
-            return await HandleRequestFetch(deviceId, false);
+            return await HandleRequestFetch(deviceId, false, false);
         }
 
         public async Task<SyncV2Metadata> RequestFetchV2(string deviceId)
         {
-            return await HandleRequestFetch(deviceId, true);
+            return await HandleRequestFetch(deviceId, true, false);
         }
 
-        private async Task<SyncV2Metadata> HandleRequestFetch(string deviceId, bool includeMonographs)
+        public async Task<SyncV2Metadata> RequestFetchV3(string deviceId)
+        {
+            return await HandleRequestFetch(deviceId, true, true);
+        }
+
+        private async Task<SyncV2Metadata> HandleRequestFetch(string deviceId, bool includeMonographs, bool includeInboxItems)
         {
             var userId = Context.User?.FindFirstValue("sub") ?? throw new HubException("Please login to sync.");
 
@@ -283,6 +289,19 @@ namespace Notesnook.API.Hubs
                         throw new HubException("Client rejected monographs.");
 
                     device.HasInitialMonographsSync = true;
+                }
+
+                if (includeInboxItems)
+                {
+                    var unsyncedInboxItems = ids.Where((id) => id.EndsWith(":inboxItems")).ToHashSet();
+                    var unsyncedInboxItemIds = unsyncedInboxItems.Select((id) => id.Split(":")[0]).ToArray();
+                    var userInboxItems = isResetSync
+                        ? await Repositories.InboxItems.FindAsync(m => m.UserId == userId)
+                        : await Repositories.InboxItems.FindAsync(m => m.UserId == userId && unsyncedInboxItemIds.Contains(m.ItemId));
+                    if (userInboxItems.Any() && !await Clients.Caller.SendInboxItems(userInboxItems).WaitAsync(TimeSpan.FromMinutes(10)))
+                    {
+                        throw new HubException("Client rejected inbox items.");
+                    }
                 }
 
                 deviceService.Reset();

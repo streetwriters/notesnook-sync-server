@@ -173,7 +173,8 @@ namespace Notesnook.API
             services.AddRepository<UserSettings>("user_settings", "notesnook")
                     .AddRepository<Monograph>("monographs", "notesnook")
                     .AddRepository<Announcement>("announcements", "notesnook")
-                    .AddRepository<InboxApiKey>(Collections.InboxApiKeysKey, "notesnook");
+                    .AddRepository<InboxApiKey>(Collections.InboxApiKeysKey, "notesnook")
+                    .AddRepository<InboxSyncItem>(Collections.InboxItems, "notesnook");
 
             services.AddMongoCollection(Collections.SettingsKey)
                     .AddMongoCollection(Collections.AttachmentsKey)
