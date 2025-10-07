@@ -43,19 +43,10 @@ namespace Notesnook.API.Controllers
     [ApiController]
     [Route("monographs")]
     [Authorize("Sync")]
-    public class MonographsController : ControllerBase
+    public class MonographsController(Repository<Monograph> monographs, IURLAnalyzer analyzer) : ControllerBase
     {
         const string SVG_PIXEL = "<svg xmlns='http://www.w3.org/2000/svg' width='1' height='1'><circle r='9'/></svg>";
-        private Repository<Monograph> Monographs { get; set; }
-        private readonly IURLAnalyzer urlAnalyzer;
-        private readonly IUnitOfWork unit;
         private const int MAX_DOC_SIZE = 15 * 1024 * 1024;
-        public MonographsController(Repository<Monograph> monographs, IUnitOfWork unitOfWork, IURLAnalyzer analyzer)
-        {
-            Monographs = monographs;
-            unit = unitOfWork;
-            urlAnalyzer = analyzer;
-        }
 
         private static FilterDefinition<Monograph> CreateMonographFilter(string userId, Monograph monograph)
         {
@@ -85,7 +76,7 @@ namespace Notesnook.API.Controllers
 
         private async Task<Monograph> FindMonographAsync(string userId, Monograph monograph)
         {
-            var result = await Monographs.Collection.FindAsync(CreateMonographFilter(userId, monograph), new FindOptions<Monograph>
+            var result = await monographs.Collection.FindAsync(CreateMonographFilter(userId, monograph), new FindOptions<Monograph>
             {
                 Limit = 1
             });
@@ -94,7 +85,7 @@ namespace Notesnook.API.Controllers
 
         private async Task<Monograph> FindMonographAsync(string itemId)
         {
-            var result = await Monographs.Collection.FindAsync(CreateMonographFilter(itemId), new FindOptions<Monograph>
+            var result = await monographs.Collection.FindAsync(CreateMonographFilter(itemId), new FindOptions<Monograph>
             {
                 Limit = 1
             });
@@ -107,13 +98,11 @@ namespace Notesnook.API.Controllers
             try
             {
                 var userId = this.User.FindFirstValue("sub");
+                var jti = this.User.FindFirstValue("jti");
                 if (userId == null) return Unauthorized();
 
                 var existingMonograph = await FindMonographAsync(userId, monograph);
-                if (existingMonograph != null && !existingMonograph.Deleted)
-                {
-                    return base.Conflict("This monograph is already published.");
-                }
+                if (existingMonograph != null && !existingMonograph.Deleted) return await UpdateAsync(deviceId, monograph);
 
                 if (monograph.EncryptedContent == null)
                     monograph.CompressedContent = (await CleanupContentAsync(monograph.Content)).CompressBrotli();
@@ -125,16 +114,16 @@ namespace Notesnook.API.Controllers
 
                 if (existingMonograph != null)
                 {
-                    monograph.Id = existingMonograph?.Id;
+                    monograph.Id = existingMonograph.Id;
                 }
                 monograph.Deleted = false;
-                await Monographs.Collection.ReplaceOneAsync(
+                await monographs.Collection.ReplaceOneAsync(
                     CreateMonographFilter(userId, monograph),
                     monograph,
                     new ReplaceOptions { IsUpsert = true }
                 );
 
-                await MarkMonographForSyncAsync(monograph.ItemId ?? monograph.Id, deviceId);
+                await MarkMonographForSyncAsync(userId, monograph.ItemId ?? monograph.Id, deviceId, jti);
 
                 return Ok(new
                 {
@@ -155,6 +144,7 @@ namespace Notesnook.API.Controllers
             try
             {
                 var userId = this.User.FindFirstValue("sub");
+                var jti = this.User.FindFirstValue("jti");
                 if (userId == null) return Unauthorized();
 
                 var existingMonograph = await FindMonographAsync(userId, monograph);
@@ -172,7 +162,7 @@ namespace Notesnook.API.Controllers
                     monograph.Content = null;
 
                 monograph.DatePublished = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                var result = await Monographs.Collection.UpdateOneAsync(
+                var result = await monographs.Collection.UpdateOneAsync(
                     CreateMonographFilter(userId, monograph),
                     Builders<Monograph>.Update
                     .Set(m => m.DatePublished, monograph.DatePublished)
@@ -184,7 +174,7 @@ namespace Notesnook.API.Controllers
                 );
                 if (!result.IsAcknowledged) return BadRequest();
 
-                await MarkMonographForSyncAsync(monograph.ItemId ?? monograph.Id, deviceId);
+                await MarkMonographForSyncAsync(userId, monograph.ItemId ?? monograph.Id, deviceId, jti);
 
                 return Ok(new
                 {
@@ -205,7 +195,7 @@ namespace Notesnook.API.Controllers
             var userId = this.User.FindFirstValue("sub");
             if (userId == null) return Unauthorized();
 
-            var monographs = (await Monographs.Collection.FindAsync(
+            var userMonographs = (await monographs.Collection.FindAsync(
                     Builders<Monograph>.Filter.And(
                         Builders<Monograph>.Filter.Eq("UserId", userId),
                         Builders<Monograph>.Filter.Ne("Deleted", true)
@@ -214,7 +204,7 @@ namespace Notesnook.API.Controllers
                {
                    Projection = Builders<Monograph>.Projection.Include("_id").Include("ItemId"),
                })).ToEnumerable();
-            return Ok(monographs.Select((m) => m.ItemId ?? m.Id));
+            return Ok(userMonographs.Select((m) => m.ItemId ?? m.Id));
         }
 
         [HttpGet("{id}")]
@@ -232,8 +222,8 @@ namespace Notesnook.API.Controllers
             }
 
             if (monograph.EncryptedContent == null)
-                monograph.Content = monograph.CompressedContent.DecompressBrotli();
-            if (monograph.ItemId == null) monograph.ItemId = monograph.Id;
+                monograph.Content = monograph.CompressedContent?.DecompressBrotli();
+            monograph.ItemId ??= monograph.Id;
             return Ok(monograph);
         }
 
@@ -246,9 +236,8 @@ namespace Notesnook.API.Controllers
 
             if (monograph.SelfDestruct)
             {
-                var userId = this.User.FindFirstValue("sub");
-                await Monographs.Collection.ReplaceOneAsync(
-                    CreateMonographFilter(userId, monograph),
+                await monographs.Collection.ReplaceOneAsync(
+                    CreateMonographFilter(monograph.UserId, monograph),
                     new Monograph
                     {
                         ItemId = id,
@@ -258,7 +247,7 @@ namespace Notesnook.API.Controllers
                     }
                 );
 
-                await MarkMonographForSyncAsync(id);
+                await MarkMonographForSyncAsync(monograph.UserId, id);
             }
 
             return Content(SVG_PIXEL, "image/svg+xml");
@@ -267,18 +256,16 @@ namespace Notesnook.API.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteAsync([FromQuery] string? deviceId, [FromRoute] string id)
         {
+            var userId = this.User.FindFirstValue("sub");
+            if (userId is null) return Unauthorized();
+
             var monograph = await FindMonographAsync(id);
             if (monograph == null || monograph.Deleted)
-            {
-                return NotFound(new
-                {
-                    error = "invalid_id",
-                    error_description = $"No such monograph found."
-                });
-            }
+                return Ok();
 
-            var userId = this.User.FindFirstValue("sub");
-            await Monographs.Collection.ReplaceOneAsync(
+            var jti = this.User.FindFirstValue("jti");
+
+            await monographs.Collection.ReplaceOneAsync(
                 CreateMonographFilter(userId, monograph),
                 new Monograph
                 {
@@ -289,33 +276,27 @@ namespace Notesnook.API.Controllers
                 }
             );
 
-            await MarkMonographForSyncAsync(id, deviceId);
+            await MarkMonographForSyncAsync(userId, id, deviceId, jti);
 
             return Ok();
         }
 
-        private async Task MarkMonographForSyncAsync(string monographId, string? deviceId)
+        private static async Task MarkMonographForSyncAsync(string userId, string monographId, string? deviceId, string? jti)
         {
             if (deviceId == null) return;
-            var userId = this.User.FindFirstValue("sub");
 
             new SyncDeviceService(new SyncDevice(userId, deviceId)).AddIdsToOtherDevices([$"{monographId}:monograph"]);
-            await SendTriggerSyncEventAsync();
+            await SendTriggerSyncEventAsync(userId, jti);
         }
 
-        private async Task MarkMonographForSyncAsync(string monographId)
+        private static async Task MarkMonographForSyncAsync(string userId, string monographId)
         {
-            var userId = this.User.FindFirstValue("sub");
-
             new SyncDeviceService(new SyncDevice(userId, string.Empty)).AddIdsToAllDevices([$"{monographId}:monograph"]);
-            await SendTriggerSyncEventAsync(sendToAllDevices: true);
+            await SendTriggerSyncEventAsync(userId, sendToAllDevices: true);
         }
 
-        private async Task SendTriggerSyncEventAsync(bool sendToAllDevices = false)
+        private static async Task SendTriggerSyncEventAsync(string userId, string? jti = null, bool sendToAllDevices = false)
         {
-            var userId = this.User.FindFirstValue("sub");
-            var jti = this.User.FindFirstValue("jti");
-
             await WampServers.MessengerServer.PublishMessageAsync(MessengerServerTopics.SendSSETopic, new SendSSEMessage
             {
                 OriginTokenId = sendToAllDevices ? null : jti,
@@ -355,7 +336,7 @@ namespace Notesnook.API.Controllers
                     {
                         var href = element.GetAttribute("href");
                         if (string.IsNullOrEmpty(href)) continue;
-                        if (!await urlAnalyzer.IsURLSafeAsync(href)) element.RemoveAttribute("href");
+                        if (!await analyzer.IsURLSafeAsync(href)) element.RemoveAttribute("href");
                     }
                     html = document.ToHtml();
                 }
