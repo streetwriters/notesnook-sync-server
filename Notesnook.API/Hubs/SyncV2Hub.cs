@@ -260,9 +260,15 @@ namespace Notesnook.API.Hubs
                     var isSyncingMonographsForFirstTime = !device.HasInitialMonographsSync;
                     var unsyncedMonographs = ids.Where((id) => id.EndsWith(":monograph")).ToHashSet();
                     var unsyncedMonographIds = unsyncedMonographs.Select((id) => id.Split(":")[0]).ToArray();
-                    Expression<Func<Monograph, bool>> filter = isResetSync || isSyncingMonographsForFirstTime
-                        ? (m => m.UserId == userId)
-                        : (m => m.UserId == userId && unsyncedMonographIds.Contains(m.ItemId));
+                    FilterDefinition<Monograph> filter = isResetSync || isSyncingMonographsForFirstTime
+                        ? Builders<Monograph>.Filter.Eq("UserId", userId)
+                        : Builders<Monograph>.Filter.And(
+                            Builders<Monograph>.Filter.Eq("UserId", userId),
+                            Builders<Monograph>.Filter.Or(
+                                Builders<Monograph>.Filter.In("ItemId", unsyncedMonographIds),
+                                Builders<Monograph>.Filter.In("_id", unsyncedMonographIds)
+                            )
+                        );
                     var userMonographs = await Repositories.Monographs.Collection.Find(filter).Project((m) => new MonographMetadata
                     {
                         DatePublished = m.DatePublished,
@@ -270,7 +276,7 @@ namespace Notesnook.API.Hubs
                         Password = m.Password,
                         SelfDestruct = m.SelfDestruct,
                         Title = m.Title,
-                        ItemId = m.ItemId,
+                        ItemId = m.ItemId ?? m.Id.ToString(),
                     }).ToListAsync();
 
                     if (userMonographs.Count > 0 && !await Clients.Caller.SendMonographs(userMonographs).WaitAsync(TimeSpan.FromMinutes(10)))
