@@ -112,13 +112,7 @@ namespace Notesnook.API
                     policy.RequireAuthenticatedUser();
                     policy.Requirements.Add(new SyncRequirement());
                 });
-                options.AddPolicy("Pro", policy =>
-                {
-                    policy.AuthenticationSchemes.Add("introspection");
-                    policy.RequireAuthenticatedUser();
-                    policy.Requirements.Add(new SyncRequirement());
-                    policy.Requirements.Add(new ProUserRequirement());
-                });
+
                 options.AddPolicy(InboxApiKeyAuthenticationDefaults.AuthenticationScheme, policy =>
                 {
                     policy.AuthenticationSchemes.Add(InboxApiKeyAuthenticationDefaults.AuthenticationScheme);
