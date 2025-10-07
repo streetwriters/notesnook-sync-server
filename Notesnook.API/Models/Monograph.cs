@@ -82,7 +82,7 @@ namespace Notesnook.API.Models
 
         [JsonPropertyName("content")]
         [BsonIgnore]
-        public string Content { get; set; }
+        public string? Content { get; set; }
 
         [JsonIgnore]
         public byte[]? CompressedContent { get; set; }
