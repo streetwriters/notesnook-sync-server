@@ -230,7 +230,7 @@ namespace Notesnook.API.Services
             if (userId == null || objectName == null) throw new Exception("Could not abort multipart upload.");
 
             var subscriptionService = await WampServers.SubscriptionServer.GetServiceAsync<IUserSubscriptionService>(SubscriptionServerTopics.UserSubscriptionServiceTopic);
-            var subscription = await subscriptionService.GetUserSubscriptionAsync(Clients.Notesnook.Id, userId);
+            var subscription = await subscriptionService.GetUserSubscriptionAsync(Clients.Notesnook.Id, userId) ?? throw new Exception("User subscription not found.");
 
             long fileSize = await GetMultipartUploadSizeAsync(userId, uploadRequest.Key, uploadRequest.UploadId);
             if (StorageHelper.IsFileSizeExceeded(subscription, fileSize))
