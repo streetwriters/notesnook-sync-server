@@ -65,6 +65,7 @@ namespace Notesnook.API.Controllers
 
             var subscriptionService = await WampServers.SubscriptionServer.GetServiceAsync<IUserSubscriptionService>(SubscriptionServerTopics.UserSubscriptionServiceTopic);
             var subscription = await subscriptionService.GetUserSubscriptionAsync(Clients.Notesnook.Id, userId);
+            if (subscription is null) return BadRequest(new { error = "User subscription not found." });
 
             if (StorageHelper.IsFileSizeExceeded(subscription, fileSize))
             {
@@ -82,6 +83,7 @@ namespace Notesnook.API.Controllers
 
             var httpClient = new HttpClient();
             var content = new StreamContent(HttpContext.Request.BodyReader.AsStream());
+            content.Headers.ContentLength = Request.ContentLength;
             var response = await httpClient.SendRequestAsync<Response>(url, null, HttpMethod.Put, content);
             if (!response.Success) return BadRequest(await response.Content.ReadAsStringAsync());
 
