@@ -10,8 +10,8 @@
 name: Publish Docker images
 
 on:
-  release:
-    types: [published]
+  tags:
+    - "v*"
 
 jobs:
   push_to_registry:
