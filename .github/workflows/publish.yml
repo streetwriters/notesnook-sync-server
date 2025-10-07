@@ -10,8 +10,9 @@
 name: Publish Docker images
 
 on:
-  tags:
-    - "v*"
+  push:
+    tags:
+      - "v*"
 
 jobs:
   push_to_registry:
