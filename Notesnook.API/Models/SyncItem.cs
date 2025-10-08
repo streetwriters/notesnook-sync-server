@@ -44,7 +44,7 @@ namespace Notesnook.API.Models
         [DataMember(Name = "userId")]
         [JsonPropertyName("userId")]
         [MessagePack.Key("userId")]
-        public string UserId
+        public string? UserId
         {
             get; set;
         }
@@ -71,7 +71,7 @@ namespace Notesnook.API.Models
         [DataMember(Name = "id")]
         [JsonPropertyName("id")]
         [MessagePack.Key("id")]
-        public string ItemId
+        public string? ItemId
         {
             get; set;
         }
