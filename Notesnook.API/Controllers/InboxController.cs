@@ -19,15 +19,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
 using System.Security.Claims;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MongoDB.Bson;
 using Notesnook.API.Authorization;
-using Notesnook.API.Interfaces;
 using Notesnook.API.Models;
-using Notesnook.API.Repositories;
+using Notesnook.API.Services;
 using Streetwriters.Common;
+using Streetwriters.Common.Messages;
 using Streetwriters.Data.Repositories;
 
 namespace Notesnook.API.Controllers
@@ -38,16 +39,16 @@ namespace Notesnook.API.Controllers
     {
         private readonly Repository<InboxApiKey> InboxApiKey;
         private readonly Repository<UserSettings> UserSetting;
-        private SyncItemsRepository InboxItems;
+        private Repository<InboxSyncItem> InboxItems;
 
         public InboxController(
             Repository<InboxApiKey> inboxApiKeysRepository,
             Repository<UserSettings> userSettingsRepository,
-            ISyncItemsRepositoryAccessor syncItemsRepositoryAccessor)
+            Repository<InboxSyncItem> inboxItemsRepository)
         {
             InboxApiKey = inboxApiKeysRepository;
             UserSetting = userSettingsRepository;
-            InboxItems = syncItemsRepositoryAccessor.InboxItems;
+            InboxItems = inboxItemsRepository;
         }
 
         [HttpGet("api-keys")]
@@ -189,6 +190,18 @@ namespace Notesnook.API.Controllers
                 request.UserId = userId;
                 request.ItemId = ObjectId.GenerateNewId().ToString();
                 await InboxItems.InsertAsync(request);
+                new SyncDeviceService(new SyncDevice(userId, string.Empty))
+                    .AddIdsToAllDevices([$"{request.ItemId}:inboxItems"]);
+                await WampServers.MessengerServer.PublishMessageAsync(MessengerServerTopics.SendSSETopic, new SendSSEMessage
+                {
+                    OriginTokenId = null,
+                    UserId = userId,
+                    Message = new Message
+                    {
+                        Type = "triggerSync",
+                        Data = JsonSerializer.Serialize(new { reason = "Inbox items updated." })
+                    }
+                });
                 return Ok();
             }
             catch (Exception ex)
