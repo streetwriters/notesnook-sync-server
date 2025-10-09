@@ -30,16 +30,18 @@ const RawInboxItemSchema = z.object({
 
 interface EncryptedInboxItem {
   v: 1;
-  key: Omit<EncryptedInboxItem, "key" | "iv" | "v">;
+  key: Omit<EncryptedInboxItem, "key" | "iv" | "v" | "salt">;
   iv: string;
   alg: string;
   cipher: string;
   length: number;
+  salt: string;
 }
 
 function encrypt(rawData: string, publicKey: string): EncryptedInboxItem {
   try {
     const password = sodium.crypto_aead_xchacha20poly1305_ietf_keygen();
+    const salt = sodium.randombytes_buf(sodium.crypto_pwhash_SALTBYTES);
     const nonce = sodium.randombytes_buf(
       sodium.crypto_aead_xchacha20poly1305_ietf_NPUBBYTES
     );
@@ -71,6 +73,7 @@ function encrypt(rawData: string, publicKey: string): EncryptedInboxItem {
       alg: `xcha-argon2i13-${base64_variants.URLSAFE_NO_PADDING}`,
       cipher: sodium.to_base64(cipher, base64_variants.URLSAFE_NO_PADDING),
       length: data.length,
+      salt: sodium.to_base64(salt, base64_variants.URLSAFE_NO_PADDING),
     };
   } catch (error) {
     throw new Error(`encryption failed: ${error}`);
