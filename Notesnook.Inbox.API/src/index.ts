@@ -30,16 +30,26 @@ const RawInboxItemSchema = z.object({
 
 interface EncryptedInboxItem {
   v: 1;
-  key: Omit<EncryptedInboxItem, "key" | "iv" | "v">;
+  key: Omit<EncryptedInboxItem, "key" | "iv" | "v" | "salt">;
   iv: string;
   alg: string;
   cipher: string;
   length: number;
+  salt: string;
 }
 
 function encrypt(rawData: string, publicKey: string): EncryptedInboxItem {
   try {
     const password = sodium.crypto_aead_xchacha20poly1305_ietf_keygen();
+    const saltBytes = sodium.randombytes_buf(sodium.crypto_pwhash_SALTBYTES);
+    const key = sodium.crypto_pwhash(
+      sodium.crypto_aead_xchacha20poly1305_ietf_KEYBYTES,
+      password,
+      saltBytes,
+      3, // operations limit
+      1024 * 1024 * 8, // memory limit (8MB)
+      sodium.crypto_pwhash_ALG_ARGON2I13
+    );
     const nonce = sodium.randombytes_buf(
       sodium.crypto_aead_xchacha20poly1305_ietf_NPUBBYTES
     );
@@ -49,19 +59,19 @@ function encrypt(rawData: string, publicKey: string): EncryptedInboxItem {
       null,
       null,
       nonce,
-      password
+      key
     );
     const inboxPublicKey = sodium.from_base64(
       publicKey,
       base64_variants.URLSAFE_NO_PADDING
     );
-    const encryptedPassword = sodium.crypto_box_seal(password, inboxPublicKey);
+    const encryptedKey = sodium.crypto_box_seal(key, inboxPublicKey);
 
     return {
       v: 1,
       key: {
         cipher: sodium.to_base64(
-          encryptedPassword,
+          encryptedKey,
           base64_variants.URLSAFE_NO_PADDING
         ),
         alg: `xsal-x25519-${base64_variants.URLSAFE_NO_PADDING}`,
@@ -71,6 +81,7 @@ function encrypt(rawData: string, publicKey: string): EncryptedInboxItem {
       alg: `xcha-argon2i13-${base64_variants.URLSAFE_NO_PADDING}`,
       cipher: sodium.to_base64(cipher, base64_variants.URLSAFE_NO_PADDING),
       length: data.length,
+      salt: sodium.to_base64(saltBytes, base64_variants.URLSAFE_NO_PADDING),
     };
   } catch (error) {
     throw new Error(`encryption failed: ${error}`);

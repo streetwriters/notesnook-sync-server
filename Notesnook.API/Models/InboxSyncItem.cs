@@ -35,6 +35,15 @@ namespace Notesnook.API.Models
         {
             get; set;
         }
+
+        [DataMember(Name = "salt")]
+        [JsonPropertyName("salt")]
+        [MessagePack.Key("salt")]
+        [Required]
+        public string Salt
+        {
+            get; set;
+        }
     }
 
     [MessagePack.MessagePackObject]
