@@ -63,20 +63,23 @@ namespace Notesnook.API.Controllers
                 return Ok(uploadUrl);
             }
 
-            var subscriptionService = await WampServers.SubscriptionServer.GetServiceAsync<IUserSubscriptionService>(SubscriptionServerTopics.UserSubscriptionServiceTopic);
-            var subscription = await subscriptionService.GetUserSubscriptionAsync(Clients.Notesnook.Id, userId);
-            if (subscription is null) return BadRequest(new { error = "User subscription not found." });
-
-            if (StorageHelper.IsFileSizeExceeded(subscription, fileSize))
-            {
-                return BadRequest(new { error = "Max file size exceeded." });
-            }
-
             var userSettings = await Repositories.UsersSettings.FindOneAsync((u) => u.UserId == userId);
-            userSettings.StorageLimit ??= new Limit { Value = 0, UpdatedAt = 0 };
-            userSettings.StorageLimit.Value += fileSize;
-            if (StorageHelper.IsStorageLimitReached(subscription, userSettings.StorageLimit))
-                return BadRequest(new { error = "Storage limit exceeded." });
+            if (!Constants.IS_SELF_HOSTED)
+            {
+                var subscriptionService = await WampServers.SubscriptionServer.GetServiceAsync<IUserSubscriptionService>(SubscriptionServerTopics.UserSubscriptionServiceTopic);
+                var subscription = await subscriptionService.GetUserSubscriptionAsync(Clients.Notesnook.Id, userId);
+                if (subscription is null) return BadRequest(new { error = "User subscription not found." });
+
+                if (StorageHelper.IsFileSizeExceeded(subscription, fileSize))
+                {
+                    return BadRequest(new { error = "Max file size exceeded." });
+                }
+
+                userSettings.StorageLimit ??= new Limit { Value = 0, UpdatedAt = 0 };
+                userSettings.StorageLimit.Value += fileSize;
+                if (StorageHelper.IsStorageLimitReached(subscription, userSettings.StorageLimit))
+                    return BadRequest(new { error = "Storage limit exceeded." });
+            }
 
             var url = S3Service.GetUploadObjectUrl(userId, name);
             if (url == null) return BadRequest(new { error = "Could not create signed url." });
@@ -87,8 +90,11 @@ namespace Notesnook.API.Controllers
             var response = await httpClient.SendRequestAsync<Response>(url, null, HttpMethod.Put, content);
             if (!response.Success) return BadRequest(await response.Content.ReadAsStringAsync());
 
-            userSettings.StorageLimit.UpdatedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            await Repositories.UsersSettings.UpsertAsync(userSettings, (u) => u.UserId == userId);
+            if (!Constants.IS_SELF_HOSTED)
+            {
+                userSettings.StorageLimit.UpdatedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                await Repositories.UsersSettings.UpsertAsync(userSettings, (u) => u.UserId == userId);
+            }
 
             return Ok(response);
         }
