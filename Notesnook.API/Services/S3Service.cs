@@ -229,16 +229,6 @@ namespace Notesnook.API.Services
             var objectName = GetFullObjectName(userId, uploadRequest.Key);
             if (userId == null || objectName == null) throw new Exception("Could not abort multipart upload.");
 
-            var subscriptionService = await WampServers.SubscriptionServer.GetServiceAsync<IUserSubscriptionService>(SubscriptionServerTopics.UserSubscriptionServiceTopic);
-            var subscription = await subscriptionService.GetUserSubscriptionAsync(Clients.Notesnook.Id, userId) ?? throw new Exception("User subscription not found.");
-
-            long fileSize = await GetMultipartUploadSizeAsync(userId, uploadRequest.Key, uploadRequest.UploadId);
-            if (StorageHelper.IsFileSizeExceeded(subscription, fileSize))
-            {
-                await this.AbortMultipartUploadAsync(userId, uploadRequest.Key, uploadRequest.UploadId);
-                throw new Exception("Max file size exceeded.");
-            }
-
             var userSettings = await Repositories.UsersSettings.FindOneAsync((u) => u.UserId == userId);
             if (userSettings == null)
             {
@@ -246,12 +236,25 @@ namespace Notesnook.API.Services
                 throw new Exception("User settings not found.");
             }
 
-            userSettings.StorageLimit ??= new Limit { Value = 0, UpdatedAt = 0 };
-            userSettings.StorageLimit.Value += fileSize;
-            if (StorageHelper.IsStorageLimitReached(subscription, userSettings.StorageLimit))
+            if (!Constants.IS_SELF_HOSTED)
             {
-                await this.AbortMultipartUploadAsync(userId, uploadRequest.Key, uploadRequest.UploadId);
-                throw new Exception("Storage limit reached.");
+                var subscriptionService = await WampServers.SubscriptionServer.GetServiceAsync<IUserSubscriptionService>(SubscriptionServerTopics.UserSubscriptionServiceTopic);
+                var subscription = await subscriptionService.GetUserSubscriptionAsync(Clients.Notesnook.Id, userId) ?? throw new Exception("User subscription not found.");
+
+                long fileSize = await GetMultipartUploadSizeAsync(userId, uploadRequest.Key, uploadRequest.UploadId);
+                if (StorageHelper.IsFileSizeExceeded(subscription, fileSize))
+                {
+                    await this.AbortMultipartUploadAsync(userId, uploadRequest.Key, uploadRequest.UploadId);
+                    throw new Exception("Max file size exceeded.");
+                }
+
+                userSettings.StorageLimit ??= new Limit { Value = 0, UpdatedAt = 0 };
+                userSettings.StorageLimit.Value += fileSize;
+                if (StorageHelper.IsStorageLimitReached(subscription, userSettings.StorageLimit))
+                {
+                    await this.AbortMultipartUploadAsync(userId, uploadRequest.Key, uploadRequest.UploadId);
+                    throw new Exception("Storage limit reached.");
+                }
             }
 
             uploadRequest.Key = objectName;
@@ -259,8 +262,11 @@ namespace Notesnook.API.Services
             var response = await GetS3Client(S3ClientMode.INTERNAL).CompleteMultipartUploadAsync(uploadRequest);
             if (!IsSuccessStatusCode(((int)response.HttpStatusCode))) throw new Exception("Failed to complete multipart upload.");
 
-            userSettings.StorageLimit.UpdatedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            await Repositories.UsersSettings.UpsertAsync(userSettings, (u) => u.UserId == userId);
+            if (!Constants.IS_SELF_HOSTED)
+            {
+                userSettings.StorageLimit.UpdatedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                await Repositories.UsersSettings.UpsertAsync(userSettings, (u) => u.UserId == userId);
+            }
         }
 
         private string? GetPresignedURL(string userId, string name, HttpVerb httpVerb, S3ClientMode mode = S3ClientMode.EXTERNAL)

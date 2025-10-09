@@ -42,10 +42,10 @@ namespace Notesnook.API.Controllers
 
         [HttpGet("active")]
         [AllowAnonymous]
-        public async Task<IActionResult> GetActiveAnnouncements([FromQuery] string userId)
+        public async Task<IActionResult> GetActiveAnnouncements([FromQuery] string? userId)
         {
             var totalActive = await Announcements.Collection.CountDocumentsAsync(Builders<Announcement>.Filter.Eq("IsActive", true));
-            if (totalActive <= 0) return Ok(new Announcement[] { });
+            if (totalActive <= 0) return Ok(Array.Empty<Announcement>());
 
             var announcements = (await Announcements.FindAsync((a) => a.IsActive)).Where((a) => a.UserIds == null || a.UserIds.Length == 0 || a.UserIds.Contains(userId));
             foreach (var announcement in announcements)
