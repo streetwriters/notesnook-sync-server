@@ -160,6 +160,11 @@ namespace Notesnook.API.Services
             return this.GetPresignedURL(userId, name, HttpVerb.PUT);
         }
 
+        public string? GetInternalUploadObjectUrl(string userId, string name)
+        {
+            return this.GetPresignedURL(userId, name, HttpVerb.PUT, S3ClientMode.INTERNAL);
+        }
+
         public async Task<string?> GetDownloadObjectUrl(string userId, string name)
         {
             // var subscriptionService = await WampServers.SubscriptionServer.GetServiceAsync<IUserSubscriptionService>(SubscriptionServerTopics.UserSubscriptionServiceTopic);

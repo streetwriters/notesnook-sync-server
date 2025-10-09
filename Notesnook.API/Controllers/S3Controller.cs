@@ -81,7 +81,7 @@ namespace Notesnook.API.Controllers
                     return BadRequest(new { error = "Storage limit exceeded." });
             }
 
-            var url = S3Service.GetUploadObjectUrl(userId, name);
+            var url = S3Service.GetInternalUploadObjectUrl(userId, name);
             if (url == null) return BadRequest(new { error = "Could not create signed url." });
 
             var httpClient = new HttpClient();
