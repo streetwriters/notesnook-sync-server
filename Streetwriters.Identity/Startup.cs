@@ -235,25 +235,15 @@ namespace Streetwriters.Identity
             {
                 realm.Services.RegisterCallee(() => app.ApplicationServices.CreateScope().ServiceProvider.GetRequiredService<IUserAccountService>());
 
-                realm.Subscribe(SubscriptionServerTopics.CreateSubscriptionTopic, async (CreateSubscriptionMessage message) =>
+                realm.Subscribe(SubscriptionServerTopics.CreateSubscriptionTopic, async (Subscription subscription) =>
                 {
                     using (var serviceScope = app.ApplicationServices.CreateScope())
                     {
                         var services = serviceScope.ServiceProvider;
                         var userManager = services.GetRequiredService<UserManager<User>>();
-                        await MessageHandlers.CreateSubscription.Process(message, userManager);
+                        await MessageHandlers.CreateSubscription.Process(subscription, userManager);
                     }
                 });
-
-                realm.Subscribe(SubscriptionServerTopics.CreateSubscriptionV2Topic, async (CreateSubscriptionMessageV2 message) =>
-               {
-                   using (var serviceScope = app.ApplicationServices.CreateScope())
-                   {
-                       var services = serviceScope.ServiceProvider;
-                       var userManager = services.GetRequiredService<UserManager<User>>();
-                       await MessageHandlers.CreateSubscriptionV2.Process(message, userManager);
-                   }
-               });
 
                 realm.Subscribe(SubscriptionServerTopics.DeleteSubscriptionTopic, async (DeleteSubscriptionMessage message) =>
                 {

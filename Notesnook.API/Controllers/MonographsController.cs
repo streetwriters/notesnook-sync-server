@@ -105,7 +105,7 @@ namespace Notesnook.API.Controllers
                 if (existingMonograph != null && !existingMonograph.Deleted) return await UpdateAsync(deviceId, monograph);
 
                 if (monograph.EncryptedContent == null)
-                    monograph.CompressedContent = (await CleanupContentAsync(monograph.Content)).CompressBrotli();
+                    monograph.CompressedContent = (await CleanupContentAsync(User, monograph.Content)).CompressBrotli();
                 monograph.UserId = userId;
                 monograph.DatePublished = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
@@ -157,7 +157,7 @@ namespace Notesnook.API.Controllers
                     return base.BadRequest("Monograph is too big. Max allowed size is 15mb.");
 
                 if (monograph.EncryptedContent == null)
-                    monograph.CompressedContent = (await CleanupContentAsync(monograph.Content)).CompressBrotli();
+                    monograph.CompressedContent = (await CleanupContentAsync(User, monograph.Content)).CompressBrotli();
                 else
                     monograph.Content = null;
 
@@ -309,25 +309,15 @@ namespace Notesnook.API.Controllers
             });
         }
 
-        private async Task<string> CleanupContentAsync(string content)
+        private async Task<string> CleanupContentAsync(ClaimsPrincipal user, string content)
         {
+            if (Constants.IS_SELF_HOSTED) return content;
             try
             {
                 var json = JsonSerializer.Deserialize<MonographContent>(content);
                 var html = json.Data;
-                if (!Constants.IS_SELF_HOSTED && !User.IsUserSubscribed())
-                {
-                    var config = Configuration.Default.WithDefaultLoader();
-                    var context = BrowsingContext.New(config);
-                    var document = await context.OpenAsync(r => r.Content(html));
-                    foreach (var element in document.QuerySelectorAll("a,iframe,img,object,svg,button,link"))
-                    {
-                        element.Remove();
-                    }
-                    html = document.ToHtml();
-                }
 
-                if (User.IsUserSubscribed())
+                if (user.IsUserSubscribed())
                 {
                     var config = Configuration.Default.WithDefaultLoader();
                     var context = BrowsingContext.New(config);
@@ -336,7 +326,23 @@ namespace Notesnook.API.Controllers
                     {
                         var href = element.GetAttribute("href");
                         if (string.IsNullOrEmpty(href)) continue;
-                        if (!await analyzer.IsURLSafeAsync(href)) element.RemoveAttribute("href");
+                        if (!await analyzer.IsURLSafeAsync(href))
+                        {
+                            await Slogger<MonographsController>.Info("CleanupContentAsync", "Malicious URL detected: " + href);
+                            element.RemoveAttribute("href");
+                        }
+                    }
+                    html = document.ToHtml();
+                }
+                else
+                {
+                    var config = Configuration.Default.WithDefaultLoader();
+                    var context = BrowsingContext.New(config);
+                    var document = await context.OpenAsync(r => r.Content(html));
+                    foreach (var element in document.QuerySelectorAll("a,iframe,img,object,svg,button,link"))
+                    {
+                        foreach (var attr in element.Attributes)
+                            element.RemoveAttribute(attr.Name);
                     }
                     html = document.ToHtml();
                 }

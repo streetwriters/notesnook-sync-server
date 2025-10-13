@@ -9,5 +9,6 @@ namespace Streetwriters.Common.Interfaces
     {
         [WampProcedure("co.streetwriters.subscriptions.subscriptions.get_user_subscription")]
         Task<Subscription> GetUserSubscriptionAsync(string clientId, string userId);
+        Subscription TransformUserSubscription(Subscription subscription);
     }
 }

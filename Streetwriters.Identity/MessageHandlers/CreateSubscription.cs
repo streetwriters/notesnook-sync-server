@@ -30,20 +30,19 @@ namespace Streetwriters.Identity.MessageHandlers
 {
     public class CreateSubscription
     {
-        public static async Task Process(CreateSubscriptionMessage message, UserManager<User> userManager)
+        public static async Task Process(Subscription subscription, UserManager<User> userManager)
         {
-            var user = await userManager.FindByIdAsync(message.UserId);
-            var client = Clients.FindClientByAppId(message.AppId);
+            var user = await userManager.FindByIdAsync(subscription.UserId);
+            var client = Clients.FindClientByAppId(subscription.AppId);
             if (client == null || user == null) return;
 
             IdentityUserClaim<string> statusClaim = user.Claims.FirstOrDefault((c) => c.ClaimType == UserService.GetClaimKey(client.Id));
-            Claim subscriptionClaim = UserService.SubscriptionTypeToClaim(client.Id, message.Type);
+            Claim subscriptionClaim = UserService.SubscriptionPlanToClaim(client.Id, subscription);
             if (statusClaim?.ClaimValue == subscriptionClaim.Value) return;
             if (statusClaim != null)
                 await userManager.ReplaceClaimAsync(user, statusClaim.ToClaim(), subscriptionClaim);
-            // we no longer accept legacy subscriptions.
-            // else
-            //     await userManager.AddClaimAsync(user, subscriptionClaim);
+            else
+                await userManager.AddClaimAsync(user, subscriptionClaim);
         }
 
     }

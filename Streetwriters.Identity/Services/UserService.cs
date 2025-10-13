@@ -17,6 +17,7 @@ You should have received a copy of the Affero GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+using System;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
@@ -28,27 +29,6 @@ namespace Streetwriters.Identity.Services
 {
     public class UserService
     {
-        private static SubscriptionType? GetUserSubscriptionStatus(string clientId, User user)
-        {
-            var claimKey = GetClaimKey(clientId);
-            var status = user.Claims.FirstOrDefault((c) => c.ClaimType == claimKey).ClaimValue;
-            switch (status)
-            {
-                case "basic":
-                    return SubscriptionType.BASIC;
-                case "trial":
-                    return SubscriptionType.TRIAL;
-                case "premium":
-                    return SubscriptionType.PREMIUM;
-                case "premium_canceled":
-                    return SubscriptionType.PREMIUM_CANCELED;
-                case "premium_expired":
-                    return SubscriptionType.PREMIUM_EXPIRED;
-                default:
-                    return null;
-            }
-        }
-
         private static SubscriptionPlan? GetUserSubscriptionPlan(string clientId, User user)
         {
             var claimKey = GetClaimKey(clientId);
@@ -72,39 +52,23 @@ namespace Streetwriters.Identity.Services
 
         public static bool IsSMSMFAAllowed(string clientId, User user)
         {
-            var legacyStatus = GetUserSubscriptionStatus(clientId, user);
             var status = GetUserSubscriptionPlan(clientId, user);
-            if (legacyStatus == null && status == null) return false;
-            return legacyStatus == SubscriptionType.PREMIUM ||
-                    legacyStatus == SubscriptionType.PREMIUM_CANCELED ||
+            if (status == null) return false;
+            return status == SubscriptionPlan.LEGACY_PRO ||
                     status == SubscriptionPlan.PRO ||
                     status == SubscriptionPlan.EDUCATION ||
                     status == SubscriptionPlan.BELIEVER;
         }
 
-        public static Claim SubscriptionTypeToClaim(string clientId, SubscriptionType type)
+        public static Claim SubscriptionPlanToClaim(string clientId, Subscription subscription)
         {
             var claimKey = GetClaimKey(clientId);
-            switch (type)
-            {
-                case SubscriptionType.BASIC:
-                    return new Claim(claimKey, "basic");
-                case SubscriptionType.TRIAL:
-                    return new Claim(claimKey, "trial");
-                case SubscriptionType.PREMIUM:
-                    return new Claim(claimKey, "premium");
-                case SubscriptionType.PREMIUM_CANCELED:
-                    return new Claim(claimKey, "premium_canceled");
-                case SubscriptionType.PREMIUM_EXPIRED:
-                    return new Claim(claimKey, "premium_expired");
-            }
-            return null;
-        }
 
-        public static Claim SubscriptionPlanToClaim(string clientId, SubscriptionPlan plan)
-        {
-            var claimKey = GetClaimKey(clientId);
-            switch (plan)
+            // just in case
+            if (subscription.ExpiryDate <= DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+                return new Claim(claimKey, "free");
+
+            switch (subscription.Plan)
             {
                 case SubscriptionPlan.FREE:
                     return new Claim(claimKey, "free");
@@ -116,6 +80,8 @@ namespace Streetwriters.Identity.Services
                     return new Claim(claimKey, "essential");
                 case SubscriptionPlan.PRO:
                     return new Claim(claimKey, "pro");
+                case SubscriptionPlan.LEGACY_PRO:
+                    return new Claim(claimKey, "legacy_pro");
             }
             return null;
         }
