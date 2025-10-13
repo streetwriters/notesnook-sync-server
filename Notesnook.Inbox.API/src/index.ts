@@ -1,6 +1,7 @@
 import express from "express";
 import _sodium, { base64_variants } from "libsodium-wrappers-sumo";
 import { z } from "zod";
+import { rateLimit } from "express-rate-limit";
 
 const NOTESNOOK_API_SERVER_URL = process.env.NOTESNOOK_API_SERVER_URL;
 if (!NOTESNOOK_API_SERVER_URL) {
@@ -126,6 +127,12 @@ async function postEncryptedInboxItem(
 
 const app = express();
 app.use(express.json({ limit: "10mb" }));
+app.use(
+  rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 minute
+    limit: 60,
+  })
+);
 app.post("/inbox", async (req, res) => {
   try {
     const apiKey = req.headers["authorization"];
