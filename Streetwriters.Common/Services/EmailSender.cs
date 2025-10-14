@@ -28,8 +28,8 @@ namespace Streetwriters.Common.Services
             string email,
             EmailTemplate template,
             IClient client,
-            GnuPGContext gpgContext = null,
-            Dictionary<string, byte[]> attachments = null
+            GnuPGContext? gpgContext = null,
+            Dictionary<string, byte[]>? attachments = null
         )
         {
             if (!mailClient.IsConnected)
@@ -78,8 +78,8 @@ namespace Streetwriters.Common.Services
             EmailTemplate template,
             IClient client,
             MailboxAddress sender,
-            GnuPGContext gpgContext = null,
-            Dictionary<string, byte[]> attachments = null
+            GnuPGContext? gpgContext = null,
+            Dictionary<string, byte[]>? attachments = null
         )
         {
             var builder = new BodyBuilder();

@@ -43,7 +43,7 @@ namespace Notesnook.API.Authorization
             PathString path = context.Resource is DefaultHttpContext httpContext ? httpContext.Request.Path : null;
             var result = this.IsAuthorized(context.User, path);
             if (result.Succeeded) context.Succeed(requirement);
-            else if (result.AuthorizationFailure.FailureReasons.Any())
+            else if (result.AuthorizationFailure?.FailureReasons.Any() == true)
                 context.Fail(result.AuthorizationFailure.FailureReasons.First());
             else context.Fail();
 
@@ -63,11 +63,11 @@ namespace Notesnook.API.Authorization
                 return PolicyAuthorizationResult.Forbid(AuthorizationFailure.Failed(reason));
             }
 
-            var hasSyncScope = User.HasClaim("scope", "notesnook.sync");
-            var isInAudience = User.HasClaim("aud", "notesnook");
-            var hasRole = User.HasClaim("role", "notesnook");
+            var hasSyncScope = User?.HasClaim("scope", "notesnook.sync") ?? false;
+            var isInAudience = User?.HasClaim("aud", "notesnook") ?? false;
+            var hasRole = User?.HasClaim("role", "notesnook") ?? false;
 
-            var isEmailVerified = User.HasClaim("verified", "true");
+            var isEmailVerified = User?.HasClaim("verified", "true") ?? false;
 
             if (!isEmailVerified)
             {

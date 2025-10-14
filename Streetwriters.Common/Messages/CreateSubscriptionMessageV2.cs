@@ -28,7 +28,7 @@ namespace Streetwriters.Common.Messages
     public class CreateSubscriptionMessageV2
     {
         [JsonPropertyName("userId")]
-        public string UserId { get; set; }
+        public required string UserId { get; set; }
 
         [JsonPropertyName("provider")]
         public SubscriptionProvider Provider { get; set; }
@@ -49,13 +49,13 @@ namespace Streetwriters.Common.Messages
         public long ExpiryTime { get; set; }
 
         [JsonPropertyName("orderId")]
-        public string OrderId { get; set; }
+        public string? OrderId { get; set; }
 
         [JsonPropertyName("subscriptionId")]
-        public string SubscriptionId { get; set; }
+        public string? SubscriptionId { get; set; }
 
         [JsonPropertyName("productId")]
-        public string ProductId { get; set; }
+        public string? ProductId { get; set; }
 
         [JsonPropertyName("timestamp")]
         public long Timestamp { get; set; }

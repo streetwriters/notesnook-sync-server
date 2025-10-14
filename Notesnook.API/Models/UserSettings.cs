@@ -29,23 +29,23 @@ namespace Notesnook.API.Models
         public long UpdatedAt { get; set; }
     }
 
-    public class UserSettings : IUserSettings
+    public class UserSettings
     {
         public UserSettings()
         {
-            this.Id = ObjectId.GenerateNewId().ToString();
+            this.Id = ObjectId.GenerateNewId();
         }
-        public string UserId { get; set; }
+        public required string UserId { get; set; }
         public long LastSynced { get; set; }
-        public string Salt { get; set; }
+        public required string Salt { get; set; }
         public EncryptedData? VaultKey { get; set; }
         public EncryptedData? AttachmentsKey { get; set; }
         public EncryptedData? MonographPasswordsKey { get; set; }
         public InboxKeys? InboxKeys { get; set; }
-        public Limit StorageLimit { get; set; }
+        public Limit? StorageLimit { get; set; }
 
         [BsonId]
         [BsonRepresentation(BsonType.ObjectId)]
-        public string Id { get; set; }
+        public ObjectId Id { get; set; }
     }
 }

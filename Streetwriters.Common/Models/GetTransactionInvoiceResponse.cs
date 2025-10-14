@@ -10,12 +10,12 @@ namespace Streetwriters.Common.Models
     public class GetTransactionInvoiceResponse : PaddleResponse
     {
         [JsonPropertyName("data")]
-        public Invoice Invoice { get; set; }
+        public Invoice? Invoice { get; set; }
     }
 
     public partial class Invoice
     {
         [JsonPropertyName("url")]
-        public string Url { get; set; }
+        public string? Url { get; set; }
     }
 }

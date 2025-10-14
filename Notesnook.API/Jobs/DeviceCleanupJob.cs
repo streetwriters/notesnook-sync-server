@@ -7,7 +7,7 @@ namespace Notesnook.API.Jobs
 {
     public class DeviceCleanupJob : IJob
     {
-        public async Task Execute(IJobExecutionContext context)
+        public Task Execute(IJobExecutionContext context)
         {
             ParallelOptions parallelOptions = new()
             {
@@ -59,6 +59,7 @@ namespace Notesnook.API.Jobs
                     }
                 }
             });
+            return Task.CompletedTask;
         }
     }
 }

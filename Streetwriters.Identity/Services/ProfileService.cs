@@ -43,7 +43,7 @@ namespace Streetwriters.Identity.Services
 
         public async Task GetProfileDataAsync(ProfileDataRequestContext context)
         {
-            User user = await UserManager.GetUserAsync(context.Subject);
+            User? user = await UserManager.GetUserAsync(context.Subject);
             if (user == null) return;
 
             IList<string> roles = await UserManager.GetRolesAsync(user);

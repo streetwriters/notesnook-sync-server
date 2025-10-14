@@ -31,19 +31,13 @@ namespace Notesnook.API.Models
         [JsonPropertyName("key")]
         [MessagePack.Key("key")]
         [Required]
-        public EncryptedKey Key
-        {
-            get; set;
-        }
+        public required EncryptedKey Key { get; set; }
 
         [DataMember(Name = "salt")]
         [JsonPropertyName("salt")]
         [MessagePack.Key("salt")]
         [Required]
-        public string Salt
-        {
-            get; set;
-        }
+        public required string Salt { get; set; }
     }
 
     [MessagePack.MessagePackObject]
@@ -53,19 +47,13 @@ namespace Notesnook.API.Models
         [JsonPropertyName("alg")]
         [MessagePack.Key("alg")]
         [Required]
-        public string Algorithm
-        {
-            get; set;
-        }
+        public required string Algorithm { get; set; }
 
         [DataMember(Name = "cipher")]
         [JsonPropertyName("cipher")]
         [MessagePack.Key("cipher")]
         [Required]
-        public string Cipher
-        {
-            get; set;
-        }
+        public required string Cipher { get; set; }
 
         [JsonPropertyName("length")]
         [DataMember(Name = "length")]

@@ -43,9 +43,9 @@ namespace Streetwriters.Identity.Services
         {
             var result = await base.ProcessAsync(validationResult);
 
-            if (result.TryGetValue("sub", out object userId))
+            if (result.TryGetValue("sub", out object? userId) && userId != null)
             {
-                var user = await UserManager.FindByIdAsync(userId.ToString());
+                var user = await UserManager.FindByIdAsync(userId.ToString() ?? "");
                 if (user == null || user.Claims == null) return result;
 
                 var verifiedClaim = user.Claims.Find((c) => c.ClaimType == "verified");
@@ -57,7 +57,7 @@ namespace Streetwriters.Identity.Services
 
                 user.Claims.ForEach((claim) =>
                 {
-                    if (claim.ClaimType == "verified" || claim.ClaimType == "hcli") return;
+                    if (claim.ClaimType == null || claim.ClaimType == "verified" || claim.ClaimType == "hcli") return;
                     result.TryAdd(claim.ClaimType, claim.ClaimValue);
                 });
                 result.TryAdd("verified", user.EmailConfirmed.ToString().ToLowerInvariant());

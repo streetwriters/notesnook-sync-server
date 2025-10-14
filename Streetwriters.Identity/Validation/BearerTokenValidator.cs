@@ -33,7 +33,7 @@ namespace Streetwriters.Identity.Validation
         /// <returns></returns>
         public static BearerTokenUsageValidationResult ValidateAuthorizationHeader(HttpContext context)
         {
-            var authorizationHeader = context.Request.Headers["Authorization"].FirstOrDefault();
+            var authorizationHeader = context.Request.Headers.Authorization.FirstOrDefault();
             if (!string.IsNullOrEmpty(authorizationHeader))
             {
                 var header = authorizationHeader.Trim();

@@ -24,8 +24,10 @@ namespace Microsoft.AspNetCore.Identity
 {
     public static class UserManagerExtensions
     {
-        public static async Task<User> FindRegisteredUserAsync(this UserManager<User> userManager, string email, string clientId)
+        public static async Task<User?> FindRegisteredUserAsync(this UserManager<User> userManager, string? email, string clientId)
         {
+            if (email == null) return null;
+
             var user = await userManager.FindByEmailAsync(email);
             return user != null && await userManager.IsInRoleAsync(user, clientId) ? user : null;
         }

@@ -51,7 +51,7 @@ namespace Streetwriters.Identity.Controllers
             var client = Clients.FindClientById(User.FindFirstValue("client_id"));
             if (client == null) return BadRequest("Invalid client_id.");
 
-            var user = await UserManager.GetUserAsync(User);
+            var user = await UserManager.GetUserAsync(User) ?? throw new Exception("User not found.");
 
             try
             {
@@ -83,7 +83,7 @@ namespace Streetwriters.Identity.Controllers
         [HttpGet("codes")]
         public async Task<IActionResult> GetRecoveryCodes()
         {
-            var user = await UserManager.GetUserAsync(User);
+            var user = await UserManager.GetUserAsync(User) ?? throw new Exception("User not found.");
             if (!await UserManager.GetTwoFactorEnabledAsync(user)) return BadRequest("Please enable 2FA.");
             return Ok(await UserManager.GenerateNewTwoFactorRecoveryCodesAsync(user, 16));
         }
@@ -97,7 +97,7 @@ namespace Streetwriters.Identity.Controllers
             var client = Clients.FindClientById(User.FindFirstValue("client_id"));
             if (client == null) return BadRequest("Invalid client_id.");
 
-            var user = await UserManager.FindByIdAsync(User.FindFirstValue("sub"));
+            var user = await UserManager.GetUserAsync(User);
             if (user == null) return Ok(); // We cannot expose that the user doesn't exist.
 
             await MFAService.SendOTPAsync(user, client, new MultiFactorSetupForm
@@ -111,7 +111,7 @@ namespace Streetwriters.Identity.Controllers
         [HttpPatch]
         public async Task<IActionResult> EnableAuthenticator([FromForm] MultiFactorEnableForm form)
         {
-            var user = await UserManager.GetUserAsync(User);
+            var user = await UserManager.GetUserAsync(User) ?? throw new Exception("User not found.");
 
             if (!await MFAService.VerifyOTPAsync(user, form.VerificationCode, form.Type))
                 return BadRequest("Invalid verification code.");

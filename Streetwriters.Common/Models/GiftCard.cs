@@ -9,14 +9,14 @@ namespace Streetwriters.Common.Models
     {
         public GiftCard()
         {
-            Id = ObjectId.GenerateNewId().ToString();
+            Id = ObjectId.GenerateNewId();
         }
 
-        public string Code { get; set; }
-        public string OrderId { get; set; }
-        public string OrderIdType { get; set; }
-        public string ProductId { get; set; }
-        public string RedeemedBy { get; set; }
+        public required string Code { get; set; }
+        public required string OrderId { get; set; }
+        public required string OrderIdType { get; set; }
+        public required string ProductId { get; set; }
+        public string? RedeemedBy { get; set; }
         public long RedeemedAt { get; set; }
         public long Timestamp { get; set; }
         public long Term { get; set; }
@@ -24,6 +24,6 @@ namespace Streetwriters.Common.Models
         [BsonId]
         [BsonRepresentation(BsonType.ObjectId)]
         [JsonIgnore]
-        public string Id { get; set; }
+        public ObjectId Id { get; set; }
     }
 }

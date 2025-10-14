@@ -27,14 +27,14 @@ namespace Streetwriters.Identity.Models
     {
         [Required]
         [BindProperty(Name = "email")]
-        public string Email
+        public required string Email
         {
             get; set;
         }
 
         [Required]
         [BindProperty(Name = "client_id")]
-        public string ClientId
+        public required string ClientId
         {
             get; set;
         }

@@ -28,7 +28,7 @@ namespace Streetwriters.Identity.Models
         [Required]
         [StringLength(120, ErrorMessage = "Password must be longer than or equal to 8 characters.", MinimumLength = 8)]
         [BindProperty(Name = "password")]
-        public string Password
+        public required string Password
         {
             get; set;
         }
@@ -36,20 +36,20 @@ namespace Streetwriters.Identity.Models
         [Required]
         [BindProperty(Name = "email")]
         [EmailAddress]
-        public string Email
+        public required string Email
         {
             get; set;
         }
 
         [BindProperty(Name = "username")]
-        public string Username
+        public string? Username
         {
             get; set;
         }
 
         [Required]
         [BindProperty(Name = "client_id")]
-        public string ClientId
+        public required string ClientId
         {
             get; set;
         }

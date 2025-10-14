@@ -10,40 +10,40 @@ namespace Streetwriters.Common.Models
     public partial class SubscriptionPreviewResponse : PaddleResponse
     {
         [JsonPropertyName("data")]
-        public SubscriptionPreviewData Data { get; set; }
+        public SubscriptionPreviewData? Data { get; set; }
     }
 
     public partial class SubscriptionPreviewData
     {
         [JsonPropertyName("currency_code")]
-        public string CurrencyCode { get; set; }
+        public string? CurrencyCode { get; set; }
 
         [JsonPropertyName("billing_cycle")]
-        public BillingCycle BillingCycle { get; set; }
+        public BillingCycle? BillingCycle { get; set; }
 
         [JsonPropertyName("update_summary")]
-        public UpdateSummary UpdateSummary { get; set; }
+        public UpdateSummary? UpdateSummary { get; set; }
 
         [JsonPropertyName("immediate_transaction")]
-        public TransactionV2 ImmediateTransaction { get; set; }
+        public TransactionV2? ImmediateTransaction { get; set; }
 
         [JsonPropertyName("next_transaction")]
-        public TransactionV2 NextTransaction { get; set; }
+        public TransactionV2? NextTransaction { get; set; }
 
         [JsonPropertyName("recurring_transaction_details")]
-        public Details RecurringTransactionDetails { get; set; }
+        public Details? RecurringTransactionDetails { get; set; }
     }
 
     public partial class UpdateSummary
     {
         [JsonPropertyName("charge")]
-        public UpdateSummaryItem Charge { get; set; }
+        public UpdateSummaryItem? Charge { get; set; }
 
         [JsonPropertyName("credit")]
-        public UpdateSummaryItem Credit { get; set; }
+        public UpdateSummaryItem? Credit { get; set; }
 
         [JsonPropertyName("result")]
-        public UpdateSummaryItem Result { get; set; }
+        public UpdateSummaryItem? Result { get; set; }
     }
 
     public partial class UpdateSummaryItem

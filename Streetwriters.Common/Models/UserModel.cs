@@ -24,13 +24,13 @@ namespace Streetwriters.Common.Models
     public class UserModel
     {
         [JsonPropertyName("id")]
-        public string UserId { get; set; }
+        public required string UserId { get; set; }
 
         [JsonPropertyName("email")]
-        public string Email { get; set; }
+        public required string Email { get; set; }
 
         [JsonPropertyName("phoneNumber")]
-        public string PhoneNumber { get; set; }
+        public string? PhoneNumber { get; set; }
 
         [JsonPropertyName("isEmailConfirmed")]
         public bool IsEmailConfirmed { get; set; }
@@ -39,7 +39,7 @@ namespace Streetwriters.Common.Models
         public bool MarketingConsent { get; set; }
 
         [JsonPropertyName("mfa")]
-        public MFAConfig MFA { get; set; }
+        public required MFAConfig MFA { get; set; }
     }
 
 }

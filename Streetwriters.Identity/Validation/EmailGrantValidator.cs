@@ -64,20 +64,17 @@ namespace Streetwriters.Identity.Validation
         {
             var email = context.Request.Raw["email"];
             var clientId = context.Request.ClientId;
-            var user = await UserManager.FindRegisteredUserAsync(email, clientId);
-            if (user == null)
+            var user = await UserManager.FindRegisteredUserAsync(email, clientId) ?? new User
             {
-                user = new User
-                {
-                    Id = MongoDB.Bson.ObjectId.GenerateNewId(),
-                    Email = email,
-                    UserName = email,
-                    NormalizedEmail = email,
-                    NormalizedUserName = email,
-                    EmailConfirmed = false,
-                    SecurityStamp = ""
-                };
-            }
+                Id = MongoDB.Bson.ObjectId.GenerateNewId(),
+                Email = email,
+                UserName = email,
+                NormalizedEmail = email,
+                NormalizedUserName = email,
+                EmailConfirmed = false,
+                SecurityStamp = ""
+            };
+
             var isMultiFactor = await UserManager.GetTwoFactorEnabledAsync(user);
 
             var primaryMethod = isMultiFactor ? MFAService.GetPrimaryMethod(user) : MFAMethods.Email;
@@ -88,20 +85,13 @@ namespace Streetwriters.Identity.Validation
             {
                 ["additional_data"] = new MFARequiredResponse
                 {
-                    PhoneNumber = sendPhoneNumber ? Regex.Replace(user.PhoneNumber, @"\d(?!\d{0,3}$)", "*") : null,
+                    PhoneNumber = sendPhoneNumber && user.PhoneNumber != null ? Regex.Replace(user.PhoneNumber, @"\d(?!\d{0,3}$)", "*") : null,
                     PrimaryMethod = primaryMethod,
                     SecondaryMethod = secondaryMethod,
                 }
             };
             context.Result.IsError = false;
             context.Result.Subject = await TokenGenerationService.TransformTokenRequestAsync(context.Request, user, GrantType, new string[] { Config.MFA_GRANT_TYPE_SCOPE });
-        }
-
-
-        string Pluralize(int? value, string singular, string plural)
-        {
-            if (value == null) return $"0 {plural}";
-            return value == 1 ? $"{value} {singular}" : $"{value} {plural}";
         }
     }
 }

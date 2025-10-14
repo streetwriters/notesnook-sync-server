@@ -24,6 +24,6 @@ namespace Streetwriters.Identity.Models
     public class MFAPasswordRequiredResponse
     {
         [JsonPropertyName("token")]
-        public string Token { get; set; }
+        public required string Token { get; set; }
     }
 }

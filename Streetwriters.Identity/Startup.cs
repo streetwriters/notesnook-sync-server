@@ -263,7 +263,7 @@ namespace Streetwriters.Identity
             });
         }
 
-        private void AddOperationalStore(IServiceCollection services, TokenCleanupOptions tokenCleanUpOptions = null)
+        private static void AddOperationalStore(IServiceCollection services, TokenCleanupOptions? tokenCleanUpOptions = null)
         {
             BsonClassMap.RegisterClassMap<PersistedGrant>(cm =>
             {
@@ -279,7 +279,7 @@ namespace Streetwriters.Identity
             {
                 q.UseMicrosoftDependencyInjectionJobFactory();
 
-                if (tokenCleanUpOptions.Enable)
+                if (tokenCleanUpOptions?.Enable == true)
                 {
                     var jobKey = new JobKey("TokenCleanupJob");
                     q.AddJob<TokenCleanupJob>(opts => opts.WithIdentity(jobKey));

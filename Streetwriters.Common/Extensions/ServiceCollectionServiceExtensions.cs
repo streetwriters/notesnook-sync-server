@@ -27,7 +27,7 @@ namespace Streetwriters.Common.Extensions
     {
         public static IServiceCollection AddRepository<T>(this IServiceCollection services, string collectionName, string database) where T : class
         {
-            services.AddSingleton((provider) => MongoDbContext.GetMongoCollection<T>(provider.GetService<MongoDB.Driver.IMongoClient>(), database, collectionName));
+            services.AddSingleton((provider) => MongoDbContext.GetMongoCollection<T>(provider.GetRequiredService<MongoDB.Driver.IMongoClient>(), database, collectionName));
             services.AddScoped<Repository<T>>();
             return services;
         }

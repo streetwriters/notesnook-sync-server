@@ -30,16 +30,16 @@ namespace Streetwriters.Common
 {
     public class Server
     {
-        public Server(string originCertPath = null, string originCertKeyPath = null)
+        public Server(string? originCertPath = null, string? originCertKeyPath = null)
         {
             if (!string.IsNullOrEmpty(originCertPath) && !string.IsNullOrEmpty(originCertKeyPath))
                 this.SSLCertificate = X509Certificate2.CreateFromPemFile(originCertPath, originCertKeyPath);
         }
-        public string Id { get; set; }
+        public string? Id { get; set; }
         public int Port { get; set; }
-        public string Hostname { get; set; }
-        public Uri PublicURL { get; set; }
-        public X509Certificate2 SSLCertificate { get; }
+        public required string Hostname { get; set; }
+        public Uri? PublicURL { get; set; }
+        public X509Certificate2? SSLCertificate { get; }
         public bool IsSecure { get => this.SSLCertificate != null; }
 
         public override string ToString()
@@ -93,14 +93,14 @@ namespace Streetwriters.Common
         public static Server NotesnookAPI { get; } = new(Constants.NOTESNOOK_CERT_PATH, Constants.NOTESNOOK_CERT_KEY_PATH)
         {
             Port = Constants.NOTESNOOK_SERVER_PORT,
-            Hostname = Constants.NOTESNOOK_SERVER_HOST,
+            Hostname = Constants.NOTESNOOK_SERVER_HOST ?? "localhost",
             Id = "notesnook-sync"
         };
 
         public static Server MessengerServer { get; } = new(Constants.SSE_CERT_PATH, Constants.SSE_CERT_KEY_PATH)
         {
             Port = Constants.SSE_SERVER_PORT,
-            Hostname = Constants.SSE_SERVER_HOST,
+            Hostname = Constants.SSE_SERVER_HOST ?? "localhost",
             Id = "sse"
         };
 
@@ -108,14 +108,14 @@ namespace Streetwriters.Common
         {
             PublicURL = Constants.IDENTITY_SERVER_URL,
             Port = Constants.IDENTITY_SERVER_PORT,
-            Hostname = Constants.IDENTITY_SERVER_HOST,
+            Hostname = Constants.IDENTITY_SERVER_HOST ?? "localhost",
             Id = "auth"
         };
 
         public static Server SubscriptionServer { get; } = new(Constants.SUBSCRIPTIONS_CERT_PATH, Constants.SUBSCRIPTIONS_CERT_KEY_PATH)
         {
             Port = Constants.SUBSCRIPTIONS_SERVER_PORT,
-            Hostname = Constants.SUBSCRIPTIONS_SERVER_HOST,
+            Hostname = Constants.SUBSCRIPTIONS_SERVER_HOST ?? "localhost",
             Id = "subscription"
         };
     }

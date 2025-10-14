@@ -28,14 +28,14 @@ namespace Streetwriters.Identity.Models
         [DataType(DataType.Text)]
         [Display(Name = "Authenticator type")]
         [BindProperty(Name = "type")]
-        public string Type { get; set; }
+        public required string Type { get; set; }
 
         [Required]
         [StringLength(6, ErrorMessage = "The {0} must be at least {2} and at max {1} characters long.", MinimumLength = 6)]
         [DataType(DataType.Text)]
         [Display(Name = "Verification Code")]
         [BindProperty(Name = "code")]
-        public string VerificationCode { get; set; }
+        public required string VerificationCode { get; set; }
 
         [BindProperty(Name = "isFallback")]
         public bool IsFallback { get; set; }

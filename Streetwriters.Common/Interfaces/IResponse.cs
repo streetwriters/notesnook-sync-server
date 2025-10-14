@@ -25,6 +25,6 @@ namespace Streetwriters.Common.Interfaces
     {
         bool Success { get; set; }
         int StatusCode { get; set; }
-        HttpContent Content { get; set; }
+        HttpContent? Content { get; set; }
     }
 }

@@ -27,7 +27,7 @@ namespace Streetwriters.Common.Messages
     public class DeleteSubscriptionMessage
     {
         [JsonPropertyName("userId")]
-        public string UserId { get; set; }
+        public required string UserId { get; set; }
 
         [JsonPropertyName("appId")]
         public ApplicationType AppId { get; set; }

@@ -53,20 +53,14 @@ namespace Notesnook.API.Models
         [DataMember(Name = "iv")]
         [MessagePack.Key("iv")]
         [Required]
-        public string IV
-        {
-            get; set;
-        }
+        public string IV { get; set; } = string.Empty;
 
 
         [JsonPropertyName("cipher")]
         [DataMember(Name = "cipher")]
         [MessagePack.Key("cipher")]
         [Required]
-        public string Cipher
-        {
-            get; set;
-        }
+        public string Cipher { get; set; } = string.Empty;
 
         [DataMember(Name = "id")]
         [JsonPropertyName("id")]
@@ -108,10 +102,7 @@ namespace Notesnook.API.Models
         [DataMember(Name = "alg")]
         [MessagePack.Key("alg")]
         [Required]
-        public string Algorithm
-        {
-            get; set;
-        }
+        public string Algorithm { get; set; } = string.Empty;
     }
 
     public class SyncItemBsonSerializer : SerializerBase<SyncItem>

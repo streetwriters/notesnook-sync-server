@@ -10,7 +10,7 @@ namespace Streetwriters.Common.Models
     public partial class GetSubscriptionResponse : PaddleResponse
     {
         [JsonPropertyName("data")]
-        public Data Data { get; set; }
+        public Data? Data { get; set; }
     }
 
     public partial class Data
@@ -22,7 +22,7 @@ namespace Streetwriters.Common.Models
         // public string Status { get; set; }
 
         [JsonPropertyName("customer_id")]
-        public string CustomerId { get; set; }
+        public string? CustomerId { get; set; }
 
         // [JsonPropertyName("address_id")]
         // public string AddressId { get; set; }
@@ -64,7 +64,7 @@ namespace Streetwriters.Common.Models
         // public CurrentBillingPeriod CurrentBillingPeriod { get; set; }
 
         [JsonPropertyName("billing_cycle")]
-        public BillingCycle BillingCycle { get; set; }
+        public BillingCycle? BillingCycle { get; set; }
 
         // [JsonPropertyName("scheduled_change")]
         // public object ScheduledChange { get; set; }
@@ -76,7 +76,7 @@ namespace Streetwriters.Common.Models
         // public object CustomData { get; set; }
 
         [JsonPropertyName("management_urls")]
-        public ManagementUrls ManagementUrls { get; set; }
+        public ManagementUrls? ManagementUrls { get; set; }
 
         // [JsonPropertyName("discount")]
         // public object Discount { get; set; }
@@ -91,7 +91,7 @@ namespace Streetwriters.Common.Models
         public long Frequency { get; set; }
 
         [JsonPropertyName("interval")]
-        public string Interval { get; set; }
+        public string? Interval { get; set; }
     }
 
     // public partial class CurrentBillingPeriod
@@ -206,9 +206,9 @@ namespace Streetwriters.Common.Models
     public partial class ManagementUrls
     {
         [JsonPropertyName("update_payment_method")]
-        public Uri UpdatePaymentMethod { get; set; }
+        public Uri? UpdatePaymentMethod { get; set; }
 
         [JsonPropertyName("cancel")]
-        public Uri Cancel { get; set; }
+        public Uri? Cancel { get; set; }
     }
 }

@@ -15,7 +15,7 @@ namespace Streetwriters.Identity.Services
         public async Task<UserModel?> GetUserAsync(string clientId, string userId)
         {
             var user = await userManager.FindByIdAsync(userId);
-            if (!await UserService.IsUserValidAsync(userManager, user, clientId))
+            if (user == null || !await UserService.IsUserValidAsync(userManager, user, clientId))
                 return null;
 
             var claims = await userManager.GetClaimsAsync(user);
@@ -25,7 +25,9 @@ namespace Streetwriters.Identity.Services
             {
                 await mfaService.EnableMFAAsync(user, MFAMethods.Email);
                 user = await userManager.FindByIdAsync(userId);
+                ArgumentNullException.ThrowIfNull(user);
             }
+            ArgumentNullException.ThrowIfNull(user.Email);
 
             return new UserModel
             {
@@ -46,7 +48,7 @@ namespace Streetwriters.Identity.Services
         public async Task DeleteUserAsync(string clientId, string userId, string password)
         {
             var user = await userManager.FindByIdAsync(userId);
-            if (!await UserService.IsUserValidAsync(userManager, user, clientId)) return;
+            if (user == null || !await UserService.IsUserValidAsync(userManager, user, clientId)) return;
 
             if (!await userManager.CheckPasswordAsync(user, password)) throw new Exception("Wrong password.");
 

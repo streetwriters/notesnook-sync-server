@@ -5,9 +5,9 @@ namespace Notesnook.API.Models;
 
 public class CompleteMultipartUploadRequestWrapper
 {
-    public string Key { get; set; }
-    public List<PartETagWrapper> PartETags { get; set; }
-    public string UploadId { get; set; }
+    public required string Key { get; set; }
+    public required List<PartETagWrapper> PartETags { get; set; }
+    public required string UploadId { get; set; }
 
     public CompleteMultipartUploadRequest ToRequest()
     {

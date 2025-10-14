@@ -32,7 +32,7 @@ namespace Streetwriters.Identity.Services
         private static SubscriptionPlan? GetUserSubscriptionPlan(string clientId, User user)
         {
             var claimKey = GetClaimKey(clientId);
-            var status = user.Claims.FirstOrDefault((c) => c.ClaimType == claimKey).ClaimValue;
+            var status = user.Claims.FirstOrDefault((c) => c.ClaimType == claimKey)?.ClaimValue;
             switch (status)
             {
                 case "free":

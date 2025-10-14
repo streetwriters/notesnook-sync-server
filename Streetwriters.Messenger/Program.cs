@@ -51,7 +51,7 @@ namespace Streetwriters.Messenger
                     {
                         options.Limits.MaxRequestBodySize = long.MaxValue;
                         options.ListenAnyIP(Servers.MessengerServer.Port);
-                        if (Servers.MessengerServer.IsSecure)
+                        if (Servers.MessengerServer.IsSecure && Servers.MessengerServer.SSLCertificate != null)
                         {
                             options.ListenAnyIP(443, listenerOptions =>
                             {

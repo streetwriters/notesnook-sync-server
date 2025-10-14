@@ -35,6 +35,6 @@ namespace Streetwriters.Common.Models
         public SubscriptionProvider Provider { get; set; }
 
         [JsonPropertyName("code")]
-        public string Code { get; set; }
+        public required string Code { get; set; }
     }
 }

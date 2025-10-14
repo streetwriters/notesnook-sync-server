@@ -119,8 +119,8 @@ namespace Notesnook.API
                     policy.RequireAuthenticatedUser();
                 });
 
-                options.DefaultPolicy = options.GetPolicy("Notesnook");
-            }).AddSingleton<IAuthorizationMiddlewareResultHandler, AuthorizationResultTransformer>(); ;
+                options.DefaultPolicy = options.GetPolicy("Notesnook") ?? throw new Exception("Notesnook policy not found");
+            }).AddSingleton<IAuthorizationMiddlewareResultHandler, AuthorizationResultTransformer>();
 
             services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddOAuth2Introspection("introspection", options =>
@@ -138,13 +138,13 @@ namespace Notesnook.API
 
                 options.Events.OnTokenValidated = (context) =>
                 {
-                    if (long.TryParse(context.Principal.FindFirst("exp")?.Value, out long expiryTime))
+                    if (long.TryParse(context.Principal?.FindFirst("exp")?.Value, out long expiryTime))
                     {
                         context.Properties.ExpiresUtc = DateTimeOffset.FromUnixTimeSeconds(expiryTime);
                     }
                     context.Properties.AllowRefresh = true;
                     context.Properties.IsPersistent = true;
-                    context.HttpContext.User = context.Principal;
+                    context.HttpContext.User = context.Principal ?? throw new Exception("No principal found in token.");
                     return Task.CompletedTask;
                 };
                 options.CacheKeyGenerator = (options, token) => (token + ":" + "reference_token").Sha256();
@@ -289,11 +289,6 @@ namespace Notesnook.API
             {
                 endpoints.MapControllers();
                 endpoints.MapHealthChecks("/health");
-                endpoints.MapHub<SyncHub>("/hubs/sync", options =>
-                {
-                    options.CloseOnAuthenticationExpiration = false;
-                    options.Transports = HttpTransportType.WebSockets;
-                });
                 endpoints.MapHub<SyncV2Hub>("/hubs/sync/v2", options =>
                 {
                     options.CloseOnAuthenticationExpiration = false;
@@ -307,7 +302,7 @@ namespace Notesnook.API
     {
         public static IServiceCollection AddMongoCollection(this IServiceCollection services, string collectionName, string database = "notesnook")
         {
-            services.AddKeyedSingleton(collectionName, (provider, key) => MongoDbContext.GetMongoCollection<SyncItem>(provider.GetService<MongoDB.Driver.IMongoClient>(), database, collectionName));
+            services.AddKeyedSingleton(collectionName, (provider, key) => MongoDbContext.GetMongoCollection<SyncItem>(provider.GetRequiredService<MongoDB.Driver.IMongoClient>(), database, collectionName));
             return services;
         }
     }

@@ -129,7 +129,7 @@ namespace Streetwriters.Common.Services
         public async Task<GetCustomerResponse?> FindCustomerFromTransactionAsync(string transactionId)
         {
             var transaction = await GetTransactionAsync(transactionId);
-            if (transaction == null) return null;
+            if (transaction?.Transaction?.CustomerId == null) return null;
             var url = $"{PADDLE_BASE_URI}/customers/{transaction.Transaction.CustomerId}";
             var response = await httpClient.GetFromJsonAsync<GetCustomerResponse>(url);
             return response;

@@ -17,11 +17,13 @@ You should have received a copy of the Affero GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+using System;
+
 namespace Notesnook.API.Models
 {
     public class MultipartUploadMeta
     {
-        public string UploadId { get; set; }
-        public string[] Parts { get; set; }
+        public string UploadId { get; set; } = string.Empty;
+        public string[] Parts { get; set; } = Array.Empty<string>();
     }
 }

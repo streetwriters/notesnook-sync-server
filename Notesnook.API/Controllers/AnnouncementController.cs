@@ -57,7 +57,7 @@ namespace Notesnook.API.Controllers
                     if (item.Type != "callToActions") continue;
                     foreach (var action in item.Actions)
                     {
-                        if (action.Type != "link") continue;
+                        if (action.Type != "link" || action.Data == null) continue;
 
                         action.Data = action.Data.Replace("{{UserId}}", userId ?? "0");
                     }

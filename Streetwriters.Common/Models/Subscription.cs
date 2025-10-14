@@ -65,8 +65,12 @@ namespace Streetwriters.Common.Models
 
         [BsonRepresentation(BsonType.Int32)]
         [JsonPropertyName("type")]
-        [Obsolete("Use SubscriptionPlan and SubscriptionStatus instead.")]
-        public SubscriptionType Type { get; set; }
+        public SubscriptionType Type
+        {
+            get;
+            [Obsolete("Use SubscriptionPlan and SubscriptionStatus instead.")]
+            set;
+        }
 
         [JsonPropertyName("cancelURL")]
         public string? CancelURL { get; set; }

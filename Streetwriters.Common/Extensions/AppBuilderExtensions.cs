@@ -42,7 +42,7 @@ namespace Streetwriters.Common.Extensions
                     var data = new Dictionary<string, object>
                     {
                         { "version", Constants.COMPATIBILITY_VERSION },
-                        { "id", server.Id },
+                        { "id", server.Id ?? "unknown" },
                         { "instance", Constants.INSTANCE_NAME }
                     };
                     await context.Response.WriteAsync(JsonSerializer.Serialize(data));
@@ -70,12 +70,12 @@ namespace Streetwriters.Common.Extensions
             return app;
         }
 
-        public static T GetService<T>(this IApplicationBuilder app)
+        public static T GetService<T>(this IApplicationBuilder app) where T : notnull
         {
             return app.ApplicationServices.GetRequiredService<T>();
         }
 
-        public static T GetScopedService<T>(this IApplicationBuilder app)
+        public static T GetScopedService<T>(this IApplicationBuilder app) where T : notnull
         {
             using (var scope = app.ApplicationServices.CreateScope())
             {

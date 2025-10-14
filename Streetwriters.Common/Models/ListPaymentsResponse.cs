@@ -9,7 +9,7 @@ namespace Streetwriters.Common.Models
         public bool Success { get; set; }
 
         [JsonPropertyName("response")]
-        public Payment[] Payments { get; set; }
+        public Payment[]? Payments { get; set; }
     }
 
     public partial class Payment
@@ -24,10 +24,10 @@ namespace Streetwriters.Common.Models
         public double Amount { get; set; }
 
         [JsonPropertyName("currency")]
-        public string Currency { get; set; }
+        public string? Currency { get; set; }
 
         [JsonPropertyName("payout_date")]
-        public string PayoutDate { get; set; }
+        public string? PayoutDate { get; set; }
 
         [JsonPropertyName("is_paid")]
         public short IsPaid { get; set; }
@@ -36,6 +36,6 @@ namespace Streetwriters.Common.Models
         public bool IsOneOffCharge { get; set; }
 
         [JsonPropertyName("receipt_url")]
-        public string ReceiptUrl { get; set; }
+        public string? ReceiptUrl { get; set; }
     }
 }

@@ -18,7 +18,7 @@ namespace Streetwriters.Common.Services
 
         HttpClient httpClient = new HttpClient();
 
-        public async Task<ListUsersResponse> ListUsersAsync(
+        public async Task<ListUsersResponse?> ListUsersAsync(
             string subscriptionId,
             int results
         )
@@ -41,7 +41,7 @@ namespace Streetwriters.Common.Services
             return await response.Content.ReadFromJsonAsync<ListUsersResponse>();
         }
 
-        public async Task<ListPaymentsResponse> ListPaymentsAsync(
+        public async Task<ListPaymentsResponse?> ListPaymentsAsync(
             string subscriptionId,
             long planId
         )
@@ -66,7 +66,7 @@ namespace Streetwriters.Common.Services
             return await response.Content.ReadFromJsonAsync<ListPaymentsResponse>();
         }
 
-        public async Task<ListTransactionsResponse> ListTransactionsAsync(
+        public async Task<ListTransactionsResponse?> ListTransactionsAsync(
             string subscriptionId
         )
         {
@@ -86,7 +86,7 @@ namespace Streetwriters.Common.Services
             return await response.Content.ReadFromJsonAsync<ListTransactionsResponse>();
         }
 
-        public async Task<PaddleTransactionUser> FindUserFromOrderAsync(string orderId)
+        public async Task<PaddleTransactionUser?> FindUserFromOrderAsync(string orderId)
         {
             var url = $"{PADDLE_BASE_URI}/2.0/order/{orderId}/transactions";
             var httpClient = new HttpClient();
@@ -101,7 +101,7 @@ namespace Streetwriters.Common.Services
                 )
             );
             var transactions = await response.Content.ReadFromJsonAsync<ListTransactionsResponse>();
-            if (transactions.Transactions.Length == 0) return null;
+            if (transactions?.Transactions == null || transactions.Transactions.Length == 0) return null;
             return transactions.Transactions[0].User;
         }
 
@@ -123,7 +123,7 @@ namespace Streetwriters.Common.Services
             );
 
             var refundResponse = await response.Content.ReadFromJsonAsync<RefundPaymentResponse>();
-            return refundResponse.Success;
+            return refundResponse?.Success ?? false;
         }
 
         public async Task<bool> CancelSubscriptionAsync(string subscriptionId)

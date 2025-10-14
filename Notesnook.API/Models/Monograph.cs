@@ -29,15 +29,9 @@ namespace Notesnook.API.Models
         [BsonId]
         [BsonIgnoreIfDefault]
         [BsonRepresentation(BsonType.ObjectId)]
-        public string Id
-        {
-            get; set;
-        }
+        public required string Id { get; set; }
 
-        public string ItemId
-        {
-            get; set;
-        }
+        public required string ItemId { get; set; }
     }
 
     public class Monograph
@@ -50,23 +44,17 @@ namespace Notesnook.API.Models
         [DataMember(Name = "id")]
         [JsonPropertyName("id")]
         [MessagePack.Key("id")]
-        public string ItemId
-        {
-            get; set;
-        }
+        public string? ItemId { get; set; }
 
         [BsonId]
         [BsonIgnoreIfDefault]
         [BsonRepresentation(BsonType.ObjectId)]
         [JsonIgnore]
         [MessagePack.IgnoreMember]
-        public string Id
-        {
-            get; set;
-        }
+        public string Id { get; set; } = string.Empty;
 
         [JsonPropertyName("title")]
-        public string Title { get; set; }
+        public string? Title { get; set; }
 
         [JsonPropertyName("userId")]
         public string? UserId { get; set; }

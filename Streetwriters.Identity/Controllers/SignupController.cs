@@ -88,6 +88,7 @@ namespace Streetwriters.Identity.Controllers
                 if (result.Errors.Any((e) => e.Code == "DuplicateEmail"))
                 {
                     var user = await UserManager.FindByEmailAsync(form.Email);
+                    if (user == null) return BadRequest(new string[] { "User not found." });
 
                     if (!await UserManager.IsInRoleAsync(user, client.Id))
                     {
@@ -114,6 +115,8 @@ namespace Streetwriters.Identity.Controllers
                 if (result.Succeeded)
                 {
                     var user = await UserManager.FindByEmailAsync(form.Email);
+                    if (user == null) return BadRequest(new string[] { "User not found after creation." });
+
                     await UserManager.AddToRoleAsync(user, client.Id);
                     if (Constants.IS_SELF_HOSTED)
                     {
@@ -124,7 +127,10 @@ namespace Streetwriters.Identity.Controllers
                         await UserManager.AddClaimAsync(user, new Claim("platform", PlatformFromUserAgent(base.HttpContext.Request.Headers.UserAgent)));
                         var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
                         var callbackUrl = Url.TokenLink(user.Id.ToString(), code, client.Id, TokenType.CONFRIM_EMAIL);
-                        await EmailSender.SendConfirmationEmailAsync(user.Email, callbackUrl, client);
+                        if (!string.IsNullOrEmpty(user.Email) && callbackUrl != null)
+                        {
+                            await EmailSender.SendConfirmationEmailAsync(user.Email, callbackUrl, client);
+                        }
                     }
                     return Ok(new
                     {
@@ -141,8 +147,9 @@ namespace Streetwriters.Identity.Controllers
             }
         }
 
-        string PlatformFromUserAgent(string userAgent)
+        static string PlatformFromUserAgent(string? userAgent)
         {
+            if (string.IsNullOrEmpty(userAgent)) return "unknown";
             return userAgent.Contains("okhttp/") ? "android" : userAgent.Contains("Darwin/") || userAgent.Contains("CFNetwork/") ? "ios" : "web";
         }
     }

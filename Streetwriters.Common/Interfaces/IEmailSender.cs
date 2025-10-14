@@ -12,8 +12,8 @@ namespace Streetwriters.Common.Interfaces
             string email,
             EmailTemplate template,
             IClient client,
-            GnuPGContext gpgContext = null,
-            Dictionary<string, byte[]> attachments = null
+            GnuPGContext? gpgContext = null,
+            Dictionary<string, byte[]>? attachments = null
         );
     }
 }

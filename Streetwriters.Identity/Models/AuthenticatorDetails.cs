@@ -21,12 +21,12 @@ namespace Streetwriters.Identity.Models
 {
     public class AuthenticatorDetails
     {
-        public string SharedKey
+        public required string SharedKey
         {
             get; set;
         }
 
-        public string AuthenticatorUri
+        public required string AuthenticatorUri
         {
             get; set;
         }

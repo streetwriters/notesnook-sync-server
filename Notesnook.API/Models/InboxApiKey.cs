@@ -37,16 +37,16 @@ namespace Notesnook.API.Models
         [BsonRepresentation(BsonType.ObjectId)]
         [JsonIgnore]
         [MessagePack.IgnoreMember]
-        public string Id { get; set; }
+        public string Id { get; set; } = string.Empty;
 
         [JsonPropertyName("userId")]
-        public string UserId { get; set; }
+        public required string UserId { get; set; }
 
         [JsonPropertyName("name")]
-        public string Name { get; set; }
+        public required string Name { get; set; }
 
         [JsonPropertyName("key")]
-        public string Key { get; set; }
+        public string Key { get; set; } = string.Empty;
 
         [JsonPropertyName("dateCreated")]
         public long DateCreated { get; set; }

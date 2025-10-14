@@ -36,7 +36,7 @@ namespace Streetwriters.Identity.MessageHandlers
             var client = Clients.FindClientByAppId(subscription.AppId);
             if (client == null || user == null) return;
 
-            IdentityUserClaim<string> statusClaim = user.Claims.FirstOrDefault((c) => c.ClaimType == UserService.GetClaimKey(client.Id));
+            IdentityUserClaim<string>? statusClaim = user.Claims.FirstOrDefault((c) => c.ClaimType == UserService.GetClaimKey(client.Id));
             Claim subscriptionClaim = UserService.SubscriptionPlanToClaim(client.Id, subscription);
             if (statusClaim?.ClaimValue == subscriptionClaim.Value) return;
             if (statusClaim != null)

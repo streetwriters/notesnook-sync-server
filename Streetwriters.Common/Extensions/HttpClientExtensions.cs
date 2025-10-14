@@ -17,6 +17,7 @@ You should have received a copy of the Affero GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+using System;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Json;
@@ -28,7 +29,7 @@ namespace Streetwriters.Common.Extensions
 {
     public static class HttpClientExtensions
     {
-        public static async Task<T> SendRequestAsync<T>(this HttpClient httpClient, string url, IHeaderDictionary headers, HttpMethod method, HttpContent content = null) where T : IResponse, new()
+        public static async Task<T> SendRequestAsync<T>(this HttpClient httpClient, string url, IHeaderDictionary? headers, HttpMethod method, HttpContent? content = null) where T : IResponse, new()
         {
             var request = new HttpRequestMessage(method, url);
 
@@ -51,22 +52,23 @@ namespace Streetwriters.Common.Extensions
             }
 
             var response = await httpClient.SendAsync(request);
-            if (response.Content.Headers.ContentLength > 0 && response.Content.Headers.ContentType.ToString().Contains("application/json"))
+            if (response.Content.Headers.ContentLength > 0 && response.Content.Headers.ContentType?.ToString()?.Contains("application/json") == true)
             {
                 var res = await response.Content.ReadFromJsonAsync<T>();
-                res.Success = response.IsSuccessStatusCode;
-                res.StatusCode = (int)response.StatusCode;
-                return res;
+                if (res != null)
+                {
+                    res.Success = response.IsSuccessStatusCode;
+                    res.StatusCode = (int)response.StatusCode;
+                    return res;
+                }
             }
-            else
-            {
-                return new T { Success = response.IsSuccessStatusCode, StatusCode = (int)response.StatusCode, Content = response.Content };
-            }
+
+            return new T { Success = response.IsSuccessStatusCode, StatusCode = (int)response.StatusCode, Content = response.Content };
         }
 
         public static Task<T> ForwardAsync<T>(this HttpClient httpClient, IHttpContextAccessor accessor, string url, HttpMethod method) where T : IResponse, new()
         {
-            var httpContext = accessor.HttpContext;
+            var httpContext = accessor.HttpContext ?? throw new InvalidOperationException("HttpContext is not available");
             var content = new StreamContent(httpContext.Request.BodyReader.AsStream());
             return httpClient.SendRequestAsync<T>(url, httpContext.Request.Headers, method, content);
         }

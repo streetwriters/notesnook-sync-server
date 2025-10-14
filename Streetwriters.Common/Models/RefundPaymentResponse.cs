@@ -9,7 +9,7 @@ namespace Streetwriters.Common.Models
         public bool Success { get; set; }
 
         [JsonPropertyName("response")]
-        public Refund Refund { get; set; }
+        public required Refund Refund { get; set; }
     }
 
     public partial class Refund

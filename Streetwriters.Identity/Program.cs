@@ -57,7 +57,7 @@ namespace Streetwriters.Identity
                     {
                         options.Limits.MaxRequestBodySize = long.MaxValue;
                         options.ListenAnyIP(Servers.IdentityServer.Port);
-                        if (Servers.IdentityServer.IsSecure)
+                        if (Servers.IdentityServer.IsSecure && Servers.IdentityServer.SSLCertificate != null)
                         {
                             options.ListenAnyIP(443, listenerOptions =>
                             {

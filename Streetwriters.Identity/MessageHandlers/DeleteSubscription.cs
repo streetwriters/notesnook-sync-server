@@ -34,7 +34,7 @@ namespace Streetwriters.Identity.MessageHandlers
             var client = Clients.FindClientByAppId(message.AppId);
             if (client == null || user == null) return;
 
-            IdentityUserClaim<string> statusClaim = user.Claims.FirstOrDefault((c) => c.ClaimType == $"{client.Id}:status");
+            IdentityUserClaim<string>? statusClaim = user.Claims.FirstOrDefault((c) => c.ClaimType == $"{client.Id}:status");
             if (statusClaim != null)
             {
                 await userManager.RemoveClaimAsync(user, statusClaim.ToClaim());

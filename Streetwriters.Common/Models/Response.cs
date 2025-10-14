@@ -30,6 +30,6 @@ namespace Streetwriters.Common.Models
         public bool Success { get; set; }
         public int StatusCode { get; set; }
         [JsonIgnore]
-        public HttpContent Content { get; set; }
+        public HttpContent? Content { get; set; }
     }
 }

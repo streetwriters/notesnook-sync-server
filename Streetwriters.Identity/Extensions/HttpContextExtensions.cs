@@ -33,14 +33,14 @@ namespace Microsoft.AspNetCore.Http
         /// <param name="context">Http context</param>
         /// <param name="allowForwarded">Whether to allow x-forwarded-for header check</param>
         /// <returns>IPAddress</returns>
-        public static IPAddress GetRemoteIPAddress(this HttpContext context, bool allowForwarded = true)
+        public static IPAddress? GetRemoteIPAddress(this HttpContext context, bool allowForwarded = true)
         {
             if (allowForwarded)
             {
                 // if you are allowing these forward headers, please ensure you are restricting context.Connection.RemoteIpAddress
                 // to cloud flare ips: https://www.cloudflare.com/ips/
-                string header = (context.Request.Headers["CF-Connecting-IP"].FirstOrDefault() ?? context.Request.Headers["X-Forwarded-For"].FirstOrDefault());
-                if (IPAddress.TryParse(header, out IPAddress ip))
+                string? header = context.Request.Headers["CF-Connecting-IP"].FirstOrDefault() ?? context.Request.Headers["X-Forwarded-For"].FirstOrDefault();
+                if (IPAddress.TryParse(header, out IPAddress? ip))
                 {
                     return ip;
                 }
@@ -48,12 +48,12 @@ namespace Microsoft.AspNetCore.Http
             return context.Connection.RemoteIpAddress;
         }
 
-        static UserAgentService userAgentService = new UserAgentService();
+        static readonly UserAgentService userAgentService = new();
         public static string GetClientInfo(this HttpContext httpContext)
         {
-            var clientIp = httpContext.GetRemoteIPAddress().ToString();
+            var clientIp = httpContext.GetRemoteIPAddress()?.ToString();
             var country = httpContext.Request.Headers["CF-IPCountry"];
-            var userAgent = httpContext.Request.Headers["User-Agent"];
+            var userAgent = httpContext.Request.Headers.UserAgent;
             var builder = new StringBuilder();
 
             builder.AppendLine($"Date: {DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")}");

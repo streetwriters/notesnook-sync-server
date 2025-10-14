@@ -10,19 +10,19 @@ namespace Streetwriters.Common.Models
     public partial class ListTransactionsResponseV2 : PaddleResponse
     {
         [JsonPropertyName("data")]
-        public TransactionV2[] Transactions { get; set; }
+        public TransactionV2[]? Transactions { get; set; }
     }
 
     public partial class TransactionV2
     {
         [JsonPropertyName("id")]
-        public string Id { get; set; }
+        public string? Id { get; set; }
 
         [JsonPropertyName("status")]
-        public string Status { get; set; }
+        public string? Status { get; set; }
 
         [JsonPropertyName("customer_id")]
-        public string CustomerId { get; set; }
+        public string? CustomerId { get; set; }
 
         // [JsonPropertyName("address_id")]
         // public string AddressId { get; set; }
@@ -31,10 +31,10 @@ namespace Streetwriters.Common.Models
         // public object BusinessId { get; set; }
 
         [JsonPropertyName("custom_data")]
-        public Dictionary<string, string> CustomData { get; set; }
+        public Dictionary<string, string>? CustomData { get; set; }
 
         [JsonPropertyName("origin")]
-        public string Origin { get; set; }
+        public string? Origin { get; set; }
 
         // [JsonPropertyName("collection_mode")]
         // public string CollectionMode { get; set; }
@@ -49,10 +49,10 @@ namespace Streetwriters.Common.Models
         // public string InvoiceNumber { get; set; }
 
         [JsonPropertyName("billing_details")]
-        public BillingDetails BillingDetails { get; set; }
+        public BillingDetails? BillingDetails { get; set; }
 
         [JsonPropertyName("billing_period")]
-        public BillingPeriod BillingPeriod { get; set; }
+        public BillingPeriod? BillingPeriod { get; set; }
 
         // [JsonPropertyName("currency_code")]
         // public string CurrencyCode { get; set; }
@@ -70,10 +70,10 @@ namespace Streetwriters.Common.Models
         public DateTimeOffset? BilledAt { get; set; }
 
         [JsonPropertyName("items")]
-        public Item[] Items { get; set; }
+        public Item[]? Items { get; set; }
 
         [JsonPropertyName("details")]
-        public Details Details { get; set; }
+        public Details? Details { get; set; }
 
         // [JsonPropertyName("payments")]
         // public Payment[] Payments { get; set; }
@@ -88,7 +88,7 @@ namespace Streetwriters.Common.Models
         // public bool EnableCheckout { get; set; }
 
         [JsonPropertyName("payment_terms")]
-        public PaymentTerms PaymentTerms { get; set; }
+        public PaymentTerms? PaymentTerms { get; set; }
 
         // [JsonPropertyName("purchase_order_number")]
         // public string PurchaseOrderNumber { get; set; }
@@ -100,7 +100,7 @@ namespace Streetwriters.Common.Models
     public partial class PaymentTerms
     {
         [JsonPropertyName("interval")]
-        public string Interval { get; set; }
+        public string? Interval { get; set; }
 
         [JsonPropertyName("frequency")]
         public long Frequency { get; set; }
@@ -127,7 +127,7 @@ namespace Streetwriters.Common.Models
         // public TaxRatesUsed[] TaxRatesUsed { get; set; }
 
         [JsonPropertyName("totals")]
-        public Totals Totals { get; set; }
+        public Totals? Totals { get; set; }
 
         // [JsonPropertyName("adjusted_totals")]
         // public AdjustedTotals AdjustedTotals { get; set; }
@@ -139,7 +139,7 @@ namespace Streetwriters.Common.Models
         // public AdjustedTotals AdjustedPayoutTotals { get; set; }
 
         [JsonPropertyName("line_items")]
-        public LineItem[] LineItems { get; set; }
+        public LineItem[]? LineItems { get; set; }
     }
 
     public partial class Totals
@@ -175,7 +175,7 @@ namespace Streetwriters.Common.Models
         // public object Earnings { get; set; }
 
         [JsonPropertyName("currency_code")]
-        public string CurrencyCode { get; set; }
+        public string? CurrencyCode { get; set; }
     }
     // public partial class AdjustedTotals
     // {
@@ -225,10 +225,10 @@ namespace Streetwriters.Common.Models
     public partial class LineItem
     {
         [JsonPropertyName("id")]
-        public string Id { get; set; }
+        public string? Id { get; set; }
 
         [JsonPropertyName("price_id")]
-        public string PriceId { get; set; }
+        public string? PriceId { get; set; }
 
         // [JsonPropertyName("quantity")]
         // public long Quantity { get; set; }
@@ -247,7 +247,7 @@ namespace Streetwriters.Common.Models
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("proration")]
-        public Proration Proration { get; set; }
+        public Proration? Proration { get; set; }
     }
 
     // public partial class Product
@@ -322,7 +322,7 @@ namespace Streetwriters.Common.Models
     public partial class Proration
     {
         [JsonPropertyName("billing_period")]
-        public BillingPeriod BillingPeriod { get; set; }
+        public BillingPeriod? BillingPeriod { get; set; }
     }
 
     // public partial class Totals
@@ -356,20 +356,20 @@ namespace Streetwriters.Common.Models
     public partial class Item
     {
         [JsonPropertyName("price")]
-        public Price Price { get; set; }
+        public Price? Price { get; set; }
 
         [JsonPropertyName("quantity")]
         public long Quantity { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("proration")]
-        public Proration Proration { get; set; }
+        public Proration? Proration { get; set; }
     }
 
     public partial class Price
     {
         [JsonPropertyName("id")]
-        public string Id { get; set; }
+        public string? Id { get; set; }
 
         // [JsonPropertyName("description")]
         // public string Description { get; set; }
@@ -378,7 +378,7 @@ namespace Streetwriters.Common.Models
         // public TypeEnum Type { get; set; }
 
         [JsonPropertyName("name")]
-        public string Name { get; set; }
+        public string? Name { get; set; }
 
         // [JsonPropertyName("product_id")]
         // public string ProductId { get; set; }
@@ -500,7 +500,7 @@ namespace Streetwriters.Common.Models
         public long PerPage { get; set; }
 
         [JsonPropertyName("next")]
-        public Uri Next { get; set; }
+        public Uri? Next { get; set; }
 
         [JsonPropertyName("has_more")]
         public bool HasMore { get; set; }

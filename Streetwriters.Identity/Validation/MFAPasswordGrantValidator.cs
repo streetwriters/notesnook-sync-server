@@ -58,6 +58,8 @@ namespace Streetwriters.Identity.Validation
             context.Result = new GrantValidationResult(TokenRequestErrors.InvalidGrant);
 
             var httpContext = HttpContextAccessor.HttpContext;
+            if (httpContext == null) return;
+
             var tokenResult = BearerTokenValidator.ValidateAuthorizationHeader(httpContext);
             if (!tokenResult.TokenFound) return;
 

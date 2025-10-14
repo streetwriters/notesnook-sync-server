@@ -35,7 +35,7 @@ namespace Notesnook.API.Models
         }
 
         [JsonPropertyName("title")]
-        public required string Title { get; set; }
+        public string? Title { get; set; }
 
         [JsonPropertyName("selfDestruct")]
         public bool SelfDestruct { get; set; }

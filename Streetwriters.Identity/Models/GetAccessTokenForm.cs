@@ -27,21 +27,21 @@ namespace Streetwriters.Identity.Models
     {
         [Required]
         [BindProperty(Name = "authorization_code")]
-        public string Code
+        public required string Code
         {
             get; set;
         }
 
         [Required]
         [BindProperty(Name = "user_id")]
-        public string UserId
+        public required string UserId
         {
             get; set;
         }
 
         [Required]
         [BindProperty(Name = "client_id")]
-        public string ClientId
+        public required string ClientId
         {
             get; set;
         }

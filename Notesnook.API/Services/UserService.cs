@@ -52,7 +52,7 @@ namespace Notesnook.API.Services
         public async Task CreateUserAsync()
         {
             SignupResponse response = await httpClient.ForwardAsync<SignupResponse>(this.HttpContextAccessor, $"{Servers.IdentityServer}/signup", HttpMethod.Post);
-            if (!response.Success || (response.Errors != null && response.Errors.Length > 0))
+            if (!response.Success || (response.Errors != null && response.Errors.Length > 0) || response.UserId == null)
             {
                 logger.LogError("Failed to sign up user: {Response}", JsonSerializer.Serialize(response));
                 if (response.Errors != null && response.Errors.Length > 0)
@@ -216,7 +216,7 @@ namespace Notesnook.API.Services
             await S3Service.DeleteDirectoryAsync(userId);
         }
 
-        public async Task DeleteUserAsync(string userId, string jti, string password)
+        public async Task DeleteUserAsync(string userId, string? jti, string password)
         {
             logger.LogInformation("Deleting user account: {UserId}", userId);
 
@@ -227,7 +227,7 @@ namespace Notesnook.API.Services
 
             await WampServers.MessengerServer.PublishMessageAsync(MessengerServerTopics.SendSSETopic, new SendSSEMessage
             {
-                SendToAll = false,
+                SendToAll = jti == null,
                 OriginTokenId = jti,
                 UserId = userId,
                 Message = new Message

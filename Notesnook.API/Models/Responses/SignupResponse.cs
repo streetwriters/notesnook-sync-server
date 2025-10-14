@@ -6,9 +6,9 @@ namespace Notesnook.API.Models.Responses
     public class SignupResponse : Response
     {
         [JsonPropertyName("userId")]
-        public string UserId { get; set; }
+        public string? UserId { get; set; }
 
         [JsonPropertyName("errors")]
-        public string[] Errors { get; set; }
+        public string[]? Errors { get; set; }
     }
 }

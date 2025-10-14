@@ -47,7 +47,7 @@ namespace Notesnook.API.Controllers
         [Authorize(Policy = "Notesnook")]
         public async Task<IActionResult> GetApiKeysAsync()
         {
-            var userId = User.FindFirstValue("sub");
+            var userId = User.GetUserId();
             try
             {
                 var apiKeys = await inboxApiKeysRepository.FindAsync(t => t.UserId == userId);
@@ -64,7 +64,7 @@ namespace Notesnook.API.Controllers
         [Authorize(Policy = "Notesnook")]
         public async Task<IActionResult> CreateApiKeyAsync([FromBody] InboxApiKey request)
         {
-            var userId = User.FindFirstValue("sub");
+            var userId = User.GetUserId();
             try
             {
                 if (string.IsNullOrWhiteSpace(request.Name))
@@ -104,7 +104,7 @@ namespace Notesnook.API.Controllers
         [Authorize(Policy = "Notesnook")]
         public async Task<IActionResult> DeleteApiKeyAsync(string apiKey)
         {
-            var userId = User.FindFirstValue("sub");
+            var userId = User.GetUserId();
             try
             {
                 if (string.IsNullOrWhiteSpace(apiKey))
@@ -126,7 +126,7 @@ namespace Notesnook.API.Controllers
         [Authorize(Policy = InboxApiKeyAuthenticationDefaults.AuthenticationScheme)]
         public async Task<IActionResult> GetPublicKeyAsync()
         {
-            var userId = User.FindFirstValue("sub");
+            var userId = User.GetUserId();
             try
             {
                 var userSetting = await userSettingsRepository.FindOneAsync(u => u.UserId == userId);
@@ -147,7 +147,7 @@ namespace Notesnook.API.Controllers
         [Authorize(Policy = InboxApiKeyAuthenticationDefaults.AuthenticationScheme)]
         public async Task<IActionResult> CreateInboxItemAsync([FromBody] InboxSyncItem request)
         {
-            var userId = User.FindFirstValue("sub");
+            var userId = User.GetUserId();
             try
             {
                 if (request.Key.Algorithm != Algorithms.XSAL_X25519_7)

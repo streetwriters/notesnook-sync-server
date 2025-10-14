@@ -29,25 +29,25 @@ using Streetwriters.Common.Interfaces;
 
 namespace Streetwriters.Common.Models
 {
-    public class Offer : IOffer
+    public class Offer
     {
         public Offer()
         {
-            Id = ObjectId.GenerateNewId().ToString();
+            Id = ObjectId.GenerateNewId();
         }
 
         [BsonId]
         [BsonRepresentation(BsonType.ObjectId)]
         [JsonPropertyName("id")]
-        public string Id { get; set; }
+        public ObjectId Id { get; set; }
 
         [JsonPropertyName("appId")]
         public ApplicationType AppId { get; set; }
 
         [JsonPropertyName("promoCode")]
-        public string PromoCode { get; set; }
+        public required string PromoCode { get; set; }
 
         [JsonPropertyName("codes")]
-        public PromoCode[] Codes { get; set; }
+        public required PromoCode[] Codes { get; set; }
     }
 }

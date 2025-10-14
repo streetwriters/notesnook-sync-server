@@ -98,9 +98,8 @@ namespace Notesnook.API.Controllers
         {
             try
             {
-                var userId = this.User.FindFirstValue("sub");
+                var userId = this.User.GetUserId();
                 var jti = this.User.FindFirstValue("jti");
-                if (userId == null) return Unauthorized();
 
                 var existingMonograph = await FindMonographAsync(userId, monograph);
                 if (existingMonograph != null && !existingMonograph.Deleted) return await UpdateAsync(deviceId, monograph);
@@ -144,9 +143,8 @@ namespace Notesnook.API.Controllers
         {
             try
             {
-                var userId = this.User.FindFirstValue("sub");
+                var userId = this.User.GetUserId();
                 var jti = this.User.FindFirstValue("jti");
-                if (userId == null) return Unauthorized();
 
                 var existingMonograph = await FindMonographAsync(userId, monograph);
                 if (existingMonograph == null || existingMonograph.Deleted)
@@ -193,8 +191,7 @@ namespace Notesnook.API.Controllers
         [HttpGet]
         public async Task<IActionResult> GetUserMonographsAsync()
         {
-            var userId = this.User.FindFirstValue("sub");
-            if (userId == null) return Unauthorized();
+            var userId = this.User.GetUserId();
 
             var userMonographs = (await monographs.Collection.FindAsync(
                     Builders<Monograph>.Filter.And(
@@ -257,8 +254,7 @@ namespace Notesnook.API.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteAsync([FromQuery] string? deviceId, [FromRoute] string id)
         {
-            var userId = this.User.FindFirstValue("sub");
-            if (userId is null) return Unauthorized();
+            var userId = this.User.GetUserId();
 
             var monograph = await FindMonographAsync(id);
             if (monograph == null || monograph.Deleted)
@@ -310,12 +306,13 @@ namespace Notesnook.API.Controllers
             });
         }
 
-        private async Task<string> CleanupContentAsync(ClaimsPrincipal user, string content)
+        private async Task<string> CleanupContentAsync(ClaimsPrincipal user, string? content)
         {
+            if (string.IsNullOrEmpty(content)) return string.Empty;
             if (Constants.IS_SELF_HOSTED) return content;
             try
             {
-                var json = JsonSerializer.Deserialize<MonographContent>(content);
+                var json = JsonSerializer.Deserialize<MonographContent>(content) ?? throw new Exception("Invalid monograph content.");
                 var html = json.Data;
 
                 if (user.IsUserSubscribed())

@@ -26,10 +26,10 @@ namespace Streetwriters.Common.Messages
     public class Message
     {
         [JsonPropertyName("type")]
-        public string Type { get; set; }
+        public required string Type { get; set; }
 
         [JsonPropertyName("data")]
-        public string Data { get; set; }
+        public string? Data { get; set; }
     }
     public class SendSSEMessage
     {
@@ -37,10 +37,10 @@ namespace Streetwriters.Common.Messages
         public bool SendToAll { get; set; }
 
         [JsonPropertyName("userId")]
-        public string UserId { get; set; }
+        public required string UserId { get; set; }
 
         [JsonPropertyName("message")]
-        public Message Message { get; set; }
+        public required Message Message { get; set; }
 
         [JsonPropertyName("originTokenId")]
         public string? OriginTokenId { get; set; }

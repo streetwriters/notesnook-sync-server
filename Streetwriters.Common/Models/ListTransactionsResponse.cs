@@ -9,31 +9,31 @@ namespace Streetwriters.Common.Models
         public bool Success { get; set; }
 
         [JsonPropertyName("response")]
-        public Transaction[] Transactions { get; set; }
+        public Transaction[]? Transactions { get; set; }
     }
 
     public partial class Transaction
     {
         [JsonPropertyName("order_id")]
-        public string OrderId { get; set; }
+        public string? OrderId { get; set; }
 
         [JsonPropertyName("checkout_id")]
-        public string CheckoutId { get; set; }
+        public string? CheckoutId { get; set; }
 
         [JsonPropertyName("amount")]
-        public string Amount { get; set; }
+        public string? Amount { get; set; }
 
         [JsonPropertyName("currency")]
-        public string Currency { get; set; }
+        public string? Currency { get; set; }
 
         [JsonPropertyName("status")]
-        public string Status { get; set; }
+        public string? Status { get; set; }
 
         [JsonPropertyName("created_at")]
-        public string CreatedAt { get; set; }
+        public string? CreatedAt { get; set; }
 
         [JsonPropertyName("passthrough")]
-        public object Passthrough { get; set; }
+        public object? Passthrough { get; set; }
 
         [JsonPropertyName("product_id")]
         public long ProductId { get; set; }
@@ -45,13 +45,13 @@ namespace Streetwriters.Common.Models
         public bool IsOneOff { get; set; }
 
         [JsonPropertyName("subscription")]
-        public PaddleSubscription Subscription { get; set; }
+        public PaddleSubscription? Subscription { get; set; }
 
         [JsonPropertyName("user")]
-        public PaddleTransactionUser User { get; set; }
+        public PaddleTransactionUser? User { get; set; }
 
         [JsonPropertyName("receipt_url")]
-        public string ReceiptUrl { get; set; }
+        public string? ReceiptUrl { get; set; }
     }
 
     public partial class PaddleSubscription
@@ -60,7 +60,7 @@ namespace Streetwriters.Common.Models
         public long SubscriptionId { get; set; }
 
         [JsonPropertyName("status")]
-        public string Status { get; set; }
+        public string? Status { get; set; }
     }
 
     public partial class PaddleTransactionUser
@@ -69,7 +69,7 @@ namespace Streetwriters.Common.Models
         public long UserId { get; set; }
 
         [JsonPropertyName("email")]
-        public string Email { get; set; }
+        public string? Email { get; set; }
 
         [JsonPropertyName("marketing_consent")]
         public bool MarketingConsent { get; set; }

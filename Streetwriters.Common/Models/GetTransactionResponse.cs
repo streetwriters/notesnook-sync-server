@@ -10,6 +10,6 @@ namespace Streetwriters.Common.Models
     public partial class GetTransactionResponse : PaddleResponse
     {
         [JsonPropertyName("data")]
-        public TransactionV2 Transaction { get; set; }
+        public TransactionV2? Transaction { get; set; }
     }
 }

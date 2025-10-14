@@ -10,7 +10,7 @@ namespace Streetwriters.Common.Models
     public partial class PaddleResponse
     {
         [JsonPropertyName("error")]
-        public PaddleError Error { get; set; }
+        public PaddleError? Error { get; set; }
     }
 
     public class PaddleError

@@ -26,25 +26,19 @@ using System.Text.Json.Serialization;
 namespace Notesnook.API.Models
 {
     [MessagePack.MessagePackObject]
-    public class EncryptedData : IEncrypted
+    public class EncryptedData
     {
         [MessagePack.Key("iv")]
         [JsonPropertyName("iv")]
         [BsonElement("iv")]
         [DataMember(Name = "iv")]
-        public string IV
-        {
-            get; set;
-        }
+        public required string IV { get; set; }
 
         [MessagePack.Key("cipher")]
         [JsonPropertyName("cipher")]
         [BsonElement("cipher")]
         [DataMember(Name = "cipher")]
-        public string Cipher
-        {
-            get; set;
-        }
+        public required string Cipher { get; set; }
 
         [MessagePack.Key("length")]
         [JsonPropertyName("length")]
@@ -56,9 +50,9 @@ namespace Notesnook.API.Models
         [JsonPropertyName("salt")]
         [BsonElement("salt")]
         [DataMember(Name = "salt")]
-        public string Salt { get; set; }
+        public required string Salt { get; set; }
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             if (obj is EncryptedData encryptedData)
             {

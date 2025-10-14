@@ -5,7 +5,7 @@ namespace Notesnook.API.Models
     public class DeleteAccountForm
     {
         [Required]
-        public string Password
+        public required string Password
         {
             get; set;
         }

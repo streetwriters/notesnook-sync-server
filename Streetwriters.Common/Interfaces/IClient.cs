@@ -33,6 +33,6 @@ namespace Streetwriters.Common.Interfaces
         string SenderName { get; set; }
         string EmailConfirmedRedirectURL { get; }
         string AccountRecoveryRedirectURL { get; }
-        Func<string, Task> OnEmailConfirmed { get; set; }
+        Func<string, Task>? OnEmailConfirmed { get; set; }
     }
 }

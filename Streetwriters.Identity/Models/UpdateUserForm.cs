@@ -27,7 +27,7 @@ namespace Streetwriters.Identity.Models
     {
         [Required]
         [BindProperty(Name = "type")]
-        public string Type
+        public required string Type
         {
             get; set;
         }
@@ -39,33 +39,33 @@ namespace Streetwriters.Identity.Models
         }
 
         [BindProperty(Name = "old_password")]
-        public string OldPassword
+        public string? OldPassword
         {
             get; set;
         }
 
         [BindProperty(Name = "new_password")]
-        public string NewPassword
+        public string? NewPassword
         {
             get; set;
         }
 
 
         [BindProperty(Name = "password")]
-        public string Password
+        public string? Password
         {
             get; set;
         }
 
         [BindProperty(Name = "new_email")]
-        public string NewEmail
+        public string? NewEmail
         {
             get; set;
         }
 
 
         [BindProperty(Name = "verification_code")]
-        public string VerificationCode
+        public string? VerificationCode
         {
             get; set;
         }

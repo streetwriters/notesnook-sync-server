@@ -32,14 +32,14 @@ namespace Streetwriters.Common
     {
         private readonly ConcurrentDictionary<string, IWampRealmProxy> Channels = new();
 
-        public string Endpoint { get; set; }
-        public string Address { get; set; }
+        public required string Endpoint { get; set; }
+        public required string Address { get; set; }
         public T Topics { get; set; } = new T();
-        public string Realm { get; set; }
+        public required string Realm { get; set; }
 
         private async Task<IWampRealmProxy> GetChannelAsync(string topic)
         {
-            if (!Channels.TryGetValue(topic, out IWampRealmProxy channel) || !channel.Monitor.IsConnected)
+            if (!Channels.TryGetValue(topic, out IWampRealmProxy? channel) || channel == null || !channel.Monitor.IsConnected)
             {
                 channel = await WampHelper.OpenWampChannelAsync(Address, Realm);
                 Channels.AddOrUpdate(topic, (key) => channel, (key, old) => channel);

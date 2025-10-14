@@ -31,7 +31,7 @@ namespace Streetwriters.Identity.Interfaces
         Task<bool> ResetMFAAsync(User user);
         Task SetSecondaryMethodAsync(User user, string secondaryMethod);
         string GetPrimaryMethod(User user);
-        string GetSecondaryMethod(User user);
+        string? GetSecondaryMethod(User user);
         Task<int> GetRemainingValidCodesAsync(User user);
         bool IsValidMFAMethod(string method);
         bool IsValidMFAMethod(string method, User user);

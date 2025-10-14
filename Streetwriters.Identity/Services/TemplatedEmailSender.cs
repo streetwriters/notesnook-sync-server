@@ -60,35 +60,35 @@ namespace Streetwriters.Identity.Services
             EmailSender = emailSender;
         }
 
-        EmailTemplate Email2FATemplate = new EmailTemplate
+        readonly EmailTemplate Email2FATemplate = new()
         {
             Html = HtmlHelper.ReadMinifiedHtmlFile("Templates/Email2FACode.html"),
             Text = File.ReadAllText("Templates/Email2FACode.txt"),
             Subject = "Your {{app_name}} account 2FA code",
         };
 
-        EmailTemplate ConfirmEmailTemplate = new EmailTemplate
+        readonly EmailTemplate ConfirmEmailTemplate = new()
         {
             Html = HtmlHelper.ReadMinifiedHtmlFile("Templates/ConfirmEmail.html"),
             Text = File.ReadAllText("Templates/ConfirmEmail.txt"),
             Subject = "Confirm your {{app_name}} account",
         };
 
-        EmailTemplate ConfirmChangeEmailTemplate = new EmailTemplate
+        readonly EmailTemplate ConfirmChangeEmailTemplate = new()
         {
             Html = HtmlHelper.ReadMinifiedHtmlFile("Templates/EmailChangeConfirmation.html"),
             Text = File.ReadAllText("Templates/EmailChangeConfirmation.txt"),
             Subject = "Change {{app_name}} account email address",
         };
 
-        EmailTemplate PasswordResetEmailTemplate = new EmailTemplate
+        readonly EmailTemplate PasswordResetEmailTemplate = new()
         {
             Html = HtmlHelper.ReadMinifiedHtmlFile("Templates/ResetAccountPassword.html"),
             Text = File.ReadAllText("Templates/ResetAccountPassword.txt"),
             Subject = "Reset {{app_name}} account password",
         };
 
-        EmailTemplate FailedLoginAlertTemplate = new EmailTemplate
+        readonly EmailTemplate FailedLoginAlertTemplate = new()
         {
             Html = HtmlHelper.ReadMinifiedHtmlFile("Templates/FailedLoginAlert.html"),
             Text = File.ReadAllText("Templates/FailedLoginAlert.txt"),
@@ -97,12 +97,12 @@ namespace Streetwriters.Identity.Services
 
         public async Task Send2FACodeEmailAsync(string email, string code, IClient client)
         {
-            var template = new EmailTemplate
+            var template = new EmailTemplate()
             {
                 Html = Email2FATemplate.Html,
                 Text = Email2FATemplate.Text,
                 Subject = Email2FATemplate.Subject,
-                Data = new { app_name = client.Name, code = code },
+                Data = new { app_name = client.Name, code },
             };
             await EmailSender.SendEmailAsync(email, template, client, NNGnuPGContext);
         }
@@ -113,7 +113,7 @@ namespace Streetwriters.Identity.Services
             IClient client
         )
         {
-            var template = new EmailTemplate
+            var template = new EmailTemplate()
             {
                 Html = ConfirmEmailTemplate.Html,
                 Text = ConfirmEmailTemplate.Text,
@@ -129,12 +129,12 @@ namespace Streetwriters.Identity.Services
             IClient client
         )
         {
-            var template = new EmailTemplate
+            var template = new EmailTemplate()
             {
                 Html = ConfirmChangeEmailTemplate.Html,
                 Text = ConfirmChangeEmailTemplate.Text,
                 Subject = ConfirmChangeEmailTemplate.Subject,
-                Data = new { app_name = client.Name, code = code },
+                Data = new { app_name = client.Name, code },
             };
             await EmailSender.SendEmailAsync(email, template, client, NNGnuPGContext);
         }
@@ -145,7 +145,7 @@ namespace Streetwriters.Identity.Services
             IClient client
         )
         {
-            var template = new EmailTemplate
+            var template = new EmailTemplate()
             {
                 Html = PasswordResetEmailTemplate.Html,
                 Text = PasswordResetEmailTemplate.Text,
@@ -157,7 +157,7 @@ namespace Streetwriters.Identity.Services
 
         public async Task SendFailedLoginAlertAsync(string email, string deviceInfo, IClient client)
         {
-            var template = new EmailTemplate
+            var template = new EmailTemplate()
             {
                 Html = FailedLoginAlertTemplate.Html,
                 Text = FailedLoginAlertTemplate.Text,
@@ -176,7 +176,7 @@ namespace Streetwriters.Identity.Services
     {
         IConfiguration PgpKeySettings { get; set; } = pgpKeySettings;
 
-        protected override string GetPasswordForKey(PgpSecretKey key)
+        protected override string? GetPasswordForKey(PgpSecretKey key)
         {
             return PgpKeySettings[key.KeyId.ToString("X")];
         }

@@ -55,7 +55,7 @@ namespace Notesnook.API.Controllers
         [HttpGet]
         public async Task<IActionResult> GetUser()
         {
-            var userId = User.FindFirstValue("sub");
+            var userId = User.GetUserId();
             try
             {
                 UserResponse response = await UserService.GetUserAsync(userId);
@@ -72,7 +72,7 @@ namespace Notesnook.API.Controllers
         [HttpPatch]
         public async Task<IActionResult> UpdateUser([FromBody] UserKeys keys)
         {
-            var userId = User.FindFirstValue("sub");
+            var userId = User.GetUserId();
             try
             {
                 await UserService.SetUserKeysAsync(userId, keys);
@@ -88,7 +88,7 @@ namespace Notesnook.API.Controllers
         [HttpPost("reset")]
         public async Task<IActionResult> Reset([FromForm] bool removeAttachments)
         {
-            var userId = this.User.FindFirstValue("sub");
+            var userId = this.User.GetUserId();
 
             if (await UserService.ResetUserAsync(userId, removeAttachments))
                 return Ok();
@@ -99,7 +99,7 @@ namespace Notesnook.API.Controllers
         [RequestTimeout(5 * 60 * 1000)]
         public async Task<IActionResult> Delete([FromForm] DeleteAccountForm form)
         {
-            var userId = this.User.FindFirstValue("sub");
+            var userId = this.User.GetUserId();
             var jti = User.FindFirstValue("jti");
             try
             {

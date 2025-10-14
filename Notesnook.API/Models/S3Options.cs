@@ -21,9 +21,9 @@ namespace Notesnook.API.Models
 {
     public class S3Options
     {
-        public string ServiceUrl { get; set; }
-        public string Region { get; set; }
-        public string AccessKeyId { get; set; }
-        public string SecretAccessKey { get; set; }
+        public string ServiceUrl { get; set; } = string.Empty;
+        public string Region { get; set; } = string.Empty;
+        public string AccessKeyId { get; set; } = string.Empty;
+        public string SecretAccessKey { get; set; } = string.Empty;
     }
 }

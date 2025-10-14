@@ -101,18 +101,18 @@ namespace Streetwriters.Identity.Services
 
         public string GetPrimaryMethod(User user)
         {
-            return this.GetClaimValue(user, MFAService.PRIMARY_METHOD_CLAIM, MFAMethods.Email);
+            return GetClaimValue(user, MFAService.PRIMARY_METHOD_CLAIM) ?? MFAMethods.Email;
         }
 
-        public string GetSecondaryMethod(User user)
+        public string? GetSecondaryMethod(User user)
         {
-            return this.GetClaimValue(user, MFAService.SECONDARY_METHOD_CLAIM);
+            return GetClaimValue(user, MFAService.SECONDARY_METHOD_CLAIM);
         }
 
-        public string GetClaimValue(User user, string claimType, string defaultValue = null)
+        public static string? GetClaimValue(User user, string claimType)
         {
             var claim = user.Claims.FirstOrDefault((c) => c.ClaimType == claimType);
-            return claim != null ? claim.ClaimValue : defaultValue;
+            return claim?.ClaimValue;
         }
 
         public Task<int> GetRemainingValidCodesAsync(User user)
@@ -158,6 +158,8 @@ namespace Streetwriters.Identity.Services
                 await UserManager.ResetAuthenticatorKeyAsync(user);
                 unformattedKey = await UserManager.GetAuthenticatorKeyAsync(user);
             }
+            ArgumentNullException.ThrowIfNull(unformattedKey);
+            ArgumentNullException.ThrowIfNull(user.Email);
 
             return new AuthenticatorDetails
             {
@@ -183,10 +185,12 @@ namespace Streetwriters.Identity.Services
             switch (method)
             {
                 case "email":
+                    ArgumentNullException.ThrowIfNull(user.Email);
                     string emailOTP = await UserManager.GenerateTwoFactorTokenAsync(user, TokenOptions.DefaultPhoneProvider);
                     await EmailSender.Send2FACodeEmailAsync(user.Email, emailOTP, client);
                     break;
                 case "sms":
+                    ArgumentNullException.ThrowIfNull(form.PhoneNumber);
                     await UserManager.SetPhoneNumberAsync(user, form.PhoneNumber);
                     var id = await SMSSender.SendOTPAsync(form.PhoneNumber, client);
                     logger.LogInformation("SMS OTP sent for user: {UserId}, SMS ID: {SmsId}", user.Id, id);
@@ -200,13 +204,14 @@ namespace Streetwriters.Identity.Services
         {
             if (method == MFAMethods.SMS)
             {
-                var id = this.GetClaimValue(user, MFAService.SMS_ID_CLAIM);
+                var id = GetClaimValue(user, MFAService.SMS_ID_CLAIM);
                 if (string.IsNullOrEmpty(id)) throw new Exception("Could not find associated SMS verify id. Please try sending the code again.");
                 if (await SMSSender.VerifyOTPAsync(id, code))
                 {
                     // Auto confirm user phone number if not confirmed
                     if (!await UserManager.IsPhoneNumberConfirmedAsync(user))
                     {
+                        ArgumentNullException.ThrowIfNull(user.PhoneNumber);
                         var token = await UserManager.GenerateChangePhoneNumberTokenAsync(user, user.PhoneNumber);
                         await UserManager.VerifyChangePhoneNumberTokenAsync(user, token, user.PhoneNumber);
                     }
@@ -238,7 +243,7 @@ namespace Streetwriters.Identity.Services
             return method == MFAMethods.Email || method == MFAMethods.SMS ? TokenOptions.DefaultPhoneProvider : UserManager.Options.Tokens.AuthenticatorTokenProvider;
         }
 
-        private string FormatKey(string unformattedKey)
+        private static string FormatKey(string unformattedKey)
         {
             var result = new StringBuilder();
             int currentPosition = 0;
@@ -255,7 +260,7 @@ namespace Streetwriters.Identity.Services
             return result.ToString().ToLowerInvariant();
         }
 
-        private string GenerateQrCodeUri(string email, string unformattedKey, string issuer)
+        private static string GenerateQrCodeUri(string email, string unformattedKey, string issuer)
         {
             const string AuthenticatorUriFormat = "otpauth://totp/{0}:{1}?secret={2}&issuer={0}&digits=6";
 

@@ -26,7 +26,7 @@ namespace Streetwriters.Messenger.Helpers
 {
     public class SSEHelper
     {
-        public static async Task SendEventToUserAsync(string data, IServerSentEventsService sseService, string userId, string originTokenId = null)
+        public static async Task SendEventToUserAsync(string data, IServerSentEventsService sseService, string userId, string? originTokenId = null)
         {
             var clients = sseService.GetClients().Where(c => c.User.FindFirstValue("sub") == userId);
             foreach (var client in clients)

@@ -28,8 +28,8 @@ namespace Notesnook.API.Models
     public class MonographContent
     {
         [JsonPropertyName("data")]
-        public string Data { get; set; }
+        public required string Data { get; set; }
         [JsonPropertyName("type")]
-        public string Type { get; set; }
+        public required string Type { get; set; }
     }
 }

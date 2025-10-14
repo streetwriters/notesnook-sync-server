@@ -28,10 +28,10 @@ namespace Streetwriters.Identity.Models
         [Required]
         [Display(Name = "Authenticator type")]
         [BindProperty(Name = "type")]
-        public string Type { get; set; }
+        public required string Type { get; set; }
 
         [Display(Name = "Phone number")]
         [BindProperty(Name = "phoneNumber")]
-        public string PhoneNumber { get; set; }
+        public string? PhoneNumber { get; set; }
     }
 }

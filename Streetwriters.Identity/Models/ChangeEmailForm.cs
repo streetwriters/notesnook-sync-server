@@ -31,7 +31,7 @@ namespace Streetwriters.Identity.Models
         [Required]
         [BindProperty(Name = "email")]
         [EmailAddress]
-        public string NewEmail
+        public required string NewEmail
         {
             get; set;
         }

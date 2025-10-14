@@ -31,15 +31,15 @@ namespace Streetwriters.Common.Models
 {
     public class Client : IClient
     {
-        public string Id { get; set; }
-        public string Name { get; set; }
+        public required string Id { get; set; }
+        public required string Name { get; set; }
         public ApplicationType Type { get; set; }
         public ApplicationType AppId { get; set; }
-        public string SenderEmail { get; set; }
-        public string SenderName { get; set; }
-        public string EmailConfirmedRedirectURL { get; set; }
-        public string AccountRecoveryRedirectURL { get; set; }
+        public required string SenderEmail { get; set; }
+        public required string SenderName { get; set; }
+        public required string EmailConfirmedRedirectURL { get; set; }
+        public required string AccountRecoveryRedirectURL { get; set; }
 
-        public Func<string, Task> OnEmailConfirmed { get; set; }
+        public Func<string, Task>? OnEmailConfirmed { get; set; }
     }
 }

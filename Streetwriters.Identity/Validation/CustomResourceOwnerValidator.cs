@@ -84,7 +84,7 @@ namespace Streetwriters.Identity.Validation
                     var mfaCode = context.Request.Raw["mfa:code"];
                     var mfaMethod = context.Request.Raw["mfa:method"];
 
-                    if (string.IsNullOrEmpty(mfaCode) || !MFAService.IsValidMFAMethod(mfaMethod, user))
+                    if (string.IsNullOrEmpty(mfaCode) || string.IsNullOrEmpty(mfaMethod) || !MFAService.IsValidMFAMethod(mfaMethod, user))
                     {
                         var sendPhoneNumber = primaryMethod == MFAMethods.SMS || secondaryMethod == MFAMethods.SMS;
 
@@ -95,7 +95,7 @@ namespace Streetwriters.Identity.Validation
                             ["error_description"] = "Multifactor authentication required.",
                             ["data"] = JsonSerializer.Serialize(new MFARequiredResponse
                             {
-                                PhoneNumber = sendPhoneNumber ? Regex.Replace(user.PhoneNumber, @"\d(?!\d{0,3}$)", "*") : null,
+                                PhoneNumber = sendPhoneNumber && user.PhoneNumber != null ? Regex.Replace(user.PhoneNumber, @"\d(?!\d{0,3}$)", "*") : null,
                                 PrimaryMethod = primaryMethod,
                                 SecondaryMethod = secondaryMethod,
                                 Token = token,
@@ -117,7 +117,6 @@ namespace Streetwriters.Identity.Validation
                     }
                     else
                     {
-                        var provider = mfaMethod == MFAMethods.Email || mfaMethod == MFAMethods.SMS ? TokenOptions.DefaultPhoneProvider : UserManager.Options.Tokens.AuthenticatorTokenProvider;
                         var isMFACodeValid = await MFAService.VerifyOTPAsync(user, mfaCode, mfaMethod);
                         if (!isMFACodeValid)
                         {

@@ -10,12 +10,12 @@ namespace Streetwriters.Common.Models
     public partial class GetCustomerResponse : PaddleResponse
     {
         [JsonPropertyName("data")]
-        public PaddleCustomer Customer { get; set; }
+        public PaddleCustomer? Customer { get; set; }
     }
 
     public class PaddleCustomer
     {
         [JsonPropertyName("email")]
-        public string Email { get; set; }
+        public string? Email { get; set; }
     }
 }

@@ -33,7 +33,7 @@ namespace Streetwriters.Common
         {
             Id = "notesnook",
             Name = "Notesnook",
-            SenderEmail = Constants.NOTESNOOK_SENDER_EMAIL,
+            SenderEmail = Constants.NOTESNOOK_SENDER_EMAIL ?? "noreply@notesnook.com",
             SenderName = "Notesnook",
             Type = ApplicationType.NOTESNOOK,
             AppId = ApplicationType.NOTESNOOK,
@@ -58,14 +58,15 @@ namespace Streetwriters.Common
             { "notesnook", Notesnook }
         };
 
-        public static Client FindClientById(string id)
+        public static Client? FindClientById(string? id)
         {
-            if (!IsValidClient(id)) return null;
+            if (string.IsNullOrEmpty(id) || !IsValidClient(id)) return null;
             return ClientsMap[id];
         }
 
-        public static Client FindClientByAppId(ApplicationType appId)
+        public static Client? FindClientByAppId(ApplicationType? appId)
         {
+            if (appId is null) return null;
             switch (appId)
             {
                 case ApplicationType.NOTESNOOK:

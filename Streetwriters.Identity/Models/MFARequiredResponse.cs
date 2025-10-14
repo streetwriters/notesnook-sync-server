@@ -24,12 +24,12 @@ namespace Streetwriters.Identity.Models
     public class MFARequiredResponse
     {
         [JsonPropertyName("primaryMethod")]
-        public string PrimaryMethod { get; set; }
+        public required string PrimaryMethod { get; set; }
         [JsonPropertyName("secondaryMethod")]
-        public string SecondaryMethod { get; set; }
+        public string? SecondaryMethod { get; set; }
         [JsonPropertyName("token")]
-        public string Token { get; set; }
+        public string? Token { get; set; }
         [JsonPropertyName("phoneNumber")]
-        public string PhoneNumber { get; set; }
+        public string? PhoneNumber { get; set; }
     }
 }

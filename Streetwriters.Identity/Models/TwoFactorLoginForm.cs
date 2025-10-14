@@ -30,7 +30,7 @@ namespace Streetwriters.Identity.Models
         [DataType(DataType.Text)]
         [Display(Name = "Authenticator code")]
         [BindProperty(Name = "code")]
-        public string Code { get; set; }
+        public required string Code { get; set; }
 
         [BindProperty(Name = "rememberMachine")]
         public bool RememberMachine { get; set; }

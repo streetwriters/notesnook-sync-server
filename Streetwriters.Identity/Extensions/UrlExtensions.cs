@@ -29,7 +29,7 @@ namespace Microsoft.AspNetCore.Mvc
 {
     public static class UrlHelperExtensions
     {
-        public static string TokenLink(this IUrlHelper urlHelper, string userId, string code, string clientId, TokenType type)
+        public static string? TokenLink(this IUrlHelper urlHelper, string userId, string code, string clientId, TokenType type)
         {
 
             return urlHelper.ActionLink(

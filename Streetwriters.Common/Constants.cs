@@ -29,54 +29,54 @@ namespace Streetwriters.Common
         public static string INSTANCE_NAME => Environment.GetEnvironmentVariable("INSTANCE_NAME") ?? "default";
 
         // S3 related
-        public static string S3_ACCESS_KEY => Environment.GetEnvironmentVariable("S3_ACCESS_KEY");
-        public static string S3_ACCESS_KEY_ID => Environment.GetEnvironmentVariable("S3_ACCESS_KEY_ID");
-        public static string S3_SERVICE_URL => Environment.GetEnvironmentVariable("S3_SERVICE_URL");
-        public static string S3_REGION => Environment.GetEnvironmentVariable("S3_REGION");
-        public static string S3_BUCKET_NAME => Environment.GetEnvironmentVariable("S3_BUCKET_NAME");
-        public static string S3_INTERNAL_BUCKET_NAME => Environment.GetEnvironmentVariable("S3_INTERNAL_BUCKET_NAME");
-        public static string S3_INTERNAL_SERVICE_URL => Environment.GetEnvironmentVariable("S3_INTERNAL_SERVICE_URL");
+        public static string? S3_ACCESS_KEY => Environment.GetEnvironmentVariable("S3_ACCESS_KEY");
+        public static string? S3_ACCESS_KEY_ID => Environment.GetEnvironmentVariable("S3_ACCESS_KEY_ID");
+        public static string? S3_SERVICE_URL => Environment.GetEnvironmentVariable("S3_SERVICE_URL");
+        public static string? S3_REGION => Environment.GetEnvironmentVariable("S3_REGION");
+        public static string? S3_BUCKET_NAME => Environment.GetEnvironmentVariable("S3_BUCKET_NAME");
+        public static string? S3_INTERNAL_BUCKET_NAME => Environment.GetEnvironmentVariable("S3_INTERNAL_BUCKET_NAME");
+        public static string? S3_INTERNAL_SERVICE_URL => Environment.GetEnvironmentVariable("S3_INTERNAL_SERVICE_URL");
 
         // SMTP settings
-        public static string SMTP_USERNAME => Environment.GetEnvironmentVariable("SMTP_USERNAME");
-        public static string SMTP_PASSWORD => Environment.GetEnvironmentVariable("SMTP_PASSWORD");
-        public static string SMTP_HOST => Environment.GetEnvironmentVariable("SMTP_HOST");
-        public static string SMTP_PORT => Environment.GetEnvironmentVariable("SMTP_PORT");
-        public static string SMTP_REPLYTO_EMAIL => Environment.GetEnvironmentVariable("SMTP_REPLYTO_EMAIL");
-        public static string NOTESNOOK_SENDER_EMAIL => Environment.GetEnvironmentVariable("NOTESNOOK_SENDER_EMAIL") ?? Environment.GetEnvironmentVariable("SMTP_USERNAME");
+        public static string? SMTP_USERNAME => Environment.GetEnvironmentVariable("SMTP_USERNAME");
+        public static string? SMTP_PASSWORD => Environment.GetEnvironmentVariable("SMTP_PASSWORD");
+        public static string? SMTP_HOST => Environment.GetEnvironmentVariable("SMTP_HOST");
+        public static string? SMTP_PORT => Environment.GetEnvironmentVariable("SMTP_PORT");
+        public static string? SMTP_REPLYTO_EMAIL => Environment.GetEnvironmentVariable("SMTP_REPLYTO_EMAIL");
+        public static string? NOTESNOOK_SENDER_EMAIL => Environment.GetEnvironmentVariable("NOTESNOOK_SENDER_EMAIL") ?? Environment.GetEnvironmentVariable("SMTP_USERNAME");
 
-        public static string NOTESNOOK_APP_HOST => Environment.GetEnvironmentVariable("NOTESNOOK_APP_HOST");
-        public static string NOTESNOOK_API_SECRET => Environment.GetEnvironmentVariable("NOTESNOOK_API_SECRET");
+        public static string? NOTESNOOK_APP_HOST => Environment.GetEnvironmentVariable("NOTESNOOK_APP_HOST");
+        public static string NOTESNOOK_API_SECRET => Environment.GetEnvironmentVariable("NOTESNOOK_API_SECRET") ?? throw new InvalidOperationException("NOTESNOOK_API_SECRET is required");
 
         // MessageBird is used for SMS sending
-        public static string TWILIO_ACCOUNT_SID => Environment.GetEnvironmentVariable("TWILIO_ACCOUNT_SID");
-        public static string TWILIO_AUTH_TOKEN => Environment.GetEnvironmentVariable("TWILIO_AUTH_TOKEN");
-        public static string TWILIO_SERVICE_SID => Environment.GetEnvironmentVariable("TWILIO_SERVICE_SID");
+        public static string? TWILIO_ACCOUNT_SID => Environment.GetEnvironmentVariable("TWILIO_ACCOUNT_SID");
+        public static string? TWILIO_AUTH_TOKEN => Environment.GetEnvironmentVariable("TWILIO_AUTH_TOKEN");
+        public static string? TWILIO_SERVICE_SID => Environment.GetEnvironmentVariable("TWILIO_SERVICE_SID");
         // Server discovery
         public static int NOTESNOOK_SERVER_PORT => int.Parse(Environment.GetEnvironmentVariable("NOTESNOOK_SERVER_PORT") ?? "80");
-        public static string NOTESNOOK_SERVER_HOST => Environment.GetEnvironmentVariable("NOTESNOOK_SERVER_HOST");
-        public static string NOTESNOOK_CERT_PATH => Environment.GetEnvironmentVariable("NOTESNOOK_CERT_PATH");
-        public static string NOTESNOOK_CERT_KEY_PATH => Environment.GetEnvironmentVariable("NOTESNOOK_CERT_KEY_PATH");
+        public static string? NOTESNOOK_SERVER_HOST => Environment.GetEnvironmentVariable("NOTESNOOK_SERVER_HOST");
+        public static string? NOTESNOOK_CERT_PATH => Environment.GetEnvironmentVariable("NOTESNOOK_CERT_PATH");
+        public static string? NOTESNOOK_CERT_KEY_PATH => Environment.GetEnvironmentVariable("NOTESNOOK_CERT_KEY_PATH");
 
         public static int IDENTITY_SERVER_PORT => int.Parse(Environment.GetEnvironmentVariable("IDENTITY_SERVER_PORT") ?? "80");
-        public static string IDENTITY_SERVER_HOST => Environment.GetEnvironmentVariable("IDENTITY_SERVER_HOST");
-        public static Uri IDENTITY_SERVER_URL => new(Environment.GetEnvironmentVariable("IDENTITY_SERVER_URL"));
-        public static string IDENTITY_CERT_PATH => Environment.GetEnvironmentVariable("IDENTITY_CERT_PATH");
-        public static string IDENTITY_CERT_KEY_PATH => Environment.GetEnvironmentVariable("IDENTITY_CERT_KEY_PATH");
+        public static string? IDENTITY_SERVER_HOST => Environment.GetEnvironmentVariable("IDENTITY_SERVER_HOST");
+        public static Uri? IDENTITY_SERVER_URL => Environment.GetEnvironmentVariable("IDENTITY_SERVER_URL") is string url ? new Uri(url) : null;
+        public static string? IDENTITY_CERT_PATH => Environment.GetEnvironmentVariable("IDENTITY_CERT_PATH");
+        public static string? IDENTITY_CERT_KEY_PATH => Environment.GetEnvironmentVariable("IDENTITY_CERT_KEY_PATH");
 
         public static int SSE_SERVER_PORT => int.Parse(Environment.GetEnvironmentVariable("SSE_SERVER_PORT") ?? "80");
-        public static string SSE_SERVER_HOST => Environment.GetEnvironmentVariable("SSE_SERVER_HOST");
-        public static string SSE_CERT_PATH => Environment.GetEnvironmentVariable("SSE_CERT_PATH");
-        public static string SSE_CERT_KEY_PATH => Environment.GetEnvironmentVariable("SSE_CERT_KEY_PATH");
+        public static string? SSE_SERVER_HOST => Environment.GetEnvironmentVariable("SSE_SERVER_HOST");
+        public static string? SSE_CERT_PATH => Environment.GetEnvironmentVariable("SSE_CERT_PATH");
+        public static string? SSE_CERT_KEY_PATH => Environment.GetEnvironmentVariable("SSE_CERT_KEY_PATH");
 
         // internal
-        public static string WEBRISK_API_URI => Environment.GetEnvironmentVariable("WEBRISK_API_URI");
-        public static string MONGODB_CONNECTION_STRING => Environment.GetEnvironmentVariable("MONGODB_CONNECTION_STRING");
-        public static string MONGODB_DATABASE_NAME => Environment.GetEnvironmentVariable("MONGODB_DATABASE_NAME");
+        public static string? WEBRISK_API_URI => Environment.GetEnvironmentVariable("WEBRISK_API_URI");
+        public static string MONGODB_CONNECTION_STRING => Environment.GetEnvironmentVariable("MONGODB_CONNECTION_STRING") ?? throw new ArgumentNullException("MONGODB_CONNECTION_STRING environment variable is not set");
+        public static string MONGODB_DATABASE_NAME => Environment.GetEnvironmentVariable("MONGODB_DATABASE_NAME") ?? throw new ArgumentNullException("MONGODB_DATABASE_NAME environment variable is not set");
         public static int SUBSCRIPTIONS_SERVER_PORT => int.Parse(Environment.GetEnvironmentVariable("SUBSCRIPTIONS_SERVER_PORT") ?? "80");
-        public static string SUBSCRIPTIONS_SERVER_HOST => Environment.GetEnvironmentVariable("SUBSCRIPTIONS_SERVER_HOST");
-        public static string SUBSCRIPTIONS_CERT_PATH => Environment.GetEnvironmentVariable("SUBSCRIPTIONS_CERT_PATH");
-        public static string SUBSCRIPTIONS_CERT_KEY_PATH => Environment.GetEnvironmentVariable("SUBSCRIPTIONS_CERT_KEY_PATH");
+        public static string? SUBSCRIPTIONS_SERVER_HOST => Environment.GetEnvironmentVariable("SUBSCRIPTIONS_SERVER_HOST");
+        public static string? SUBSCRIPTIONS_CERT_PATH => Environment.GetEnvironmentVariable("SUBSCRIPTIONS_CERT_PATH");
+        public static string? SUBSCRIPTIONS_CERT_KEY_PATH => Environment.GetEnvironmentVariable("SUBSCRIPTIONS_CERT_KEY_PATH");
         public static string[] NOTESNOOK_CORS_ORIGINS => Environment.GetEnvironmentVariable("NOTESNOOK_CORS")?.Split(",") ?? new string[] { };
     }
 }
