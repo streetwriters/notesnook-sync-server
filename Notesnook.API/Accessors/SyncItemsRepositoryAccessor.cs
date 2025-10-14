@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
 using Notesnook.API.Interfaces;
 using Notesnook.API.Models;
@@ -74,24 +75,24 @@ namespace Notesnook.API.Accessors
         IMongoCollection<SyncItem> tags,
 
         Repository<UserSettings> usersSettings, Repository<Monograph> monographs,
-        Repository<InboxApiKey> inboxApiKey, Repository<InboxSyncItem> inboxItems)
+        Repository<InboxApiKey> inboxApiKey, Repository<InboxSyncItem> inboxItems, ILogger<SyncItemsRepository> logger)
         {
             UsersSettings = usersSettings;
             Monographs = monographs;
             InboxApiKey = inboxApiKey;
             InboxItems = inboxItems;
-            Notebooks = new SyncItemsRepository(dbContext, notebooks);
-            Notes = new SyncItemsRepository(dbContext, notes);
-            Contents = new SyncItemsRepository(dbContext, content);
-            Settings = new SyncItemsRepository(dbContext, settings);
-            LegacySettings = new SyncItemsRepository(dbContext, legacySettings);
-            Attachments = new SyncItemsRepository(dbContext, attachments);
-            Shortcuts = new SyncItemsRepository(dbContext, shortcuts);
-            Reminders = new SyncItemsRepository(dbContext, reminders);
-            Relations = new SyncItemsRepository(dbContext, relations);
-            Colors = new SyncItemsRepository(dbContext, colors);
-            Vaults = new SyncItemsRepository(dbContext, vaults);
-            Tags = new SyncItemsRepository(dbContext, tags);
+            Notebooks = new SyncItemsRepository(dbContext, notebooks, logger);
+            Notes = new SyncItemsRepository(dbContext, notes, logger);
+            Contents = new SyncItemsRepository(dbContext, content, logger);
+            Settings = new SyncItemsRepository(dbContext, settings, logger);
+            LegacySettings = new SyncItemsRepository(dbContext, legacySettings, logger);
+            Attachments = new SyncItemsRepository(dbContext, attachments, logger);
+            Shortcuts = new SyncItemsRepository(dbContext, shortcuts, logger);
+            Reminders = new SyncItemsRepository(dbContext, reminders, logger);
+            Relations = new SyncItemsRepository(dbContext, relations, logger);
+            Colors = new SyncItemsRepository(dbContext, colors, logger);
+            Vaults = new SyncItemsRepository(dbContext, vaults, logger);
+            Tags = new SyncItemsRepository(dbContext, tags, logger);
         }
     }
 }

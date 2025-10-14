@@ -24,6 +24,7 @@ using System.Text;
 using System.Text.Encodings.Web;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Logging;
 using Streetwriters.Common;
 using Streetwriters.Common.Enums;
 using Streetwriters.Common.Interfaces;
@@ -42,11 +43,13 @@ namespace Streetwriters.Identity.Services
         private UserManager<User> UserManager { get; set; }
         private ITemplatedEmailSender EmailSender { get; set; }
         private ISMSSender SMSSender { get; set; }
-        public MFAService(UserManager<User> _userManager, ITemplatedEmailSender emailSender, ISMSSender smsSender)
+        private readonly ILogger<MFAService> logger;
+        public MFAService(UserManager<User> _userManager, ITemplatedEmailSender emailSender, ISMSSender smsSender, ILogger<MFAService> logger)
         {
             UserManager = _userManager;
             EmailSender = emailSender;
             SMSSender = smsSender;
+            this.logger = logger;
         }
 
         public async Task EnableMFAAsync(User user, string primaryMethod)
@@ -186,7 +189,7 @@ namespace Streetwriters.Identity.Services
                 case "sms":
                     await UserManager.SetPhoneNumberAsync(user, form.PhoneNumber);
                     var id = await SMSSender.SendOTPAsync(form.PhoneNumber, client);
-                    await Slogger<MFAService>.Info("SendOTPAsync", user.Id.ToString(), id);
+                    logger.LogInformation("SMS OTP sent for user: {UserId}, SMS ID: {SmsId}", user.Id, id);
                     await this.ReplaceClaimAsync(user, MFAService.SMS_ID_CLAIM, id);
                     break;
 

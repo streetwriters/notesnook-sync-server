@@ -32,6 +32,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Logging;
 using Streetwriters.Common;
 using Streetwriters.Common.Enums;
 using Streetwriters.Common.Interfaces;
@@ -54,13 +55,15 @@ namespace Streetwriters.Identity.Controllers
         private IPersistedGrantStore PersistedGrantStore { get; set; }
         private ITokenGenerationService TokenGenerationService { get; set; }
         private IUserAccountService UserAccountService { get; set; }
+        private readonly ILogger<AccountController> logger;
         public AccountController(UserManager<User> _userManager, ITemplatedEmailSender _emailSender,
         SignInManager<User> _signInManager, RoleManager<MongoRole> _roleManager, IPersistedGrantStore store,
-        ITokenGenerationService tokenGenerationService, IMFAService _mfaService, IUserAccountService userAccountService) : base(_userManager, _emailSender, _signInManager, _roleManager, _mfaService)
+        ITokenGenerationService tokenGenerationService, IMFAService _mfaService, IUserAccountService userAccountService, ILogger<AccountController> logger) : base(_userManager, _emailSender, _signInManager, _roleManager, _mfaService)
         {
             PersistedGrantStore = store;
             TokenGenerationService = tokenGenerationService;
             UserAccountService = userAccountService;
+            this.logger = logger;
         }
 
         [HttpGet("confirm")]
@@ -161,7 +164,7 @@ namespace Streetwriters.Identity.Controllers
 #if (DEBUG || STAGING)
             return Ok(callbackUrl);
 #else
-            await Slogger<AccountController>.Info("ResetUserPassword", user.Email, callbackUrl);
+            logger.LogInformation("Password reset email sent to: {Email}, callback URL: {CallbackUrl}", user.Email, callbackUrl);
             await EmailSender.SendPasswordResetEmailAsync(user.Email, callbackUrl, client);
             return Ok();
 #endif

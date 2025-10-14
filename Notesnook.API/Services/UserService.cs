@@ -23,6 +23,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
 using Notesnook.API.Helpers;
 using Notesnook.API.Interfaces;
 using Notesnook.API.Models;
@@ -37,33 +38,23 @@ using Streetwriters.Data.Interfaces;
 
 namespace Notesnook.API.Services
 {
-    public class UserService : IUserService
+    public class UserService(IHttpContextAccessor accessor,
+        ISyncItemsRepositoryAccessor syncItemsRepositoryAccessor,
+        IUnitOfWork unitOfWork, IS3Service s3Service, ILogger<UserService> logger) : IUserService
     {
         private static readonly System.Security.Cryptography.RandomNumberGenerator Rng = System.Security.Cryptography.RandomNumberGenerator.Create();
-        private readonly HttpClient httpClient;
-        private IHttpContextAccessor HttpContextAccessor { get; }
-        private ISyncItemsRepositoryAccessor Repositories { get; }
-        private IS3Service S3Service { get; set; }
-        private readonly IUnitOfWork unit;
-
-        public UserService(IHttpContextAccessor accessor,
-        ISyncItemsRepositoryAccessor syncItemsRepositoryAccessor,
-        IUnitOfWork unitOfWork, IS3Service s3Service)
-        {
-            httpClient = new HttpClient();
-
-            Repositories = syncItemsRepositoryAccessor;
-            HttpContextAccessor = accessor;
-            unit = unitOfWork;
-            S3Service = s3Service;
-        }
+        private readonly HttpClient httpClient = new();
+        private IHttpContextAccessor HttpContextAccessor { get; } = accessor;
+        private ISyncItemsRepositoryAccessor Repositories { get; } = syncItemsRepositoryAccessor;
+        private IS3Service S3Service { get; set; } = s3Service;
+        private readonly IUnitOfWork unit = unitOfWork;
 
         public async Task CreateUserAsync()
         {
             SignupResponse response = await httpClient.ForwardAsync<SignupResponse>(this.HttpContextAccessor, $"{Servers.IdentityServer}/signup", HttpMethod.Post);
             if (!response.Success || (response.Errors != null && response.Errors.Length > 0))
             {
-                await Slogger<UserService>.Error(nameof(CreateUserAsync), "Couldn't sign up.", JsonSerializer.Serialize(response));
+                logger.LogError("Failed to sign up user: {Response}", JsonSerializer.Serialize(response));
                 if (response.Errors != null && response.Errors.Length > 0)
                     throw new Exception(string.Join(" ", response.Errors));
                 else throw new Exception("Could not create a new account. Error code: " + response.StatusCode);
@@ -91,7 +82,7 @@ namespace Notesnook.API.Services
                 });
             }
 
-            await Slogger<UserService>.Info(nameof(CreateUserAsync), "New user created.", JsonSerializer.Serialize(response));
+            logger.LogInformation("New user created: {Response}", JsonSerializer.Serialize(response));
         }
 
         public async Task<UserResponse> GetUserAsync(string userId)
@@ -210,7 +201,7 @@ namespace Notesnook.API.Services
             Repositories.InboxApiKey.DeleteMany((t) => t.UserId == userId);
 
             var result = await unit.Commit();
-            await Slogger<UserService>.Info(nameof(DeleteUserAsync), "User data deleted", userId, result.ToString());
+            logger.LogInformation("User data deleted for user {UserId}: {Result}", userId, result);
             if (!result) throw new Exception("Could not delete user data.");
 
             if (!Constants.IS_SELF_HOSTED)
@@ -227,7 +218,7 @@ namespace Notesnook.API.Services
 
         public async Task DeleteUserAsync(string userId, string jti, string password)
         {
-            await Slogger<UserService>.Info(nameof(DeleteUserAsync), "Deleting user account", userId);
+            logger.LogInformation("Deleting user account: {UserId}", userId);
 
             var userService = await WampServers.IdentityServer.GetServiceAsync<IUserAccountService>(IdentityServerTopics.UserAccountServiceTopic);
             await userService.DeleteUserAsync(Clients.Notesnook.Id, userId, password);

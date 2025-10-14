@@ -24,6 +24,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Notesnook.API.Interfaces;
 using Notesnook.API.Models.Responses;
 using Notesnook.API.Services;
@@ -36,10 +37,10 @@ namespace Notesnook.API.Controllers
     [ApiController]
     [Authorize]
     [Route("devices")]
-    public class SyncDeviceController : ControllerBase
+    public class SyncDeviceController(ILogger<SyncDeviceController> logger) : ControllerBase
     {
         [HttpPost]
-        public async Task<IActionResult> RegisterDevice([FromQuery] string deviceId)
+        public IActionResult RegisterDevice([FromQuery] string deviceId)
         {
             try
             {
@@ -49,14 +50,14 @@ namespace Notesnook.API.Controllers
             }
             catch (Exception ex)
             {
-                await Slogger<UsersController>.Error(nameof(UnregisterDevice), "Couldn't register device.", ex.ToString());
+                logger.LogError(ex, "Failed to register device: {DeviceId}", deviceId);
                 return BadRequest(new { error = ex.Message });
             }
         }
 
 
         [HttpDelete]
-        public async Task<IActionResult> UnregisterDevice([FromQuery] string deviceId)
+        public IActionResult UnregisterDevice([FromQuery] string deviceId)
         {
             try
             {
@@ -66,7 +67,7 @@ namespace Notesnook.API.Controllers
             }
             catch (Exception ex)
             {
-                await Slogger<UsersController>.Error(nameof(UnregisterDevice), "Couldn't unregister device.", ex.ToString());
+                logger.LogError(ex, "Failed to unregister device: {DeviceId}", deviceId);
                 return BadRequest(new { error = ex.Message });
             }
         }

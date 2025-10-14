@@ -23,6 +23,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Notesnook.API.Interfaces;
 using Notesnook.API.Models;
 using Notesnook.API.Models.Responses;
@@ -33,7 +34,7 @@ namespace Notesnook.API.Controllers
     [ApiController]
     [Authorize]
     [Route("users")]
-    public class UsersController(IUserService UserService) : ControllerBase
+    public class UsersController(IUserService UserService, ILogger<UsersController> logger) : ControllerBase
     {
         [HttpPost]
         [AllowAnonymous]
@@ -46,7 +47,7 @@ namespace Notesnook.API.Controllers
             }
             catch (Exception ex)
             {
-                await Slogger<UsersController>.Error(nameof(Signup), "Couldn't sign up.", ex.ToString());
+                logger.LogError(ex, "Failed to sign up user");
                 return BadRequest(new { error = ex.Message });
             }
         }
@@ -63,7 +64,7 @@ namespace Notesnook.API.Controllers
             }
             catch (Exception ex)
             {
-                await Slogger<UsersController>.Error(nameof(GetUser), "Couldn't get user for id.", userId, ex.ToString());
+                logger.LogError(ex, "Failed to get user with id: {UserId}", userId);
                 return BadRequest(new { error = ex.Message });
             }
         }
@@ -79,7 +80,7 @@ namespace Notesnook.API.Controllers
             }
             catch (Exception ex)
             {
-                await Slogger<UsersController>.Error(nameof(GetUser), "Couldn't update user with id.", userId, ex.ToString());
+                logger.LogError(ex, "Failed to update user with id: {UserId}", userId);
                 return BadRequest(new { error = ex.Message });
             }
         }
@@ -107,7 +108,7 @@ namespace Notesnook.API.Controllers
             }
             catch (Exception ex)
             {
-                await Slogger<UsersController>.Error(nameof(GetUser), "Couldn't delete user with id.", userId, ex.ToString());
+                logger.LogError(ex, "Failed to delete user with id: {UserId}", userId);
                 return BadRequest(new { error = ex.Message });
             }
         }

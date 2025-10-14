@@ -23,6 +23,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using MongoDB.Bson;
 using Notesnook.API.Authorization;
 using Notesnook.API.Models;
@@ -35,21 +36,12 @@ namespace Notesnook.API.Controllers
 {
     [ApiController]
     [Route("inbox")]
-    public class InboxController : ControllerBase
-    {
-        private readonly Repository<InboxApiKey> InboxApiKey;
-        private readonly Repository<UserSettings> UserSetting;
-        private Repository<InboxSyncItem> InboxItems;
-
-        public InboxController(
+    public class InboxController(
             Repository<InboxApiKey> inboxApiKeysRepository,
             Repository<UserSettings> userSettingsRepository,
-            Repository<InboxSyncItem> inboxItemsRepository)
-        {
-            InboxApiKey = inboxApiKeysRepository;
-            UserSetting = userSettingsRepository;
-            InboxItems = inboxItemsRepository;
-        }
+            Repository<InboxSyncItem> inboxItemsRepository,
+            ILogger<InboxController> logger) : ControllerBase
+    {
 
         [HttpGet("api-keys")]
         [Authorize(Policy = "Notesnook")]
@@ -58,12 +50,12 @@ namespace Notesnook.API.Controllers
             var userId = User.FindFirstValue("sub");
             try
             {
-                var apiKeys = await InboxApiKey.FindAsync(t => t.UserId == userId);
+                var apiKeys = await inboxApiKeysRepository.FindAsync(t => t.UserId == userId);
                 return Ok(apiKeys);
             }
             catch (Exception ex)
             {
-                await Slogger<InboxController>.Error(nameof(GetApiKeysAsync), "Couldn't get inbox api keys.", userId, ex.ToString());
+                logger.LogError(ex, "Couldn't get inbox api keys for user {UserId}", userId);
                 return BadRequest(new { error = ex.Message });
             }
         }
@@ -84,7 +76,7 @@ namespace Notesnook.API.Controllers
                     return BadRequest(new { error = "Valid expiry date is required." });
                 }
 
-                var count = await InboxApiKey.CountAsync(t => t.UserId == userId);
+                var count = await inboxApiKeysRepository.CountAsync(t => t.UserId == userId);
                 if (count >= 10)
                 {
                     return BadRequest(new { error = "Maximum of 10 inbox api keys allowed." });
@@ -98,12 +90,12 @@ namespace Notesnook.API.Controllers
                     ExpiryDate = request.ExpiryDate,
                     LastUsedAt = 0
                 };
-                await InboxApiKey.InsertAsync(inboxApiKey);
+                await inboxApiKeysRepository.InsertAsync(inboxApiKey);
                 return Ok(inboxApiKey);
             }
             catch (Exception ex)
             {
-                await Slogger<InboxController>.Error(nameof(CreateApiKeyAsync), "Couldn't create inbox api key.", userId, ex.ToString());
+                logger.LogError(ex, "Couldn't create inbox api key for {UserId}.", userId);
                 return BadRequest(new { error = ex.Message });
             }
         }
@@ -120,12 +112,12 @@ namespace Notesnook.API.Controllers
                     return BadRequest(new { error = "Api key is required." });
                 }
 
-                await InboxApiKey.DeleteAsync(t => t.UserId == userId && t.Key == apiKey);
+                await inboxApiKeysRepository.DeleteAsync(t => t.UserId == userId && t.Key == apiKey);
                 return Ok(new { message = "Api key deleted successfully." });
             }
             catch (Exception ex)
             {
-                await Slogger<InboxController>.Error(nameof(DeleteApiKeyAsync), "Couldn't delete inbox api key.", userId, ex.ToString());
+                logger.LogError(ex, "Couldn't delete inbox api key for user {UserId}", userId);
                 return BadRequest(new { error = ex.Message });
             }
         }
@@ -137,7 +129,7 @@ namespace Notesnook.API.Controllers
             var userId = User.FindFirstValue("sub");
             try
             {
-                var userSetting = await UserSetting.FindOneAsync(u => u.UserId == userId);
+                var userSetting = await userSettingsRepository.FindOneAsync(u => u.UserId == userId);
                 if (string.IsNullOrWhiteSpace(userSetting?.InboxKeys?.Public))
                 {
                     return BadRequest(new { error = "Inbox public key is not configured." });
@@ -146,7 +138,7 @@ namespace Notesnook.API.Controllers
             }
             catch (Exception ex)
             {
-                await Slogger<InboxController>.Error(nameof(GetPublicKeyAsync), "Couldn't get user's inbox's public key.", userId, ex.ToString());
+                logger.LogError(ex, "Couldn't get user's inbox's public key for user {UserId}", userId);
                 return BadRequest(new { error = ex.Message });
             }
         }
@@ -189,7 +181,7 @@ namespace Notesnook.API.Controllers
 
                 request.UserId = userId;
                 request.ItemId = ObjectId.GenerateNewId().ToString();
-                await InboxItems.InsertAsync(request);
+                await inboxItemsRepository.InsertAsync(request);
                 new SyncDeviceService(new SyncDevice(userId, string.Empty))
                     .AddIdsToAllDevices([$"{request.ItemId}:inboxItems"]);
                 await WampServers.MessengerServer.PublishMessageAsync(MessengerServerTopics.SendSSETopic, new SendSSEMessage
@@ -206,7 +198,7 @@ namespace Notesnook.API.Controllers
             }
             catch (Exception ex)
             {
-                await Slogger<InboxController>.Error(nameof(CreateInboxItemAsync), "Couldn't create inbox item.", userId, ex.ToString());
+                logger.LogError(ex, "Couldn't create inbox item for user {UserId}", userId);
                 return BadRequest(new { error = ex.Message });
             }
         }

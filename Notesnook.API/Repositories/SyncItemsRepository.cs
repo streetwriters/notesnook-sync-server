@@ -26,6 +26,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using IdentityModel;
 using Microsoft.VisualBasic;
+using Microsoft.Extensions.Logging;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using Notesnook.API.Hubs;
@@ -41,9 +42,11 @@ namespace Notesnook.API.Repositories
     public class SyncItemsRepository : Repository<SyncItem>
     {
         private readonly string collectionName;
-        public SyncItemsRepository(IDbContext dbContext, IMongoCollection<SyncItem> collection) : base(dbContext, collection)
+        private readonly ILogger<SyncItemsRepository> logger;
+        public SyncItemsRepository(IDbContext dbContext, IMongoCollection<SyncItem> collection, ILogger<SyncItemsRepository> logger) : base(dbContext, collection)
         {
             this.collectionName = collection.CollectionNamespace.CollectionName;
+            this.logger = logger;
         }
 
         private readonly List<string> ALGORITHMS = [Algorithms.Default, Algorithms.XSAL_X25519_7];
@@ -110,7 +113,8 @@ namespace Notesnook.API.Repositories
             // Handle case where the cipher is corrupted.
             if (!IsBase64String(item.Cipher))
             {
-                Slogger<SyncHub>.Error("Upsert", "Corrupted", item.ItemId, item.Length.ToString(), item.Cipher);
+                logger.LogError("Corrupted item {ItemId} in collection {CollectionName}. Length: {Length}, Cipher: {Cipher}",
+                    item.ItemId, this.collectionName, item.Length, item.Cipher);
                 throw new Exception($"Corrupted item \"{item.ItemId}\" in collection \"{this.collectionName}\". Please report this error to support@streetwriters.co.");
             }
 
@@ -147,7 +151,8 @@ namespace Notesnook.API.Repositories
                 // Handle case where the cipher is corrupted.
                 if (!IsBase64String(item.Cipher))
                 {
-                    Slogger<SyncHub>.Error("Upsert", "Corrupted", item.ItemId, item.Length.ToString(), item.Cipher);
+                    logger.LogError("Corrupted item {ItemId} in collection {CollectionName}. Length: {Length}, Cipher: {Cipher}",
+                        item.ItemId, this.collectionName, item.Length, item.Cipher);
                     throw new Exception($"Corrupted item \"{item.ItemId}\" in collection \"{this.collectionName}\". Please report this error to support@streetwriters.co.");
                 }
 

@@ -26,6 +26,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Logging;
 using Streetwriters.Common;
 using Streetwriters.Common.Enums;
 using Streetwriters.Common.Models;
@@ -40,9 +41,16 @@ namespace Streetwriters.Identity.Controllers
     [Route("signup")]
     public class SignupController : IdentityControllerBase
     {
+        private readonly ILogger<SignupController> logger;
+        private readonly EmailAddressValidator emailValidator;
+
         public SignupController(UserManager<User> _userManager, ITemplatedEmailSender _emailSender,
-        SignInManager<User> _signInManager, RoleManager<MongoRole> _roleManager, IMFAService _mfaService) : base(_userManager, _emailSender, _signInManager, _roleManager, _mfaService)
-        { }
+        SignInManager<User> _signInManager, RoleManager<MongoRole> _roleManager, IMFAService _mfaService,
+        ILogger<SignupController> logger, EmailAddressValidator emailValidator) : base(_userManager, _emailSender, _signInManager, _roleManager, _mfaService)
+        {
+            this.logger = logger;
+            this.emailValidator = emailValidator;
+        }
 
         private async Task AddClientRoleAsync(string clientId)
         {
@@ -68,7 +76,7 @@ namespace Streetwriters.Identity.Controllers
                 form.Email = form.Email.ToLowerInvariant();
                 form.Username = form.Username?.ToLowerInvariant();
 
-                if (!await EmailAddressValidator.IsEmailAddressValidAsync(form.Email)) return BadRequest(new string[] { "Invalid email address." });
+                if (!await emailValidator.IsEmailAddressValidAsync(form.Email)) return BadRequest(new string[] { "Invalid email address." });
 
                 var result = await UserManager.CreateAsync(new User
                 {
@@ -128,7 +136,7 @@ namespace Streetwriters.Identity.Controllers
             }
             catch (System.Exception ex)
             {
-                await Slogger<SignupController>.Error("Signup", ex.ToString());
+                logger.LogError(ex, "Failed to create user account for email: {Email}", form.Email);
                 return BadRequest("Failed to create an account.");
             }
         }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Streetwriters.Common;
 using System.Linq;
 
@@ -11,8 +12,14 @@ namespace Streetwriters.Identity.Services
     {
         private static DateTimeOffset LAST_FETCH_TIME = DateTimeOffset.MinValue;
         private static HashSet<string> BLACKLISTED_DOMAINS = new();
+        private readonly ILogger<EmailAddressValidator> logger;
 
-        public static async Task<bool> IsEmailAddressValidAsync(string email)
+        public EmailAddressValidator(ILogger<EmailAddressValidator> logger)
+        {
+            this.logger = logger;
+        }
+
+        public async Task<bool> IsEmailAddressValidAsync(string email)
         {
             var domain = email.ToLowerInvariant().Split("@")[1];
             try
@@ -30,7 +37,7 @@ namespace Streetwriters.Identity.Services
             }
             catch (Exception ex)
             {
-                await Slogger<EmailAddressValidator>.Error("IsEmailAddressValidAsync", ex.ToString());
+                logger.LogError(ex, "Failed to validate email address: {Email}", email);
                 return BLACKLISTED_DOMAINS.Count > 0 ? !BLACKLISTED_DOMAINS.Contains(domain) : true;
             }
         }

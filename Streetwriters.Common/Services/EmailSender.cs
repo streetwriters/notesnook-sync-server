@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using MailKit.Net.Smtp;
 using MimeKit;
 using MimeKit.Cryptography;
@@ -16,6 +17,12 @@ namespace Streetwriters.Common.Services
     public class EmailSender : IEmailSender, IAsyncDisposable
     {
         private readonly SmtpClient mailClient = new();
+        private readonly ILogger<EmailSender> logger;
+
+        public EmailSender(ILogger<EmailSender> logger)
+        {
+            this.logger = logger;
+        }
 
         public async Task SendEmailAsync(
             string email,
@@ -67,7 +74,7 @@ namespace Streetwriters.Common.Services
             await mailClient.SendAsync(message);
         }
 
-        private static async Task<MimeEntity> GetEmailBodyAsync(
+        private async Task<MimeEntity> GetEmailBodyAsync(
             EmailTemplate template,
             IClient client,
             MailboxAddress sender,
@@ -120,7 +127,7 @@ namespace Streetwriters.Common.Services
             }
             catch (Exception ex)
             {
-                await Slogger<EmailSender>.Error("GetEmailBodyAsync", ex.ToString());
+                logger.LogError(ex, "Failed to get email body");
                 return builder.ToMessageBody();
             }
         }

@@ -55,30 +55,14 @@ namespace Streetwriters.Common
 
         public async Task PublishMessageAsync<V>(string topic, V message)
         {
-            try
-            {
-                IWampRealmProxy channel = await GetChannelAsync(topic);
-                WampHelper.PublishMessage(channel, topic, message);
-            }
-            catch (Exception ex)
-            {
-                await Slogger<WampServer<T>>.Error(nameof(PublishMessageAsync), ex.ToString());
-                throw ex;
-            }
+            IWampRealmProxy channel = await GetChannelAsync(topic);
+            WampHelper.PublishMessage(channel, topic, message);
         }
 
         public async Task PublishMessagesAsync<V>(string topic, IEnumerable<V> messages)
         {
-            try
-            {
-                IWampRealmProxy channel = await GetChannelAsync(topic);
-                WampHelper.PublishMessages(channel, topic, messages);
-            }
-            catch (Exception ex)
-            {
-                await Slogger<WampServer<T>>.Error(nameof(PublishMessagesAsync), ex.ToString());
-                throw ex;
-            }
+            IWampRealmProxy channel = await GetChannelAsync(topic);
+            WampHelper.PublishMessages(channel, topic, messages);
         }
     }
 

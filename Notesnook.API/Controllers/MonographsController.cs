@@ -27,6 +27,7 @@ using AngleSharp;
 using AngleSharp.Dom;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using Notesnook.API.Authorization;
@@ -43,7 +44,7 @@ namespace Notesnook.API.Controllers
     [ApiController]
     [Route("monographs")]
     [Authorize("Sync")]
-    public class MonographsController(Repository<Monograph> monographs, IURLAnalyzer analyzer) : ControllerBase
+    public class MonographsController(Repository<Monograph> monographs, IURLAnalyzer analyzer, ILogger<MonographsController> logger) : ControllerBase
     {
         const string SVG_PIXEL = "<svg xmlns='http://www.w3.org/2000/svg' width='1' height='1'><circle r='9'/></svg>";
         private const int MAX_DOC_SIZE = 15 * 1024 * 1024;
@@ -133,7 +134,7 @@ namespace Notesnook.API.Controllers
             }
             catch (Exception e)
             {
-                await Slogger<MonographsController>.Error(nameof(PublishAsync), e.ToString());
+                logger.LogError(e, "Failed to publish monograph");
                 return BadRequest();
             }
         }
@@ -184,7 +185,7 @@ namespace Notesnook.API.Controllers
             }
             catch (Exception e)
             {
-                await Slogger<MonographsController>.Error(nameof(UpdateAsync), e.ToString());
+                logger.LogError(e, "Failed to update monograph");
                 return BadRequest();
             }
         }
@@ -328,7 +329,7 @@ namespace Notesnook.API.Controllers
                         if (string.IsNullOrEmpty(href)) continue;
                         if (!await analyzer.IsURLSafeAsync(href))
                         {
-                            await Slogger<MonographsController>.Info("CleanupContentAsync", "Malicious URL detected: " + href);
+                            logger.LogInformation("Malicious URL detected: {Url}", href);
                             element.RemoveAttribute("href");
                         }
                     }
@@ -355,7 +356,7 @@ namespace Notesnook.API.Controllers
             }
             catch (Exception ex)
             {
-                await Slogger<MonographsController>.Error("CleanupContentAsync", ex.ToString());
+                logger.LogError(ex, "Failed to cleanup monograph content");
                 return content;
             }
         }
