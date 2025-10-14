@@ -63,13 +63,11 @@ namespace Streetwriters.Identity.Validation
             var tokenResult = BearerTokenValidator.ValidateAuthorizationHeader(httpContext);
             if (!tokenResult.TokenFound) return;
 
-
             var tokenValidationResult = await TokenValidator.ValidateAccessTokenAsync(tokenResult.Token, Config.MFA_PASSWORD_GRANT_TYPE_SCOPE);
             if (tokenValidationResult.IsError) return;
 
-
-            var client = Clients.FindClientById(tokenValidationResult.Claims.GetClaimValue("client_id"));
-            if (client == null)
+            var client = Clients.FindClientById(context.Request.ClientId);
+            if (client == null || context.Request.ClientId != tokenValidationResult.Claims.GetClaimValue("client_id"))
             {
                 context.Result = new GrantValidationResult(TokenRequestErrors.InvalidClient);
                 return;
@@ -80,16 +78,15 @@ namespace Streetwriters.Identity.Validation
 
             if (string.IsNullOrEmpty(userId)) return;
 
+            var user = await UserManager.FindByIdAsync(userId);
+            if (user == null) return;
+
             context.Result.Error = "unauthorized";
             context.Result.ErrorDescription = "Password is incorrect.";
 
             if (string.IsNullOrEmpty(password)) return;
 
-            var user = await UserManager.FindByIdAsync(userId);
-            if (user == null) return;
-
             var result = await SignInManager.CheckPasswordSignInAsync(user, password, true);
-
             if (result.IsLockedOut)
             {
                 var timeLeft = user.LockoutEnd - DateTimeOffset.Now;

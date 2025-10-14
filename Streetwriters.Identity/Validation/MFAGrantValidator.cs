@@ -75,8 +75,8 @@ namespace Streetwriters.Identity.Validation
             var tokenValidationResult = await TokenValidator.ValidateAccessTokenAsync(tokenResult.Token, Config.MFA_GRANT_TYPE_SCOPE);
             if (tokenValidationResult.IsError) return;
 
-            var client = Clients.FindClientById(tokenValidationResult.Claims.GetClaimValue("client_id"));
-            if (client == null)
+            var client = Clients.FindClientById(context.Request.ClientId);
+            if (client == null || context.Request.ClientId != tokenValidationResult.Claims.GetClaimValue("client_id"))
             {
                 context.Result = new GrantValidationResult(TokenRequestErrors.InvalidClient);
                 return;
