@@ -27,7 +27,7 @@ namespace Notesnook.API.Interfaces
     {
         Task CreateUserAsync();
         Task DeleteUserAsync(string userId);
-        Task DeleteUserAsync(string userId, string jti, string password);
+        Task DeleteUserAsync(string userId, string? jti, string password);
         Task<bool> ResetUserAsync(string userId, bool removeAttachments);
         Task<UserResponse> GetUserAsync(string userId);
         Task SetUserKeysAsync(string userId, UserKeys keys);

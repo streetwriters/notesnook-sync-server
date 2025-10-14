@@ -66,9 +66,9 @@ namespace Streetwriters.Data.Repositories
             return data.FirstOrDefault();
         }
 
-        public virtual async Task<TEntity> GetAsync(string id)
+        public virtual async Task<TEntity> GetAsync(ObjectId id)
         {
-            var data = await Collection.FindAsync(Builders<TEntity>.Filter.Eq("_id", ObjectId.Parse(id)));
+            var data = await Collection.FindAsync(Builders<TEntity>.Filter.Eq("_id", id));
             return data.FirstOrDefault();
         }
 
@@ -89,24 +89,24 @@ namespace Streetwriters.Data.Repositories
             return await Collection.CountDocumentsAsync(filterExpression);
         }
 
-        public virtual void Update(string id, TEntity obj)
+        public virtual void Update(ObjectId id, TEntity obj)
         {
-            dbContext.AddCommand((handle, ct) => Collection.ReplaceOneAsync(handle, Builders<TEntity>.Filter.Eq("_id", ObjectId.Parse(id)), obj, cancellationToken: ct));
+            dbContext.AddCommand((handle, ct) => Collection.ReplaceOneAsync(handle, Builders<TEntity>.Filter.Eq("_id", id), obj, cancellationToken: ct));
         }
 
-        public virtual Task UpdateAsync(string id, TEntity obj)
+        public virtual Task UpdateAsync(ObjectId id, TEntity obj)
         {
-            return Collection.ReplaceOneAsync(Builders<TEntity>.Filter.Eq("_id", ObjectId.Parse(id)), obj);
+            return Collection.ReplaceOneAsync(Builders<TEntity>.Filter.Eq("_id", id), obj);
         }
 
-        public virtual void DeleteById(string id)
+        public virtual void DeleteById(ObjectId id)
         {
-            dbContext.AddCommand((handle, ct) => Collection.DeleteOneAsync(handle, Builders<TEntity>.Filter.Eq("_id", ObjectId.Parse(id)), cancellationToken: ct));
+            dbContext.AddCommand((handle, ct) => Collection.DeleteOneAsync(handle, Builders<TEntity>.Filter.Eq("_id", id), cancellationToken: ct));
         }
 
-        public virtual Task DeleteByIdAsync(string id)
+        public virtual Task DeleteByIdAsync(ObjectId id)
         {
-            return Collection.DeleteOneAsync(Builders<TEntity>.Filter.Eq("_id", ObjectId.Parse(id)));
+            return Collection.DeleteOneAsync(Builders<TEntity>.Filter.Eq("_id", id));
         }
 
         public virtual void Delete(Expression<Func<TEntity, bool>> filterExpression)
