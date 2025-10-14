@@ -39,11 +39,11 @@ namespace Notesnook.API.Helpers
             return MAX_FILE_SIZE[subscription.Plan];
         }
 
-        public static bool IsStorageLimitReached(Subscription subscription, Limit limit)
+        public static bool IsStorageLimitReached(Subscription subscription, long limit)
         {
             var storageLimit = GetStorageLimitForPlan(subscription);
             if (storageLimit == -1) return false;
-            return limit.Value > storageLimit;
+            return limit > storageLimit;
         }
 
         public static bool IsFileSizeExceeded(Subscription subscription, long fileSize)
