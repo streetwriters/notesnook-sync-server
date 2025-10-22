@@ -67,18 +67,11 @@ docker compose up
 
 This takes care of setting up everything including MongoDB, Minio etc.
 
-## TODO Self-hosting
+For detailed self-hosting instructions, see the [self-hosting documentation](docs/self-hosting.md).
 
-**Note: Self-hosting the Notesnook Sync Server is now possible, but without support. Documentation will be provided at a later date. We are working to enable full on-premise self-hosting, so stay tuned!**
+## Self-hosting
 
-- [x] Open source the Sync server
-- [x] Open source the Identity server
-- [x] Open source the SSE Messaging infrastructure
-- [x] Fully Dockerize all services
-- [x] Use self-hosted Minio for S3 storage
-- [x] Publish on DockerHub
-- [x] Add settings to change server URLs in Notesnook client apps (starting from v3.0.18)
-- [ ] Write self hosting docs
+Self-hosting the Notesnook Sync Server is now possible using Docker. For complete setup instructions, see the [self-hosting documentation](docs/self-hosting.md).
 
 ## License
 
