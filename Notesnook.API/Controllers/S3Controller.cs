@@ -56,7 +56,11 @@ namespace Notesnook.API.Controllers
 
             var fileSize = HttpContext.Request.ContentLength ?? 0;
             bool hasBody = fileSize > 0;
-            if (!hasBody) return Ok(Request.GetEncodedUrl());
+
+            if (!hasBody)
+            {
+                return Ok(Request.GetEncodedUrl() + "&access_token=" + Request.Headers.Authorization.ToString().Replace("Bearer ", ""));
+            }
 
             if (Constants.IS_SELF_HOSTED) await UploadFileAsync(userId, name, fileSize);
             else await UploadFileWithChecksAsync(userId, name, fileSize);
