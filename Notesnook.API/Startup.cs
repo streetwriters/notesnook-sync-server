@@ -251,20 +251,7 @@ namespace Notesnook.API
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
-            if (!env.IsDevelopment())
-            {
-                var forwardedHeadersOptions = new ForwardedHeadersOptions
-                {
-                    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
-                };
-            
-                foreach (var proxy in Constants.KNOWN_PROXIES)
-                {
-                    forwardedHeadersOptions.KnownProxies.Add(System.Net.IPAddress.Parse(proxy));
-                }
-            
-                app.UseForwardedHeaders(forwardedHeadersOptions);
-            }
+            app.UseForwardedHeadersWithKnownProxies(env);
 
             app.UseOpenTelemetryPrometheusScrapingEndpoint((context) => context.Request.Path == "/metrics" && context.Connection.LocalPort == 5067);
             app.UseResponseCompression();

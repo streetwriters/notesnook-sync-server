@@ -212,14 +212,7 @@ namespace Streetwriters.Identity
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
-            if (!env.IsDevelopment())
-            {
-                app.UseForwardedHeaders(new ForwardedHeadersOptions
-                {
-                    ForwardedForHeaderName = "CF-Connecting-IP",
-                    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
-                });
-            }
+            app.UseForwardedHeadersWithKnownProxies(env, "CF-Connecting-IP");
 
             app.UseCors("notesnook");
             app.UseVersion(Servers.IdentityServer);
