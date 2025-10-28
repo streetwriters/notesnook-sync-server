@@ -253,10 +253,17 @@ namespace Notesnook.API
         {
             if (!env.IsDevelopment())
             {
-                app.UseForwardedHeaders(new ForwardedHeadersOptions
+                var forwardedHeadersOptions = new ForwardedHeadersOptions
                 {
                     ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
-                });
+                };
+            
+                foreach (var proxy in Constants.KNOWN_PROXIES)
+                {
+                    forwardedHeadersOptions.KnownProxies.Add(System.Net.IPAddress.Parse(proxy));
+                }
+            
+                app.UseForwardedHeaders(forwardedHeadersOptions);
             }
 
             app.UseOpenTelemetryPrometheusScrapingEndpoint((context) => context.Request.Path == "/metrics" && context.Connection.LocalPort == 5067);
