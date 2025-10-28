@@ -57,6 +57,7 @@ namespace Streetwriters.Common
         public static string? NOTESNOOK_SERVER_HOST => Environment.GetEnvironmentVariable("NOTESNOOK_SERVER_HOST");
         public static string? NOTESNOOK_CERT_PATH => Environment.GetEnvironmentVariable("NOTESNOOK_CERT_PATH");
         public static string? NOTESNOOK_CERT_KEY_PATH => Environment.GetEnvironmentVariable("NOTESNOOK_CERT_KEY_PATH");
+        public static string[] KNOWN_PROXIES => (Environment.GetEnvironmentVariable("KNOWN_PROXIES") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
         public static int IDENTITY_SERVER_PORT => int.Parse(Environment.GetEnvironmentVariable("IDENTITY_SERVER_PORT") ?? "80");
         public static string? IDENTITY_SERVER_HOST => Environment.GetEnvironmentVariable("IDENTITY_SERVER_HOST");
@@ -79,4 +80,5 @@ namespace Streetwriters.Common
         public static string? SUBSCRIPTIONS_CERT_KEY_PATH => Environment.GetEnvironmentVariable("SUBSCRIPTIONS_CERT_KEY_PATH");
         public static string[] NOTESNOOK_CORS_ORIGINS => Environment.GetEnvironmentVariable("NOTESNOOK_CORS")?.Split(",") ?? new string[] { };
     }
+
 }
