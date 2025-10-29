@@ -19,9 +19,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
 using System.Collections.Generic;
+using System.Net;
 using System.Text.Json;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.DependencyInjection;
 using WampSharp.AspNetCore.WebSockets.Server;
 using WampSharp.Binding;
@@ -81,6 +84,31 @@ namespace Streetwriters.Common.Extensions
             {
                 return scope.ServiceProvider.GetRequiredService<T>();
             }
+        }
+
+        public static IApplicationBuilder UseForwardedHeadersWithKnownProxies(this IApplicationBuilder app, IWebHostEnvironment env, string forwardedForHeaderName = null)
+        {
+            if (!env.IsDevelopment())
+            {
+                var forwardedHeadersOptions = new ForwardedHeadersOptions
+                {
+                    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+                };
+
+                if (!string.IsNullOrEmpty(forwardedForHeaderName))
+                {
+                    forwardedHeadersOptions.ForwardedForHeaderName = forwardedForHeaderName;
+                }
+
+                foreach (var proxy in Constants.KNOWN_PROXIES)
+                {
+                    forwardedHeadersOptions.KnownProxies.Add(IPAddress.Parse(proxy));
+                }
+
+                app.UseForwardedHeaders(forwardedHeadersOptions);
+            }
+
+            return app;
         }
     }
 }
