@@ -91,7 +91,7 @@ function encrypt(rawData: string, publicKey: string): EncryptedInboxItem {
 
 async function getInboxPublicEncryptionKey(apiKey: string) {
   const response = await fetch(
-    `${NOTESNOOK_API_SERVER_URL}inbox/public-encryption-key`,
+    `${NOTESNOOK_API_SERVER_URL}/inbox/public-encryption-key`,
     {
       headers: {
         Authorization: apiKey,
@@ -112,7 +112,7 @@ async function postEncryptedInboxItem(
   apiKey: string,
   item: EncryptedInboxItem
 ) {
-  const response = await fetch(`${NOTESNOOK_API_SERVER_URL}inbox/items`, {
+  const response = await fetch(`${NOTESNOOK_API_SERVER_URL}/inbox/items`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -139,11 +139,14 @@ app.post("/inbox", async (req, res) => {
     if (!apiKey) {
       return res.status(401).json({ error: "unauthorized" });
     }
-    if (!req.body.item) {
-      return res.status(400).json({ error: "item is required" });
-    }
 
-    const validationResult = RawInboxItemSchema.safeParse(req.body.item);
+    const inboxPublicKey = await getInboxPublicEncryptionKey(apiKey);
+    if (!inboxPublicKey) {
+      return res.status(403).json({ error: "inbox public key not found" });
+    }
+    console.log("[info] fetched inbox public key");
+
+    const validationResult = RawInboxItemSchema.safeParse(req.body);
     if (!validationResult.success) {
       return res.status(400).json({
         error: "invalid item",
@@ -151,17 +154,16 @@ app.post("/inbox", async (req, res) => {
       });
     }
 
-    const inboxPublicKey = await getInboxPublicEncryptionKey(apiKey);
-    if (!inboxPublicKey) {
-      return res.status(403).json({ error: "inbox public key not found" });
-    }
-    console.log("[info] fetched inbox public key:", inboxPublicKey);
+    const encryptedItem = encrypt(
+      JSON.stringify(validationResult.data),
+      inboxPublicKey
+    );
+    console.log("[info] encrypted item");
 
-    const item = validationResult.data;
-    const encryptedItem = encrypt(JSON.stringify(item), inboxPublicKey);
-    console.log("[info] encrypted item:", encryptedItem);
     await postEncryptedInboxItem(apiKey, encryptedItem);
-    return res.status(200).json({ message: "inbox item posted" });
+    console.log("[info] posted encrypted inbox item successfully");
+
+    return res.status(200).json({ success: true });
   } catch (error) {
     if (error instanceof Error) {
       console.log("[error]", error.message);
