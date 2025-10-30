@@ -292,7 +292,7 @@ namespace Streetwriters.Identity.Controllers
         }
 
         [HttpPost("sessions/clear")]
-        public async Task<IActionResult> ClearUserSessions([FromQuery] bool all, [FromForm] string refresh_token)
+        public async Task<IActionResult> ClearUserSessions([FromQuery] bool all, [FromForm] string? refresh_token)
         {
             var client = Clients.FindClientById(User.FindFirstValue("client_id"));
             if (client == null) return BadRequest("Invalid client_id.");
@@ -307,7 +307,7 @@ namespace Streetwriters.Identity.Controllers
                 ClientId = client.Id,
                 SubjectId = user.Id.ToString()
             });
-            var refreshTokenKey = GetHashedKey(refresh_token, PersistedGrantTypes.RefreshToken);
+            string? refreshTokenKey = refresh_token != null ? GetHashedKey(refresh_token, PersistedGrantTypes.RefreshToken) : null;
             var removedKeys = new List<string>();
             foreach (var grant in grants)
             {
