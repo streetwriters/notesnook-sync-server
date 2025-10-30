@@ -150,7 +150,7 @@ app.use(
 app.get("/health", (_, res) => {
   return res.status(200).json({ status: "ok" });
 });
-app.post("/inbox", async (req, res) => {
+app.post("/", async (req, res) => {
   try {
     const apiKey = req.headers["authorization"];
     if (!apiKey) {
