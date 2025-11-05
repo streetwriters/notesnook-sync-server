@@ -29,11 +29,11 @@ namespace Streetwriters.Common
         public static string INSTANCE_NAME => Environment.GetEnvironmentVariable("INSTANCE_NAME") ?? "default";
 
         // S3 related
-        public static string? S3_ACCESS_KEY => Environment.GetEnvironmentVariable("S3_ACCESS_KEY");
-        public static string? S3_ACCESS_KEY_ID => Environment.GetEnvironmentVariable("S3_ACCESS_KEY_ID");
-        public static string? S3_SERVICE_URL => Environment.GetEnvironmentVariable("S3_SERVICE_URL");
-        public static string? S3_REGION => Environment.GetEnvironmentVariable("S3_REGION");
-        public static string? S3_BUCKET_NAME => Environment.GetEnvironmentVariable("S3_BUCKET_NAME");
+        public static string S3_ACCESS_KEY => Environment.GetEnvironmentVariable("S3_ACCESS_KEY") ?? throw new InvalidOperationException("S3_ACCESS_KEY is required");
+        public static string S3_ACCESS_KEY_ID => Environment.GetEnvironmentVariable("S3_ACCESS_KEY_ID") ?? throw new InvalidOperationException("S3_ACCESS_KEY_ID is required");
+        public static string S3_SERVICE_URL => Environment.GetEnvironmentVariable("S3_SERVICE_URL") ?? throw new InvalidOperationException("S3_SERVICE_URL is required");
+        public static string S3_REGION => Environment.GetEnvironmentVariable("S3_REGION") ?? throw new InvalidOperationException("S3_REGION is required");
+        public static string S3_BUCKET_NAME => Environment.GetEnvironmentVariable("S3_BUCKET_NAME") ?? throw new InvalidOperationException("S3_BUCKET_NAME is required");
         public static string? S3_INTERNAL_BUCKET_NAME => Environment.GetEnvironmentVariable("S3_INTERNAL_BUCKET_NAME");
         public static string? S3_INTERNAL_SERVICE_URL => Environment.GetEnvironmentVariable("S3_INTERNAL_SERVICE_URL");
 
