@@ -24,6 +24,7 @@ using System.Security.Claims;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Threading.Tasks;
+using Amazon.Runtime;
 using IdentityModel.AspNetCore.OAuth2Introspection;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -39,6 +40,7 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -198,7 +200,13 @@ namespace Notesnook.API
 
             services.AddControllers();
 
-            services.AddHealthChecks(); // .AddMongoDb(dbSettings.ConnectionString, dbSettings.DatabaseName, "database-check");
+            services.AddHealthChecks().AddS3((options) =>
+            {
+                options.Credentials = new BasicAWSCredentials(Constants.S3_ACCESS_KEY_ID, Constants.S3_ACCESS_KEY);
+                options.S3Config = S3Service.CreateConfig();
+                options.BucketName = Constants.S3_BUCKET_NAME;
+            }, "s3-check", HealthStatus.Degraded).AddMongoDb(Constants.MONGODB_CONNECTION_STRING, "mongodb-check", HealthStatus.Unhealthy);
+
             services.AddSignalR((hub) =>
             {
                 hub.MaximumReceiveMessageSize = 100 * 1024 * 1024;

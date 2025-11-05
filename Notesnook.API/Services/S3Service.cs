@@ -28,6 +28,7 @@ using Amazon.Runtime;
 using Amazon.S3;
 using Amazon.S3.Model;
 using Microsoft.Extensions.Options;
+using MongoDB.Driver;
 using Notesnook.API.Helpers;
 using Notesnook.API.Interfaces;
 using Notesnook.API.Models;
@@ -65,18 +66,7 @@ namespace Notesnook.API.Services
         public S3Service(ISyncItemsRepositoryAccessor syncItemsRepositoryAccessor)
         {
             Repositories = syncItemsRepositoryAccessor;
-            var config = new AmazonS3Config
-            {
-#if (DEBUG || STAGING)
-                ServiceURL = Servers.S3Server.ToString(),
-#else
-                ServiceURL = Constants.S3_SERVICE_URL,
-                AuthenticationRegion = Constants.S3_REGION,
-#endif
-                ForcePathStyle = true,
-                SignatureMethod = SigningAlgorithm.HmacSHA256,
-                SignatureVersion = "4"
-            };
+            var config = CreateConfig();
 #if (DEBUG || STAGING)
             S3Client = new AmazonS3Client("S3RVER", "S3RVER", config);
 #else
@@ -96,6 +86,22 @@ namespace Notesnook.API.Services
             }
 
             AWSConfigsS3.UseSignatureVersion4 = true;
+        }
+
+        public static AmazonS3Config CreateConfig()
+        {
+            return new AmazonS3Config
+            {
+#if (DEBUG || STAGING)
+                ServiceURL = Servers.S3Server.ToString(),
+#else
+                ServiceURL = Constants.S3_SERVICE_URL,
+                AuthenticationRegion = Constants.S3_REGION,
+#endif
+                ForcePathStyle = true,
+                SignatureMethod = SigningAlgorithm.HmacSHA256,
+                SignatureVersion = "4"
+            };
         }
 
         public async Task DeleteObjectAsync(string userId, string name)
