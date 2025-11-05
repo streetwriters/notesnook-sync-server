@@ -239,7 +239,7 @@ namespace Notesnook.API.Services
                 await this.AbortMultipartUploadAsync(userId, uploadRequest.Key, uploadRequest.UploadId);
                 throw new Exception("User settings not found.");
             }
-            userSettings.StorageLimit ??= new Limit { Value = 0, UpdatedAt = 0 };
+            userSettings.StorageLimit ??= StorageHelper.RolloverStorageLimit(userSettings.StorageLimit);
 
             if (!Constants.IS_SELF_HOSTED)
             {
@@ -268,8 +268,11 @@ namespace Notesnook.API.Services
 
             if (!Constants.IS_SELF_HOSTED)
             {
-                userSettings.StorageLimit.UpdatedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
                 await Repositories.UsersSettings.UpsertAsync(userSettings, (u) => u.UserId == userId);
+                await Repositories.UsersSettings.Collection.UpdateOneAsync(
+                    Builders<UserSettings>.Filter.Eq(u => u.UserId, userId),
+                    Builders<UserSettings>.Update.Set(u => u.StorageLimit, userSettings.StorageLimit)
+                );
             }
         }
 

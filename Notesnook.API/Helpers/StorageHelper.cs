@@ -52,6 +52,17 @@ namespace Notesnook.API.Helpers
             return fileSize > maxFileSize;
         }
 
+        public static Limit RolloverStorageLimit(Limit? limit)
+        {
+            var updatedAt = DateTimeOffset.FromUnixTimeMilliseconds(limit?.UpdatedAt ?? 0);
+            if (limit == null || DateTimeOffset.UtcNow.Year > updatedAt.Year || DateTimeOffset.UtcNow.Month > updatedAt.Month)
+            {
+                limit = new Limit { UpdatedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), Value = 0 };
+                return limit;
+            }
+            return limit;
+        }
+
         private static readonly string[] sizes = ["B", "KB", "MB", "GB", "TB"];
         public static string FormatBytes(long size)
         {

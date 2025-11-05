@@ -24,6 +24,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
+using MongoDB.Driver;
 using Notesnook.API.Helpers;
 using Notesnook.API.Interfaces;
 using Notesnook.API.Models;
@@ -115,10 +116,14 @@ namespace Notesnook.API.Services
             var userSettings = await Repositories.UsersSettings.FindOneAsync((u) => u.UserId == user.UserId) ?? throw new Exception("User settings not found.");
 
             // reset user's attachment limit every month
-            if (userSettings.StorageLimit == null || DateTimeOffset.UtcNow.Month > DateTimeOffset.FromUnixTimeMilliseconds(userSettings.StorageLimit.UpdatedAt).Month)
+            var limit = StorageHelper.RolloverStorageLimit(userSettings.StorageLimit);
+            if (userSettings.StorageLimit == null || limit.UpdatedAt != userSettings.StorageLimit?.UpdatedAt)
             {
-                userSettings.StorageLimit ??= new Limit { UpdatedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), Value = 0 };
-                await Repositories.UsersSettings.UpsertAsync(userSettings, (u) => u.UserId == user.UserId);
+                userSettings.StorageLimit = limit;
+                await Repositories.UsersSettings.Collection.UpdateOneAsync(
+                    Builders<UserSettings>.Filter.Eq(u => u.UserId, user.UserId),
+                    Builders<UserSettings>.Update.Set(u => u.StorageLimit, userSettings.StorageLimit)
+                );
             }
 
             return new UserResponse

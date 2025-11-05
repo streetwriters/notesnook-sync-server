@@ -17,6 +17,7 @@ You should have received a copy of the Affero GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+using System;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 using Notesnook.API.Interfaces;
@@ -25,8 +26,21 @@ namespace Notesnook.API.Models
 {
     public class Limit
     {
-        public long Value { get; set; }
-        public long UpdatedAt { get; set; }
+        private long _value = 0;
+        public long Value
+        {
+            get => _value;
+            set
+            {
+                _value = value;
+                UpdatedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            }
+        }
+        public long UpdatedAt
+        {
+            get;
+            set;
+        }
     }
 
     public class UserSettings
