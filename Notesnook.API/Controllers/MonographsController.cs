@@ -26,6 +26,7 @@ using System.Threading.Tasks;
 using AngleSharp;
 using AngleSharp.Dom;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using MongoDB.Bson;
@@ -117,6 +118,7 @@ namespace Notesnook.API.Controllers
                     monograph.Id = existingMonograph.Id;
                 }
                 monograph.Deleted = false;
+                monograph.ViewCount = 0;
                 await monographs.Collection.ReplaceOneAsync(
                     CreateMonographFilter(userId, monograph),
                     monograph,
@@ -129,6 +131,7 @@ namespace Notesnook.API.Controllers
                 {
                     id = monograph.ItemId,
                     datePublished = monograph.DatePublished,
+                    viewCount = monograph.ViewCount
                 });
             }
             catch (Exception e)
@@ -170,6 +173,7 @@ namespace Notesnook.API.Controllers
                     .Set(m => m.SelfDestruct, monograph.SelfDestruct)
                     .Set(m => m.Title, monograph.Title)
                     .Set(m => m.Password, monograph.Password)
+                    .Set(m => m.ViewCount, monograph.ViewCount)
                 );
                 if (!result.IsAcknowledged) return BadRequest();
 
@@ -179,6 +183,7 @@ namespace Notesnook.API.Controllers
                 {
                     id = monograph.ItemId,
                     datePublished = monograph.DatePublished,
+                    viewCount = monograph.ViewCount
                 });
             }
             catch (Exception e)
@@ -232,6 +237,9 @@ namespace Notesnook.API.Controllers
             var monograph = await FindMonographAsync(id);
             if (monograph == null || monograph.Deleted) return Content(SVG_PIXEL, "image/svg+xml");
 
+            var cookieName = $"viewed_{id}";
+            var hasVisitedBefore = Request.Cookies.ContainsKey(cookieName);
+
             if (monograph.SelfDestruct)
             {
                 await monographs.Collection.ReplaceOneAsync(
@@ -241,9 +249,27 @@ namespace Notesnook.API.Controllers
                         ItemId = id,
                         Id = monograph.Id,
                         Deleted = true,
-                        UserId = monograph.UserId
+                        UserId = monograph.UserId,
+                        ViewCount = 0
                     }
                 );
+                await MarkMonographForSyncAsync(monograph.UserId, id);
+            }
+            else if (!hasVisitedBefore)
+            {
+                await monographs.Collection.UpdateOneAsync(
+                    CreateMonographFilter(monograph.UserId, monograph),
+                    Builders<Monograph>.Update.Inc(m => m.ViewCount, 1)
+                );
+
+                var cookieOptions = new CookieOptions
+                {
+                    Path = $"/monographs/{id}",
+                    HttpOnly = true,
+                    Secure = Request.IsHttps,
+                    Expires = DateTimeOffset.UtcNow.AddMonths(1)
+                };
+                Response.Cookies.Append(cookieName, "1", cookieOptions);
 
                 await MarkMonographForSyncAsync(monograph.UserId, id);
             }
@@ -269,7 +295,8 @@ namespace Notesnook.API.Controllers
                     ItemId = id,
                     Id = monograph.Id,
                     Deleted = true,
-                    UserId = monograph.UserId
+                    UserId = monograph.UserId,
+                    ViewCount = 0
                 }
             );
 
