@@ -30,6 +30,7 @@ using WampSharp.AspNetCore.WebSockets.Server;
 using WampSharp.Binding;
 using WampSharp.V2;
 using WampSharp.V2.Realm;
+using Microsoft.Extensions.Hosting;
 
 namespace Streetwriters.Common.Extensions
 {
