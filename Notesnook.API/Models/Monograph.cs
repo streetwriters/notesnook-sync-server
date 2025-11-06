@@ -80,5 +80,8 @@ namespace Notesnook.API.Models
 
         [JsonPropertyName("deleted")]
         public bool Deleted { get; set; }
+
+        [JsonPropertyName("viewCount")]
+        public int ViewCount { get; set; }
     }
 }

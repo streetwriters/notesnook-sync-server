@@ -283,6 +283,7 @@ namespace Notesnook.API.Hubs
                         SelfDestruct = m.SelfDestruct,
                         Title = m.Title,
                         ItemId = m.ItemId ?? m.Id.ToString(),
+                        ViewCount = m.ViewCount
                     }).ToListAsync();
 
                     if (userMonographs.Count > 0 && !await Clients.Caller.SendMonographs(userMonographs).WaitAsync(TimeSpan.FromMinutes(10)))
