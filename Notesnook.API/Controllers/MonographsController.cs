@@ -130,8 +130,7 @@ namespace Notesnook.API.Controllers
                 return Ok(new
                 {
                     id = monograph.ItemId,
-                    datePublished = monograph.DatePublished,
-                    viewCount = monograph.ViewCount
+                    datePublished = monograph.DatePublished
                 });
             }
             catch (Exception e)
@@ -173,7 +172,6 @@ namespace Notesnook.API.Controllers
                     .Set(m => m.SelfDestruct, monograph.SelfDestruct)
                     .Set(m => m.Title, monograph.Title)
                     .Set(m => m.Password, monograph.Password)
-                    .Set(m => m.ViewCount, monograph.ViewCount)
                 );
                 if (!result.IsAcknowledged) return BadRequest();
 
@@ -182,8 +180,7 @@ namespace Notesnook.API.Controllers
                 return Ok(new
                 {
                     id = monograph.ItemId,
-                    datePublished = monograph.DatePublished,
-                    viewCount = monograph.ViewCount
+                    datePublished = monograph.DatePublished
                 });
             }
             catch (Exception e)
