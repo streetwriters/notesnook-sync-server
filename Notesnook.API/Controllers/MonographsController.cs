@@ -267,11 +267,23 @@ namespace Notesnook.API.Controllers
                     Expires = DateTimeOffset.UtcNow.AddMonths(1)
                 };
                 Response.Cookies.Append(cookieName, "1", cookieOptions);
-
-                await MarkMonographForSyncAsync(monograph.UserId, id);
             }
 
             return Content(SVG_PIXEL, "image/svg+xml");
+        }
+
+        [HttpGet("{id}/stats")]
+        public async Task<IActionResult> GetMonographStatsAsync([FromRoute] string id)
+        {
+            var userId = this.User.GetUserId();
+            var monograph = await FindMonographAsync(id);
+
+            if (monograph == null || monograph.Deleted || monograph.UserId != userId)
+            {
+                return NotFound();
+            }
+
+            return Ok(new { viewCount = monograph.ViewCount });
         }
 
         [HttpDelete("{id}")]
