@@ -1,14 +1,12 @@
 import express from "express";
-import _sodium, { base64_variants } from "libsodium-wrappers-sumo";
 import { z } from "zod";
 import { rateLimit } from "express-rate-limit";
+import * as openpgp from "openpgp";
 
 const NOTESNOOK_API_SERVER_URL = process.env.NOTESNOOK_API_SERVER_URL;
 if (!NOTESNOOK_API_SERVER_URL) {
   throw new Error("NOTESNOOK_API_SERVER_URL is not defined");
 }
-
-let sodium: typeof _sodium;
 
 const RawInboxItemSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -31,62 +29,23 @@ const RawInboxItemSchema = z.object({
 
 interface EncryptedInboxItem {
   v: 1;
-  key: Omit<EncryptedInboxItem, "key" | "iv" | "v" | "salt">;
-  iv: string;
-  alg: string;
-  cipher: string;
-  length: number;
-  salt: string;
+  item: string;
 }
 
-function encrypt(rawData: string, publicKey: string): EncryptedInboxItem {
-  try {
-    const password = sodium.crypto_aead_xchacha20poly1305_ietf_keygen();
-    const saltBytes = sodium.randombytes_buf(sodium.crypto_pwhash_SALTBYTES);
-    const key = sodium.crypto_pwhash(
-      sodium.crypto_aead_xchacha20poly1305_ietf_KEYBYTES,
-      password,
-      saltBytes,
-      3, // operations limit
-      1024 * 1024 * 8, // memory limit (8MB)
-      sodium.crypto_pwhash_ALG_ARGON2I13
-    );
-    const nonce = sodium.randombytes_buf(
-      sodium.crypto_aead_xchacha20poly1305_ietf_NPUBBYTES
-    );
-    const data = sodium.from_string(rawData);
-    const cipher = sodium.crypto_aead_xchacha20poly1305_ietf_encrypt(
-      data,
-      null,
-      null,
-      nonce,
-      key
-    );
-    const inboxPublicKey = sodium.from_base64(
-      publicKey,
-      base64_variants.URLSAFE_NO_PADDING
-    );
-    const encryptedKey = sodium.crypto_box_seal(key, inboxPublicKey);
-
-    return {
-      v: 1,
-      key: {
-        cipher: sodium.to_base64(
-          encryptedKey,
-          base64_variants.URLSAFE_NO_PADDING
-        ),
-        alg: `xsal-x25519-${base64_variants.URLSAFE_NO_PADDING}`,
-        length: password.length,
-      },
-      iv: sodium.to_base64(nonce, base64_variants.URLSAFE_NO_PADDING),
-      alg: `xcha-argon2i13-${base64_variants.URLSAFE_NO_PADDING}`,
-      cipher: sodium.to_base64(cipher, base64_variants.URLSAFE_NO_PADDING),
-      length: data.length,
-      salt: sodium.to_base64(saltBytes, base64_variants.URLSAFE_NO_PADDING),
-    };
-  } catch (error) {
-    throw new Error(`encryption failed: ${error}`);
-  }
+async function encrypt(
+  rawData: string,
+  rawPublicKey: string
+): Promise<EncryptedInboxItem> {
+  const publicKey = await openpgp.readKey({ armoredKey: rawPublicKey });
+  const message = await openpgp.createMessage({ text: rawData });
+  const encrypted = await openpgp.encrypt({
+    message,
+    encryptionKeys: publicKey,
+  });
+  return {
+    v: 1,
+    item: encrypted,
+  };
 }
 
 async function getInboxPublicEncryptionKey(apiKey: string) {
@@ -154,7 +113,7 @@ app.post("/inbox", async (req, res) => {
       });
     }
 
-    const encryptedItem = encrypt(
+    const encryptedItem = await encrypt(
       JSON.stringify(validationResult.data),
       inboxPublicKey
     );
@@ -180,14 +139,9 @@ app.post("/inbox", async (req, res) => {
   }
 });
 
-(async () => {
-  await _sodium.ready;
-  sodium = _sodium;
-
-  const PORT = Number(process.env.PORT || "5181");
-  app.listen(PORT, () => {
-    console.log(`📫 notesnook inbox api server running on port ${PORT}`);
-  });
-})();
+const PORT = Number(process.env.PORT || "5181");
+app.listen(PORT, () => {
+  console.log(`📫 notesnook inbox api server running on port ${PORT}`);
+});
 
 export default app;

@@ -150,33 +150,13 @@ namespace Notesnook.API.Controllers
             var userId = User.GetUserId();
             try
             {
-                if (request.Key.Algorithm != Algorithms.XSAL_X25519_7)
+                if (string.IsNullOrWhiteSpace(request.Item))
                 {
-                    return BadRequest(new { error = $"Only {Algorithms.XSAL_X25519_7} is supported for inbox item password." });
-                }
-                if (string.IsNullOrWhiteSpace(request.Key.Cipher))
-                {
-                    return BadRequest(new { error = "Inbox item password cipher is required." });
-                }
-                if (request.Key.Length <= 0)
-                {
-                    return BadRequest(new { error = "Valid inbox item password length is required." });
-                }
-                if (request.Algorithm != Algorithms.Default)
-                {
-                    return BadRequest(new { error = $"Only {Algorithms.Default} is supported for inbox item." });
+                    return BadRequest(new { error = "Inbox item is required." });
                 }
                 if (request.Version <= 0)
                 {
                     return BadRequest(new { error = "Valid inbox item version is required." });
-                }
-                if (string.IsNullOrWhiteSpace(request.Cipher) || string.IsNullOrWhiteSpace(request.IV))
-                {
-                    return BadRequest(new { error = "Inbox item cipher and iv is required." });
-                }
-                if (request.Length <= 0)
-                {
-                    return BadRequest(new { error = "Valid inbox item length is required." });
                 }
 
                 request.UserId = userId;
