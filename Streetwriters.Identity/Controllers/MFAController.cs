@@ -29,6 +29,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Streetwriters.Common;
 using Streetwriters.Common.Enums;
+using Streetwriters.Common.Helpers;
 using Streetwriters.Common.Models;
 using Streetwriters.Identity.Interfaces;
 using Streetwriters.Identity.Models;
@@ -53,6 +54,9 @@ namespace Streetwriters.Identity.Controllers
 
             var user = await UserManager.GetUserAsync(User) ?? throw new Exception("User not found.");
 
+            if (form.Type == MFAMethods.SMS && !FeatureAuthorizationHelper.IsFeatureAllowed(Features.SMS_2FA, client.Id, User))
+                throw new Exception("2FA via SMS is only available on Pro & Believer plans.");
+
             try
             {
                 switch (form.Type)
@@ -62,7 +66,7 @@ namespace Streetwriters.Identity.Controllers
                         return Ok(authenticatorDetails);
                     case "sms":
                     case "email":
-                        await MFAService.SendOTPAsync(user, client, form, true);
+                        await MFAService.SendOTPAsync(user, client, form);
                         return Ok();
                     default:
                         return BadRequest("Invalid authenticator type.");

@@ -35,6 +35,7 @@ using Notesnook.API.Authorization;
 using Notesnook.API.Models;
 using Notesnook.API.Services;
 using Streetwriters.Common;
+using Streetwriters.Common.Helpers;
 using Streetwriters.Common.Interfaces;
 using Streetwriters.Common.Messages;
 using Streetwriters.Data.Interfaces;
@@ -272,18 +273,20 @@ namespace Notesnook.API.Controllers
             return Content(SVG_PIXEL, "image/svg+xml");
         }
 
-        [HttpGet("{id}/stats")]
-        public async Task<IActionResult> GetMonographStatsAsync([FromRoute] string id)
+        [HttpGet("{id}/analytics")]
+        public async Task<IActionResult> GetMonographAnalyticsAsync([FromRoute] string id)
         {
+            if (!FeatureAuthorizationHelper.IsFeatureAllowed(Features.MONOGRAPH_ANALYTICS, Clients.Notesnook.Id, User))
+                return BadRequest(new { error = "Monograph analytics are only available on the Pro & Believer plans." });
+
             var userId = this.User.GetUserId();
             var monograph = await FindMonographAsync(id);
-
             if (monograph == null || monograph.Deleted || monograph.UserId != userId)
             {
                 return NotFound();
             }
 
-            return Ok(new { viewCount = monograph.ViewCount });
+            return Ok(new { totalViews = monograph.ViewCount });
         }
 
         [HttpDelete("{id}")]

@@ -29,37 +29,6 @@ namespace Streetwriters.Identity.Services
 {
     public class UserService
     {
-        private static SubscriptionPlan? GetUserSubscriptionPlan(string clientId, User user)
-        {
-            var claimKey = GetClaimKey(clientId);
-            var status = user.Claims.FirstOrDefault((c) => c.ClaimType == claimKey)?.ClaimValue;
-            switch (status)
-            {
-                case "free":
-                    return SubscriptionPlan.FREE;
-                case "believer":
-                    return SubscriptionPlan.BELIEVER;
-                case "education":
-                    return SubscriptionPlan.EDUCATION;
-                case "essential":
-                    return SubscriptionPlan.ESSENTIAL;
-                case "pro":
-                    return SubscriptionPlan.PRO;
-                default:
-                    return null;
-            }
-        }
-
-        public static bool IsSMSMFAAllowed(string clientId, User user)
-        {
-            var status = GetUserSubscriptionPlan(clientId, user);
-            if (status == null) return false;
-            return status == SubscriptionPlan.LEGACY_PRO ||
-                    status == SubscriptionPlan.PRO ||
-                    status == SubscriptionPlan.EDUCATION ||
-                    status == SubscriptionPlan.BELIEVER;
-        }
-
         public static Claim SubscriptionPlanToClaim(string clientId, Subscription subscription)
         {
             var claimKey = GetClaimKey(clientId);

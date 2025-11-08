@@ -25,7 +25,6 @@ using System.Text.Encodings.Web;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
-using Streetwriters.Common;
 using Streetwriters.Common.Enums;
 using Streetwriters.Common.Interfaces;
 using Streetwriters.Common.Models;
@@ -168,18 +167,12 @@ namespace Streetwriters.Identity.Services
             };
         }
 
-        public async Task SendOTPAsync(User user, IClient client, MultiFactorSetupForm form, bool isSetup = false)
+        public async Task SendOTPAsync(User user, IClient client, MultiFactorSetupForm form)
         {
             var method = form.Type;
             if ((method != MFAMethods.Email && method != MFAMethods.SMS) || !IsValidMFAMethod(method))
                 throw new Exception("Invalid method.");
 
-            if (isSetup &&
-                method == MFAMethods.SMS &&
-                !UserService.IsSMSMFAAllowed(client.Id, user))
-                throw new Exception("Due to the high costs of SMS, 2FA via SMS is only available on Pro & Believer plans.");
-
-            // if (!user.EmailConfirmed) throw new Exception("Please confirm your email before activating 2FA by email.");
             await GetAuthenticatorDetailsAsync(user, client);
 
             switch (method)
