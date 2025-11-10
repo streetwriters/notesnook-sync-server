@@ -22,6 +22,5 @@ namespace Notesnook.API.Models
     public class Algorithms
     {
         public static string Default => "xcha-argon2i13-7";
-        public static string XSAL_X25519_7 => "xsal-x25519-7";
     }
 }

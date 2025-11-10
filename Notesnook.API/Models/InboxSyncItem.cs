@@ -29,18 +29,11 @@ namespace Notesnook.API.Models
     [MessagePack.MessagePackObject]
     public class InboxSyncItem
     {
-        [IgnoreDataMember]
-        [MessagePack.IgnoreMember]
-        [JsonPropertyName("dateSynced")]
-        public long DateSynced
-        {
-            get; set;
-        }
-
-        [DataMember(Name = "item")]
-        [JsonPropertyName("item")]
-        [MessagePack.Key("item")]
-        public string Item
+        [DataMember(Name = "cipher")]
+        [JsonPropertyName("cipher")]
+        [MessagePack.Key("cipher")]
+        [Required]
+        public string Cipher
         {
             get; set;
         }
@@ -76,6 +69,15 @@ namespace Notesnook.API.Models
         [MessagePack.Key("v")]
         [Required]
         public double Version
+        {
+            get; set;
+        }
+
+        [JsonPropertyName("alg")]
+        [DataMember(Name = "alg")]
+        [MessagePack.Key("alg")]
+        [Required]
+        public string Algorithm
         {
             get; set;
         }

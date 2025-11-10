@@ -150,9 +150,13 @@ namespace Notesnook.API.Controllers
             var userId = User.GetUserId();
             try
             {
-                if (string.IsNullOrWhiteSpace(request.Item))
+                if (string.IsNullOrWhiteSpace(request.Cipher))
                 {
                     return BadRequest(new { error = "Inbox item is required." });
+                }
+                if (string.IsNullOrWhiteSpace(request.Algorithm))
+                {
+                    return BadRequest(new { error = "Inbox item algorithm is required." });
                 }
                 if (request.Version <= 0)
                 {
