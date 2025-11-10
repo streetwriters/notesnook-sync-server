@@ -29,7 +29,8 @@ const RawInboxItemSchema = z.object({
 
 interface EncryptedInboxItem {
   v: 1;
-  item: string;
+  cipher: string;
+  alg: string;
 }
 
 async function encrypt(
@@ -44,7 +45,8 @@ async function encrypt(
   });
   return {
     v: 1,
-    item: encrypted,
+    cipher: encrypted,
+    alg: "pgp-aes256",
   };
 }
 
