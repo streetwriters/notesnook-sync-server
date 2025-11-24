@@ -18,20 +18,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 using System.Text.Json;
 using System.Threading.Tasks;
 using AngleSharp;
-using AngleSharp.Dom;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using MongoDB.Bson;
 using MongoDB.Driver;
-using Notesnook.API.Authorization;
+using NanoidDotNet;
+using Notesnook.API.Extensions;
 using Notesnook.API.Models;
 using Notesnook.API.Services;
 using Streetwriters.Common;
@@ -40,7 +39,6 @@ using Streetwriters.Common.Enums;
 using Streetwriters.Common.Helpers;
 using Streetwriters.Common.Interfaces;
 using Streetwriters.Common.Messages;
-using Streetwriters.Data.Interfaces;
 using Streetwriters.Data.Repositories;
 
 namespace Notesnook.API.Controllers
@@ -97,6 +95,22 @@ namespace Notesnook.API.Controllers
             return await result.FirstOrDefaultAsync();
         }
 
+        private async Task<Monograph> FindMonographBySlugAsync(string slug)
+        {
+            var result = await monographs.Collection.FindAsync(
+                Builders<Monograph>.Filter.Eq("Slug", slug),
+                new FindOptions<Monograph>
+                {
+                    Limit = 1
+                });
+            return await result.FirstOrDefaultAsync();
+        }
+
+        private static string GenerateSlug()
+        {
+            return Nanoid.Generate(size: 24);
+        }
+
         [HttpPost]
         public async Task<IActionResult> PublishAsync([FromQuery] string? deviceId, [FromBody] Monograph monograph)
         {
@@ -126,6 +140,7 @@ namespace Notesnook.API.Controllers
                 }
                 monograph.Deleted = false;
                 monograph.ViewCount = 0;
+                monograph.Slug = GenerateSlug();
                 await monographs.Collection.ReplaceOneAsync(
                     CreateMonographFilter(userId, monograph),
                     monograph,
@@ -137,7 +152,8 @@ namespace Notesnook.API.Controllers
                 return Ok(new
                 {
                     id = monograph.ItemId,
-                    datePublished = monograph.DatePublished
+                    datePublished = monograph.DatePublished,
+                    publishUrl = monograph.ConstructPublishUrl()
                 });
             }
             catch (Exception e)
@@ -174,6 +190,7 @@ namespace Notesnook.API.Controllers
                     monograph.Content = null;
 
                 monograph.DatePublished = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                monograph.Slug = GenerateSlug();
                 var result = await monographs.Collection.UpdateOneAsync(
                     CreateMonographFilter(userId, monograph),
                     Builders<Monograph>.Update
@@ -182,6 +199,7 @@ namespace Notesnook.API.Controllers
                     .Set(m => m.EncryptedContent, monograph.EncryptedContent)
                     .Set(m => m.SelfDestruct, monograph.SelfDestruct)
                     .Set(m => m.Title, monograph.Title)
+                    .Set(m => m.Slug, monograph.Slug)
                     .Set(m => m.Password, monograph.Password)
                     .Set(m => m.ContentSanitizationLevel, sanitizationLevel)
                 );
@@ -192,7 +210,8 @@ namespace Notesnook.API.Controllers
                 return Ok(new
                 {
                     id = monograph.ItemId,
-                    datePublished = monograph.DatePublished
+                    datePublished = monograph.DatePublished,
+                    publishUrl = monograph.ConstructPublishUrl()
                 });
             }
             catch (Exception e)
@@ -219,11 +238,25 @@ namespace Notesnook.API.Controllers
             return Ok(userMonographs.Select((m) => m.ItemId ?? m.Id));
         }
 
-        [HttpGet("{id}")]
+        [HttpGet("{slugOrId}")]
         [AllowAnonymous]
-        public async Task<IActionResult> GetMonographAsync([FromRoute] string id)
+        public async Task<IActionResult> GetMonographAsync([FromRoute] string slugOrId)
         {
-            var monograph = await FindMonographAsync(id);
+            var monograph = await FindMonographBySlugAsync(slugOrId);
+
+            if (monograph == null)
+            {
+                monograph = await FindMonographAsync(slugOrId);
+                if (!string.IsNullOrEmpty(monograph?.Slug))
+                {
+                    return NotFound(new
+                    {
+                        error = "invalid_id",
+                        error_description = $"No such monograph found."
+                    });
+                }
+            }
+
             if (monograph == null || monograph.Deleted)
             {
                 return NotFound(new
@@ -343,7 +376,23 @@ namespace Notesnook.API.Controllers
             return Ok();
         }
 
-        private async Task MarkMonographForSyncAsync(string userId, string monographId, string? deviceId, string? jti)
+        [HttpGet("{id}/publish-url")]
+        public async Task<IActionResult> GetPublishUrlAsync([FromRoute] string id)
+        {
+            var userId = this.User.GetUserId();
+            var monograph = await FindMonographAsync(id);
+            if (monograph == null || monograph.Deleted || monograph.UserId != userId)
+            {
+                return NotFound();
+            }
+
+            return Ok(new
+            {
+                publishUrl = monograph.ConstructPublishUrl()
+            });
+        }
+
+        private static async Task MarkMonographForSyncAsync(string userId, string monographId, string? deviceId, string? jti)
         {
             if (deviceId == null) return;
 
