@@ -79,6 +79,7 @@ namespace Streetwriters.Common
         public static string? SUBSCRIPTIONS_CERT_PATH => Environment.GetEnvironmentVariable("SUBSCRIPTIONS_CERT_PATH");
         public static string? SUBSCRIPTIONS_CERT_KEY_PATH => Environment.GetEnvironmentVariable("SUBSCRIPTIONS_CERT_KEY_PATH");
         public static string[] NOTESNOOK_CORS_ORIGINS => Environment.GetEnvironmentVariable("NOTESNOOK_CORS")?.Split(",") ?? new string[] { };
+        public static string MONOGRAPH_PUBLIC_URL => Environment.GetEnvironmentVariable("MONOGRAPH_PUBLIC_URL") ?? "https://monogr.ph";
     }
 }
 
