@@ -32,6 +32,7 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
 using Notesnook.API.Authorization;
+using Notesnook.API.Extensions;
 using Notesnook.API.Interfaces;
 using Notesnook.API.Models;
 using Notesnook.API.Services;
@@ -275,17 +276,19 @@ namespace Notesnook.API.Hubs
                                 Builders<Monograph>.Filter.In("_id", unsyncedMonographIds)
                             )
                         );
-                    var userMonographs = await Repositories.Monographs.Collection.Find(filter).Project((m) => new MonographMetadata
+                    var userMonographs = await Repositories.Monographs.Collection.Find(filter).ToListAsync();
+                    var userMonographMetadatas = userMonographs.Select((m) => new MonographMetadata
                     {
                         DatePublished = m.DatePublished,
                         Deleted = m.Deleted,
                         Password = m.Password,
                         SelfDestruct = m.SelfDestruct,
                         Title = m.Title,
-                        ItemId = m.ItemId ?? m.Id.ToString()
+                        ItemId = m.ItemId ?? m.Id.ToString(),
+                        PublishUrl = m.ConstructPublishUrl()
                     }).ToListAsync();
 
-                    if (userMonographs.Count > 0 && !await Clients.Caller.SendMonographs(userMonographs).WaitAsync(TimeSpan.FromMinutes(10)))
+                    if (userMonographMetadatas.Count > 0 && !await Clients.Caller.SendMonographs(userMonographMetadatas).WaitAsync(TimeSpan.FromMinutes(10)))
                         throw new HubException("Client rejected monographs.");
                 }
 

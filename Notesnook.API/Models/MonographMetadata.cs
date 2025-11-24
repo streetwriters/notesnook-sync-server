@@ -19,8 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using System.Runtime.Serialization;
 using System.Text.Json.Serialization;
-using MongoDB.Bson;
-using MongoDB.Bson.Serialization.Attributes;
 
 namespace Notesnook.API.Models
 {
@@ -36,6 +34,9 @@ namespace Notesnook.API.Models
 
         [JsonPropertyName("title")]
         public string? Title { get; set; }
+
+        [JsonPropertyName("publishUrl")]
+        public string? PublishUrl { get; set; }
 
         [JsonPropertyName("selfDestruct")]
         public bool SelfDestruct { get; set; }
