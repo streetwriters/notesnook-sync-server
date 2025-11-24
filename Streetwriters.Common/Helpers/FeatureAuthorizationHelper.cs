@@ -32,6 +32,8 @@ namespace Streetwriters.Common.Helpers
                     return SubscriptionPlan.ESSENTIAL;
                 case "pro":
                     return SubscriptionPlan.PRO;
+                case "legacy_pro":
+                    return SubscriptionPlan.LEGACY_PRO;
                 default:
                     return null;
             }
