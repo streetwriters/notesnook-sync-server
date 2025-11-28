@@ -25,6 +25,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MongoDB.Driver;
 using Notesnook.API.Models;
+using Streetwriters.Common;
+using Streetwriters.Common.Interfaces;
+using Streetwriters.Common.Models;
 using Streetwriters.Data.Repositories;
 
 namespace Notesnook.API.Controllers
@@ -59,7 +62,13 @@ namespace Notesnook.API.Controllers
                     {
                         if (action.Type != "link" || action.Data == null) continue;
 
-                        action.Data = action.Data.Replace("{{UserId}}", userId ?? "0");
+                        action.Data = action.Data.Replace("{{UserId}}", userId ?? "");
+
+                        if (action.Data.Contains("{{Email}}"))
+                        {
+                            var user = string.IsNullOrEmpty(userId) ? null : await (await WampServers.IdentityServer.GetServiceAsync<IUserAccountService>(IdentityServerTopics.UserAccountServiceTopic)).GetUserAsync(Clients.Notesnook.Id, userId);
+                            action.Data = action.Data.Replace("{{Email}}", user?.Email ?? "");
+                        }
                     }
                 }
             }
