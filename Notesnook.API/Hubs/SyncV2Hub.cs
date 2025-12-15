@@ -29,6 +29,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
 using Notesnook.API.Authorization;
 using Notesnook.API.Interfaces;
@@ -67,9 +68,11 @@ namespace Notesnook.API.Hubs
         ];
         private readonly FrozenDictionary<string, Action<IEnumerable<SyncItem>, string, long>> UpsertActionsMap;
         private readonly Func<string, string[], bool, int, Task<IAsyncCursor<SyncItem>>>[] Collections;
+        ILogger<SyncV2Hub> Logger { get; }
 
-        public SyncV2Hub(ISyncItemsRepositoryAccessor syncItemsRepositoryAccessor, IUnitOfWork unitOfWork)
+        public SyncV2Hub(ISyncItemsRepositoryAccessor syncItemsRepositoryAccessor, IUnitOfWork unitOfWork, ILogger<SyncV2Hub> logger)
         {
+            Logger = logger;
             Repositories = syncItemsRepositoryAccessor;
             unit = unitOfWork;
 

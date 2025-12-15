@@ -107,6 +107,11 @@ namespace Streetwriters.Identity
                 options.UsersCollection = "users";
                 // options.MigrationCollection = "migration";
                 options.ConnectionString = connectionString;
+                options.ClusterConfigurator = builder =>
+                {
+                    builder.ConfigureConnectionPool((c) => c.With(maxConnections: 500, minConnections: 0));
+                    builder.ConfigureServer(s => s.With(heartbeatInterval: TimeSpan.FromSeconds(60)));
+                };
             }).AddDefaultTokenProviders();
 
             services.AddIdentityServer(
