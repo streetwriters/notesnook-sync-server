@@ -102,7 +102,7 @@ namespace Notesnook.API.Controllers
 
         private async Task<long> UploadFileAsync(string userId, string name, long fileSize)
         {
-            var url = s3Service.GetInternalUploadObjectUrl(userId, name) ?? throw new Exception("Could not create signed url.");
+            var url = await s3Service.GetInternalUploadObjectUrlAsync(userId, name) ?? throw new Exception("Could not create signed url.");
 
             var httpClient = new HttpClient();
             var content = new StreamContent(HttpContext.Request.BodyReader.AsStream());
@@ -168,7 +168,7 @@ namespace Notesnook.API.Controllers
             try
             {
                 var userId = this.User.GetUserId();
-                var url = await s3Service.GetDownloadObjectUrl(userId, name);
+                var url = await s3Service.GetDownloadObjectUrlAsync(userId, name);
                 if (url == null) return BadRequest("Could not create signed url.");
                 return Ok(url);
             }

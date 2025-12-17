@@ -200,12 +200,7 @@ namespace Notesnook.API
 
             services.AddControllers();
 
-            services.AddHealthChecks().AddS3((options) =>
-            {
-                options.Credentials = new BasicAWSCredentials(Constants.S3_ACCESS_KEY_ID, Constants.S3_ACCESS_KEY);
-                options.S3Config = S3Service.CreateConfig();
-                options.BucketName = Constants.S3_BUCKET_NAME;
-            }, "s3-check", HealthStatus.Degraded).AddMongoDb(Constants.MONGODB_CONNECTION_STRING, "mongodb-check", HealthStatus.Unhealthy);
+            services.AddHealthChecks();
 
             services.AddSignalR((hub) =>
             {
