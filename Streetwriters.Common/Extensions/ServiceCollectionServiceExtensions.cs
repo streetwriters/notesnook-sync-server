@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 using Microsoft.Extensions.DependencyInjection;
+using Streetwriters.Common.Accessors;
 using Streetwriters.Data.DbContexts;
 using Streetwriters.Data.Repositories;
 
@@ -25,6 +26,13 @@ namespace Streetwriters.Common.Extensions
 {
     public static class ServiceCollectionServiceExtensions
     {
+        public static IServiceCollection AddWampServiceAccessor(this IServiceCollection services, Server server)
+        {
+            services.AddSingleton<WampServiceAccessor>((provider) => new WampServiceAccessor(server));
+            services.AddHostedService(provider => provider.GetRequiredService<WampServiceAccessor>());
+            return services;
+        }
+
         public static IServiceCollection AddRepository<T>(this IServiceCollection services, string collectionName, string database) where T : class
         {
             services.AddSingleton((provider) => MongoDbContext.GetMongoCollection<T>(provider.GetRequiredService<MongoDB.Driver.IMongoClient>(), database, collectionName));

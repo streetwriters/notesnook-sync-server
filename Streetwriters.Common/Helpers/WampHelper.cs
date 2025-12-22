@@ -28,15 +28,28 @@ namespace Streetwriters.Common.Helpers
 {
     public class WampHelper
     {
-        public static async Task<IWampRealmProxy> OpenWampChannelAsync(string server, string realmName)
+        public static async Task<IWampChannel> OpenWampChannelAsync(string server, string realmName)
         {
             DefaultWampChannelFactory channelFactory = new();
 
             IWampChannel channel = channelFactory.CreateJsonChannel(server, realmName);
 
-            await channel.Open();
+            var isConnected = false;
+            while (!isConnected)
+            {
+                try
+                {
+                    await channel.Open();
+                    isConnected = true;
+                }
+                catch
+                {
+                    await Task.Delay(5000);
+                    continue;
+                }
+            }
 
-            return channel.RealmProxy;
+            return channel;
         }
 
         public static void PublishMessage<T>(IWampRealmProxy realm, string topicName, T message)

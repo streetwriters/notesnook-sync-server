@@ -26,11 +26,11 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using WampSharp.AspNetCore.WebSockets.Server;
 using WampSharp.Binding;
 using WampSharp.V2;
 using WampSharp.V2.Realm;
-using Microsoft.Extensions.Hosting;
 
 namespace Streetwriters.Common.Extensions
 {
@@ -55,9 +55,9 @@ namespace Streetwriters.Common.Extensions
             return app;
         }
 
-        public static IApplicationBuilder UseWamp<T>(this IApplicationBuilder app, WampServer<T> server, Action<IWampHostedRealm, WampServer<T>> action) where T : new()
+        public static IApplicationBuilder UseWamp(this IApplicationBuilder app, WampServer server, Action<IWampHostedRealm, WampServer> action)
         {
-            WampHost host = new WampHost();
+            WampHost host = new();
 
             app.Map(server.Endpoint, builder =>
             {
@@ -81,10 +81,8 @@ namespace Streetwriters.Common.Extensions
 
         public static T GetScopedService<T>(this IApplicationBuilder app) where T : notnull
         {
-            using (var scope = app.ApplicationServices.CreateScope())
-            {
-                return scope.ServiceProvider.GetRequiredService<T>();
-            }
+            using var scope = app.ApplicationServices.CreateScope();
+            return scope.ServiceProvider.GetRequiredService<T>();
         }
 
         public static IApplicationBuilder UseForwardedHeadersWithKnownProxies(this IApplicationBuilder app, IWebHostEnvironment env, string forwardedForHeaderName = null)
