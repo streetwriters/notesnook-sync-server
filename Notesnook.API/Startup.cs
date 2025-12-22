@@ -169,14 +169,19 @@ namespace Notesnook.API
             if (!BsonClassMap.IsClassMapRegistered(typeof(CallToAction)))
                 BsonClassMap.RegisterClassMap<CallToAction>();
 
+            if (!BsonClassMap.IsClassMapRegistered(typeof(SyncDevice)))
+                BsonClassMap.RegisterClassMap<SyncDevice>();
+
             services.AddScoped<IDbContext, MongoDbContext>();
             services.AddScoped<IUnitOfWork, UnitOfWork>();
 
             services.AddRepository<UserSettings>("user_settings", "notesnook")
                     .AddRepository<Monograph>("monographs", "notesnook")
                     .AddRepository<Announcement>("announcements", "notesnook")
+                    .AddRepository<DeviceIdsChunk>(Collections.DeviceIdsChunksKey, "notesnook")
+                    .AddRepository<SyncDevice>(Collections.SyncDevicesKey, "notesnook")
                     .AddRepository<InboxApiKey>(Collections.InboxApiKeysKey, "notesnook")
-                    .AddRepository<InboxSyncItem>(Collections.InboxItems, "notesnook");
+                    .AddRepository<InboxSyncItem>(Collections.InboxItemsKey, "notesnook");
 
             services.AddMongoCollection(Collections.SettingsKey)
                     .AddMongoCollection(Collections.AttachmentsKey)
@@ -190,13 +195,16 @@ namespace Notesnook.API
                     .AddMongoCollection(Collections.TagsKey)
                     .AddMongoCollection(Collections.ColorsKey)
                     .AddMongoCollection(Collections.VaultsKey)
-                    .AddMongoCollection(Collections.InboxItems)
+                    .AddMongoCollection(Collections.InboxItemsKey)
                     .AddMongoCollection(Collections.InboxApiKeysKey);
 
             services.AddScoped<ISyncItemsRepositoryAccessor, SyncItemsRepositoryAccessor>();
+            services.AddScoped<SyncDeviceService>();
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<IS3Service, S3Service>();
             services.AddScoped<IURLAnalyzer, URLAnalyzer>();
+
+            services.AddWampServiceAccessor(Servers.NotesnookAPI);
 
             services.AddControllers();
 

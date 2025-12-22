@@ -37,15 +37,15 @@ namespace Notesnook.API.Controllers
     [ApiController]
     [Authorize]
     [Route("devices")]
-    public class SyncDeviceController(ILogger<SyncDeviceController> logger) : ControllerBase
+    public class SyncDeviceController(SyncDeviceService syncDeviceService, ILogger<SyncDeviceController> logger) : ControllerBase
     {
         [HttpPost]
-        public IActionResult RegisterDevice([FromQuery] string deviceId)
+        public async Task<IActionResult> RegisterDevice([FromQuery] string deviceId)
         {
             try
             {
                 var userId = this.User.GetUserId();
-                new SyncDeviceService(new SyncDevice(userId, deviceId)).RegisterDevice();
+                await syncDeviceService.RegisterDeviceAsync(userId, deviceId);
                 return Ok();
             }
             catch (Exception ex)
@@ -57,12 +57,12 @@ namespace Notesnook.API.Controllers
 
 
         [HttpDelete]
-        public IActionResult UnregisterDevice([FromQuery] string deviceId)
+        public async Task<IActionResult> UnregisterDevice([FromQuery] string deviceId)
         {
             try
             {
                 var userId = this.User.GetUserId();
-                new SyncDeviceService(new SyncDevice(userId, deviceId)).UnregisterDevice();
+                await syncDeviceService.UnregisterDeviceAsync(userId, deviceId);
                 return Ok();
             }
             catch (Exception ex)

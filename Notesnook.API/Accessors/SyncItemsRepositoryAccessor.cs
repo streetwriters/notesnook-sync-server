@@ -46,6 +46,8 @@ namespace Notesnook.API.Accessors
         public Repository<Monograph> Monographs { get; }
         public Repository<InboxApiKey> InboxApiKey { get; }
         public Repository<InboxSyncItem> InboxItems { get; }
+        public Repository<SyncDevice> SyncDevices { get; }
+        public Repository<DeviceIdsChunk> DeviceIdsChunks { get; }
 
         public SyncItemsRepositoryAccessor(IDbContext dbContext,
 
@@ -74,13 +76,20 @@ namespace Notesnook.API.Accessors
         [FromKeyedServices(Collections.TagsKey)]
         IMongoCollection<SyncItem> tags,
 
-        Repository<UserSettings> usersSettings, Repository<Monograph> monographs,
-        Repository<InboxApiKey> inboxApiKey, Repository<InboxSyncItem> inboxItems, ILogger<SyncItemsRepository> logger)
+        Repository<UserSettings> usersSettings,
+        Repository<Monograph> monographs,
+        Repository<InboxApiKey> inboxApiKey,
+        Repository<InboxSyncItem> inboxItems,
+        Repository<SyncDevice> syncDevices,
+        Repository<DeviceIdsChunk> deviceIdsChunks,
+        ILogger<SyncItemsRepository> logger)
         {
             UsersSettings = usersSettings;
             Monographs = monographs;
             InboxApiKey = inboxApiKey;
             InboxItems = inboxItems;
+            SyncDevices = syncDevices;
+            DeviceIdsChunks = deviceIdsChunks;
             Notebooks = new SyncItemsRepository(dbContext, notebooks, logger);
             Notes = new SyncItemsRepository(dbContext, notes, logger);
             Contents = new SyncItemsRepository(dbContext, content, logger);

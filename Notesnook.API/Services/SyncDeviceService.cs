@@ -24,220 +24,201 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using MongoDB.Driver;
+using Notesnook.API.Interfaces;
+using Notesnook.API.Models;
 
 namespace Notesnook.API.Services
 {
-    public struct SyncDevice(string userId, string deviceId)
+    public readonly record struct ItemKey(string ItemId, string Type)
     {
-        public readonly string DeviceId => deviceId;
-        public readonly string UserId => userId;
-
-        public string UserSyncDirectoryPath = CreateFilePath(userId);
-        public string UserDeviceDirectoryPath = CreateFilePath(userId, deviceId);
-        public string PendingIdsFilePath = CreateFilePath(userId, deviceId, "pending");
-        public string UnsyncedIdsFilePath = CreateFilePath(userId, deviceId, "unsynced");
-        public string ResetSyncFilePath = CreateFilePath(userId, deviceId, "reset-sync");
-
-        public readonly long LastAccessTime
-        {
-            get => long.Parse(GetMetadata("LastAccessTime") ?? "0");
-            set => SetMetadata("LastAccessTime", value.ToString());
-        }
-
-        /// <summary>
-        /// Indicates if the monographs have been synced for the first time
-        /// ever on a device.
-        /// </summary>
-        public readonly bool HasInitialMonographsSync
-        {
-            get => !string.IsNullOrEmpty(GetMetadata("HasInitialMonographsSync"));
-            set => SetMetadata("HasInitialMonographsSync", value.ToString());
-        }
-
-        private static string CreateFilePath(string userId, string? deviceId = null, string? metadataKey = null)
-        {
-            return Path.Join("sync", userId, deviceId, metadataKey);
-        }
-
-        private readonly string? GetMetadata(string metadataKey)
-        {
-            var path = CreateFilePath(userId, deviceId, metadataKey);
-            if (!File.Exists(path)) return null;
-            return File.ReadAllText(path);
-        }
-
-        private readonly void SetMetadata(string metadataKey, string value)
-        {
-            try
-            {
-                var path = CreateFilePath(userId, deviceId, metadataKey);
-                File.WriteAllText(path, value);
-            }
-            catch (DirectoryNotFoundException) { }
-        }
+        public override string ToString() => $"{ItemId}:{Type}";
     }
-
-    public class SyncDeviceService(SyncDevice device)
+    public class SyncDeviceService(ISyncItemsRepositoryAccessor repositories, ILogger<SyncDeviceService> logger)
     {
-        public string[] GetUnsyncedIds()
-        {
-            try
-            {
-                return File.ReadAllLines(device.UnsyncedIdsFilePath);
-            }
-            catch { return []; }
-        }
+        private static FilterDefinition<SyncDevice> DeviceFilter(string userId, string deviceId) =>
+            Builders<SyncDevice>.Filter.Eq(x => x.UserId, userId) &
+            Builders<SyncDevice>.Filter.Eq(x => x.DeviceId, deviceId);
+        private static FilterDefinition<DeviceIdsChunk> DeviceIdsChunkFilter(string userId, string deviceId, string key) =>
+            Builders<DeviceIdsChunk>.Filter.Eq(x => x.UserId, userId) &
+            Builders<DeviceIdsChunk>.Filter.Eq(x => x.DeviceId, deviceId) &
+            Builders<DeviceIdsChunk>.Filter.Eq(x => x.Key, key);
 
-        public string[] GetUnsyncedIds(string deviceId)
-        {
-            try
-            {
-                return File.ReadAllLines(Path.Join(device.UserSyncDirectoryPath, deviceId, "unsynced"));
-            }
-            catch { return []; }
-        }
+        private static FilterDefinition<DeviceIdsChunk> DeviceIdsChunkFilter(string userId, string deviceId) =>
+            Builders<DeviceIdsChunk>.Filter.Eq(x => x.UserId, userId) &
+            Builders<DeviceIdsChunk>.Filter.Eq(x => x.DeviceId, deviceId);
 
-        public string[] FetchUnsyncedIds()
+        private static FilterDefinition<DeviceIdsChunk> DeviceIdsChunkFilter(string userId) =>
+            Builders<DeviceIdsChunk>.Filter.Eq(x => x.UserId, userId);
+
+        private static FilterDefinition<SyncDevice> UserFilter(string userId) => Builders<SyncDevice>.Filter.Eq(x => x.UserId, userId);
+
+
+        public async Task<HashSet<ItemKey>> GetIdsAsync(string userId, string deviceId, string key)
         {
-            if (IsSyncReset()) return [];
-            try
+            var cursor = await repositories.DeviceIdsChunks.Collection.FindAsync(DeviceIdsChunkFilter(userId, deviceId, key));
+            var result = new HashSet<ItemKey>();
+            while (await cursor.MoveNextAsync())
             {
-                var unsyncedIds = GetUnsyncedIds();
-                lock (device.DeviceId)
+                foreach (var chunk in cursor.Current)
                 {
-                    if (IsSyncPending())
+                    foreach (var id in chunk.Ids)
                     {
-                        unsyncedIds = unsyncedIds.Union(File.ReadAllLines(device.PendingIdsFilePath)).ToArray();
+                        var parts = id.Split(':', 2);
+                        result.Add(new ItemKey(parts[0], parts[1]));
                     }
-
-                    if (unsyncedIds.Length == 0) return [];
-
-                    File.Delete(device.UnsyncedIdsFilePath);
-                    File.WriteAllLines(device.PendingIdsFilePath, unsyncedIds);
                 }
-                return unsyncedIds;
             }
-            catch
+            return result;
+        }
+
+        const int MaxIdsPerChunk = 400_000;
+        public async Task AppendIdsAsync(string userId, string deviceId, string key, IEnumerable<ItemKey> ids)
+        {
+            var filter = DeviceIdsChunkFilter(userId, deviceId, key) & Builders<DeviceIdsChunk>.Filter.Where(x => x.Ids.Length < MaxIdsPerChunk);
+            var chunk = await repositories.DeviceIdsChunks.Collection.Find(filter).FirstOrDefaultAsync();
+
+            if (chunk != null)
             {
-                return [];
+                var update = Builders<DeviceIdsChunk>.Update.PushEach(x => x.Ids, ids.Select(i => i.ToString()));
+                await repositories.DeviceIdsChunks.Collection.UpdateOneAsync(
+                    Builders<DeviceIdsChunk>.Filter.Eq(x => x.Id, chunk.Id),
+                    update
+                );
             }
-        }
-
-        public void WritePendingIds(IEnumerable<string> ids)
-        {
-            lock (device.DeviceId)
+            else
             {
-                File.WriteAllLines(device.PendingIdsFilePath, ids);
-            }
-        }
-
-        public bool IsSyncReset()
-        {
-            return File.Exists(device.ResetSyncFilePath);
-        }
-        public bool IsSyncReset(string deviceId)
-        {
-            return File.Exists(Path.Join(device.UserSyncDirectoryPath, deviceId, "reset-sync"));
-        }
-
-        public bool IsSyncPending()
-        {
-            return File.Exists(device.PendingIdsFilePath);
-        }
-
-        public bool IsUnsynced()
-        {
-            return File.Exists(device.UnsyncedIdsFilePath);
-        }
-
-        public void Reset()
-        {
-            try
-            {
-                lock (device.UserId)
+                var newChunk = new DeviceIdsChunk
                 {
-                    File.Delete(device.ResetSyncFilePath);
-                    File.Delete(device.PendingIdsFilePath);
-                }
+                    UserId = userId,
+                    DeviceId = deviceId,
+                    Key = key,
+                    Ids = [.. ids.Select(i => i.ToString())]
+                };
+                await repositories.DeviceIdsChunks.Collection.InsertOneAsync(newChunk);
             }
-            catch (FileNotFoundException) { }
-            catch (DirectoryNotFoundException) { }
+
+            var emptyChunksFilter = DeviceIdsChunkFilter(userId, deviceId, key) & Builders<DeviceIdsChunk>.Filter.Size(x => x.Ids, 0);
+            await repositories.DeviceIdsChunks.Collection.DeleteManyAsync(emptyChunksFilter);
         }
 
-        public bool IsDeviceRegistered()
+        public async Task WriteIdsAsync(string userId, string deviceId, string key, IEnumerable<ItemKey> ids)
         {
-            return Directory.Exists(device.UserDeviceDirectoryPath);
-        }
-        public bool IsDeviceRegistered(string deviceId)
-        {
-            return Directory.Exists(Path.Join(device.UserSyncDirectoryPath, deviceId));
-        }
-
-        public string[] ListDevices()
-        {
-            return Directory.GetDirectories(device.UserSyncDirectoryPath).Select((path) => path[(path.LastIndexOf(Path.DirectorySeparatorChar) + 1)..]).ToArray();
-        }
-
-        public void ResetDevices()
-        {
-            lock (device.UserId)
+            var writes = new List<WriteModel<DeviceIdsChunk>>
             {
-                if (File.Exists(device.UserSyncDirectoryPath)) File.Delete(device.UserSyncDirectoryPath);
-                Directory.CreateDirectory(device.UserSyncDirectoryPath);
-            }
-        }
-
-        public void AddIdsToOtherDevices(List<string> ids)
-        {
-            device.LastAccessTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            foreach (string id in ListDevices())
+                new DeleteManyModel<DeviceIdsChunk>(DeviceIdsChunkFilter(userId, deviceId, key))
+            };
+            var chunks = ids.Chunk(MaxIdsPerChunk);
+            foreach (var chunk in chunks)
             {
-                if (id == device.DeviceId || IsSyncReset(id)) continue;
-
-                lock (id)
+                var newChunk = new DeviceIdsChunk
                 {
-                    if (!IsDeviceRegistered(id)) Directory.CreateDirectory(Path.Join(device.UserSyncDirectoryPath, id));
-
-                    var oldIds = GetUnsyncedIds(id);
-                    File.WriteAllLines(Path.Join(device.UserSyncDirectoryPath, id, "unsynced"), ids.Union(oldIds));
-                }
+                    UserId = userId,
+                    DeviceId = deviceId,
+                    Key = key,
+                    Ids = [.. chunk.Select(i => i.ToString())]
+                };
+                writes.Add(new InsertOneModel<DeviceIdsChunk>(newChunk));
             }
+            await repositories.DeviceIdsChunks.Collection.BulkWriteAsync(writes);
         }
 
-        public void AddIdsToAllDevices(List<string> ids)
+        public async Task<HashSet<ItemKey>> FetchUnsyncedIdsAsync(string userId, string deviceId)
         {
-            foreach (var id in ListDevices())
+            var device = await GetDeviceAsync(userId, deviceId);
+            if (device == null || device.IsSyncReset) return [];
+
+            var unsyncedIds = await GetIdsAsync(userId, deviceId, "unsynced");
+            var pendingIds = await GetIdsAsync(userId, deviceId, "pending");
+
+            unsyncedIds = [.. unsyncedIds, .. pendingIds];
+
+            if (unsyncedIds.Count == 0) return [];
+
+            await repositories.DeviceIdsChunks.Collection.DeleteManyAsync(DeviceIdsChunkFilter(userId, deviceId, "unsynced"));
+            await WriteIdsAsync(userId, deviceId, "pending", unsyncedIds);
+
+            return unsyncedIds;
+        }
+
+        public async Task WritePendingIdsAsync(string userId, string deviceId, HashSet<ItemKey> ids)
+        {
+            await WriteIdsAsync(userId, deviceId, "pending", ids);
+        }
+
+        public async Task ResetAsync(string userId, string deviceId)
+        {
+            await repositories.SyncDevices.Collection.UpdateOneAsync(DeviceFilter(userId, deviceId), Builders<SyncDevice>.Update
+                .Set(x => x.IsSyncReset, false));
+            await repositories.DeviceIdsChunks.Collection.DeleteManyAsync(DeviceIdsChunkFilter(userId, deviceId, "pending"));
+        }
+
+        public async Task<SyncDevice?> GetDeviceAsync(string userId, string deviceId)
+        {
+            return await repositories.SyncDevices.Collection.Find(DeviceFilter(userId, deviceId)).FirstOrDefaultAsync();
+        }
+
+        public async IAsyncEnumerable<SyncDevice> ListDevicesAsync(string userId)
+        {
+            using var cursor = await repositories.SyncDevices.Collection.FindAsync(UserFilter(userId));
+            while (await cursor.MoveNextAsync())
             {
-                if (IsSyncReset(id)) return;
-                lock (id)
+                foreach (var device in cursor.Current)
                 {
-                    if (!IsDeviceRegistered(id)) Directory.CreateDirectory(Path.Join(device.UserSyncDirectoryPath, id));
-
-                    var oldIds = GetUnsyncedIds(id);
-                    File.WriteAllLinesAsync(Path.Join(device.UserSyncDirectoryPath, id, "unsynced"), ids.Union(oldIds));
+                    yield return device;
                 }
             }
         }
 
-        public void RegisterDevice()
+        public async Task ResetDevicesAsync(string userId)
         {
-            lock (device.UserId)
+            await repositories.SyncDevices.Collection.DeleteManyAsync(UserFilter(userId));
+            await repositories.DeviceIdsChunks.Collection.DeleteManyAsync(DeviceIdsChunkFilter(userId));
+        }
+
+        public async Task UpdateLastAccessTimeAsync(string userId, string deviceId)
+        {
+            await repositories.SyncDevices.Collection.UpdateOneAsync(DeviceFilter(userId, deviceId), Builders<SyncDevice>.Update
+                .Set(x => x.LastAccessTime, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()));
+        }
+
+        public async Task AddIdsToOtherDevicesAsync(string userId, string deviceId, IEnumerable<ItemKey> ids)
+        {
+            await UpdateLastAccessTimeAsync(userId, deviceId);
+            await foreach (var device in ListDevicesAsync(userId))
             {
-                if (Directory.Exists(device.UserDeviceDirectoryPath))
-                    Directory.Delete(device.UserDeviceDirectoryPath, true);
-                Directory.CreateDirectory(device.UserDeviceDirectoryPath);
-                File.Create(device.ResetSyncFilePath).Close();
-                device.LastAccessTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                if (device.DeviceId == deviceId || device.IsSyncReset) continue;
+                await AppendIdsAsync(userId, device.DeviceId, "unsynced", ids);
             }
         }
 
-        public void UnregisterDevice()
+        public async Task AddIdsToAllDevicesAsync(string userId, IEnumerable<ItemKey> ids)
         {
-            lock (device.UserId)
+            await foreach (var device in ListDevicesAsync(userId))
             {
-                if (!Path.Exists(device.UserDeviceDirectoryPath)) return;
-                Directory.Delete(device.UserDeviceDirectoryPath, true);
+                if (device.IsSyncReset) continue;
+                await AppendIdsAsync(userId, device.DeviceId, "unsynced", ids);
             }
+        }
+
+        public async Task<SyncDevice> RegisterDeviceAsync(string userId, string deviceId)
+        {
+            var newDevice = new SyncDevice
+            {
+                UserId = userId,
+                DeviceId = deviceId,
+                LastAccessTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                IsSyncReset = true
+            };
+            await repositories.SyncDevices.Collection.InsertOneAsync(newDevice);
+            return newDevice;
+        }
+
+        public async Task UnregisterDeviceAsync(string userId, string deviceId)
+        {
+            await repositories.SyncDevices.Collection.DeleteOneAsync(DeviceFilter(userId, deviceId));
+            await repositories.DeviceIdsChunks.Collection.DeleteManyAsync(DeviceIdsChunkFilter(userId, deviceId));
         }
     }
 }

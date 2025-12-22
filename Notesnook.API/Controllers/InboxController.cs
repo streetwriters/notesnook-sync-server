@@ -40,6 +40,7 @@ namespace Notesnook.API.Controllers
             Repository<InboxApiKey> inboxApiKeysRepository,
             Repository<UserSettings> userSettingsRepository,
             Repository<InboxSyncItem> inboxItemsRepository,
+            SyncDeviceService syncDeviceService,
             ILogger<InboxController> logger) : ControllerBase
     {
 
@@ -182,8 +183,7 @@ namespace Notesnook.API.Controllers
                 request.UserId = userId;
                 request.ItemId = ObjectId.GenerateNewId().ToString();
                 await inboxItemsRepository.InsertAsync(request);
-                new SyncDeviceService(new SyncDevice(userId, string.Empty))
-                    .AddIdsToAllDevices([$"{request.ItemId}:inboxItems"]);
+                await syncDeviceService.AddIdsToAllDevicesAsync(userId, [new(request.ItemId, "inbox_item")]);
                 await WampServers.MessengerServer.PublishMessageAsync(MessengerServerTopics.SendSSETopic, new SendSSEMessage
                 {
                     OriginTokenId = null,

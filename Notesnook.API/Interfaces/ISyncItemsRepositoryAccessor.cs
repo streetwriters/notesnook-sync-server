@@ -42,5 +42,7 @@ namespace Notesnook.API.Interfaces
         Repository<Monograph> Monographs { get; }
         Repository<InboxApiKey> InboxApiKey { get; }
         Repository<InboxSyncItem> InboxItems { get; }
+        Repository<SyncDevice> SyncDevices { get; }
+        Repository<DeviceIdsChunk> DeviceIdsChunks { get; }
     }
 }

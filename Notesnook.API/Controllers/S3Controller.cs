@@ -17,23 +17,25 @@ You should have received a copy of the Affero GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using Amazon.S3.Model;
-using System.Threading.Tasks;
-using System.Security.Claims;
-using Notesnook.API.Interfaces;
 using System;
 using System.Net.Http;
-using Streetwriters.Common.Extensions;
-using Streetwriters.Common.Models;
-using Notesnook.API.Helpers;
-using Streetwriters.Common;
-using Streetwriters.Common.Interfaces;
-using Notesnook.API.Models;
+using System.Security.Claims;
+using System.Threading.Tasks;
+using Amazon.S3.Model;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Extensions;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
+using Notesnook.API.Accessors;
+using Notesnook.API.Helpers;
+using Notesnook.API.Interfaces;
+using Notesnook.API.Models;
+using Streetwriters.Common;
+using Streetwriters.Common.Accessors;
+using Streetwriters.Common.Extensions;
+using Streetwriters.Common.Interfaces;
+using Streetwriters.Common.Models;
 
 namespace Notesnook.API.Controllers
 {
@@ -41,7 +43,7 @@ namespace Notesnook.API.Controllers
     [Route("s3")]
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     [Authorize("Sync")]
-    public class S3Controller(IS3Service s3Service, ISyncItemsRepositoryAccessor repositories, ILogger<S3Controller> logger) : ControllerBase
+    public class S3Controller(IS3Service s3Service, ISyncItemsRepositoryAccessor repositories, WampServiceAccessor serviceAccessor, ILogger<S3Controller> logger) : ControllerBase
     {
         [HttpPut]
         public async Task<IActionResult> Upload([FromQuery] string name)
@@ -74,8 +76,7 @@ namespace Notesnook.API.Controllers
         {
             var userSettings = await repositories.UsersSettings.FindOneAsync((u) => u.UserId == userId);
 
-            var subscriptionService = await WampServers.SubscriptionServer.GetServiceAsync<IUserSubscriptionService>(SubscriptionServerTopics.UserSubscriptionServiceTopic);
-            var subscription = await subscriptionService.GetUserSubscriptionAsync(Clients.Notesnook.Id, userId) ?? throw new Exception("User subscription not found.");
+            var subscription = await serviceAccessor.UserSubscriptionService.GetUserSubscriptionAsync(Clients.Notesnook.Id, userId) ?? throw new Exception("User subscription not found.");
 
             if (StorageHelper.IsFileSizeExceeded(subscription, fileSize))
                 throw new Exception("Max file size exceeded.");

@@ -21,11 +21,14 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using AngleSharp.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MongoDB.Driver;
+using Notesnook.API.Accessors;
 using Notesnook.API.Models;
 using Streetwriters.Common;
+using Streetwriters.Common.Accessors;
 using Streetwriters.Common.Interfaces;
 using Streetwriters.Common.Models;
 using Streetwriters.Data.Repositories;
@@ -35,25 +38,26 @@ namespace Notesnook.API.Controllers
     // TODO: this should be moved out into its own microservice
     [ApiController]
     [Route("announcements")]
-    public class AnnouncementController : ControllerBase
+    public class AnnouncementController(Repository<Announcement> announcements, WampServiceAccessor serviceAccessor) : ControllerBase
     {
-        private Repository<Announcement> Announcements { get; set; }
-        public AnnouncementController(Repository<Announcement> announcements)
-        {
-            Announcements = announcements;
-        }
-
         [HttpGet("active")]
         [AllowAnonymous]
         public async Task<IActionResult> GetActiveAnnouncements([FromQuery] string? userId)
         {
-            var totalActive = await Announcements.Collection.CountDocumentsAsync(Builders<Announcement>.Filter.Eq("IsActive", true));
-            if (totalActive <= 0) return Ok(Array.Empty<Announcement>());
-
-            var announcements = (await Announcements.FindAsync((a) => a.IsActive)).Where((a) => a.UserIds == null || a.UserIds.Length == 0 || a.UserIds.Contains(userId));
-            foreach (var announcement in announcements)
+            var filter = Builders<Announcement>.Filter.Eq(x => x.IsActive, true);
+            if (!string.IsNullOrEmpty(userId))
             {
-                if (announcement.UserIds != null && !announcement.UserIds.Contains(userId)) continue;
+                var userFilter = Builders<Announcement>.Filter.Or(
+                    Builders<Announcement>.Filter.Eq(x => x.UserIds, null),
+                    Builders<Announcement>.Filter.Size(x => x.UserIds, 0),
+                    Builders<Announcement>.Filter.AnyEq(x => x.UserIds, userId)
+                );
+                filter = Builders<Announcement>.Filter.And(filter, userFilter);
+            }
+            var userAnnouncements = await announcements.Collection.Find(filter).ToListAsync();
+            foreach (var announcement in userAnnouncements)
+            {
+                if (userId != null && announcement.UserIds != null && !announcement.UserIds.Contains(userId)) continue;
 
                 foreach (var item in announcement.Body)
                 {
@@ -66,13 +70,13 @@ namespace Notesnook.API.Controllers
 
                         if (action.Data.Contains("{{Email}}"))
                         {
-                            var user = string.IsNullOrEmpty(userId) ? null : await (await WampServers.IdentityServer.GetServiceAsync<IUserAccountService>(IdentityServerTopics.UserAccountServiceTopic)).GetUserAsync(Clients.Notesnook.Id, userId);
+                            var user = string.IsNullOrEmpty(userId) ? null : await serviceAccessor.UserAccountService.GetUserAsync(Clients.Notesnook.Id, userId);
                             action.Data = action.Data.Replace("{{Email}}", user?.Email ?? "");
                         }
                     }
                 }
             }
-            return Ok(announcements);
+            return Ok(userAnnouncements);
         }
     }
 }

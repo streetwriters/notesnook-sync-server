@@ -17,10 +17,10 @@ You should have received a copy of the Affero GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+using System.Runtime.Serialization;
 using System.Text.Json.Serialization;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
-using System.Runtime.Serialization;
 
 namespace Notesnook.API.Models
 {
@@ -48,8 +48,5 @@ namespace Notesnook.API.Models
 
         [JsonPropertyName("deleted")]
         public bool Deleted { get; set; }
-
-        [JsonPropertyName("viewCount")]
-        public int ViewCount { get; set; }
     }
 }

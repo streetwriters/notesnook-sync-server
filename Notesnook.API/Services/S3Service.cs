@@ -30,10 +30,12 @@ using Amazon.S3.Model;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
+using Notesnook.API.Accessors;
 using Notesnook.API.Helpers;
 using Notesnook.API.Interfaces;
 using Notesnook.API.Models;
 using Streetwriters.Common;
+using Streetwriters.Common.Accessors;
 using Streetwriters.Common.Enums;
 using Streetwriters.Common.Interfaces;
 using Streetwriters.Common.Models;
@@ -52,6 +54,7 @@ namespace Notesnook.API.Services
         private readonly string INTERNAL_BUCKET_NAME = Constants.S3_INTERNAL_BUCKET_NAME ?? Constants.S3_BUCKET_NAME;
         private readonly S3FailoverHelper S3Client;
         private ISyncItemsRepositoryAccessor Repositories { get; }
+        private WampServiceAccessor ServiceAccessor { get; }
 
         // When running in a dockerized environment the sync server doesn't have access
         // to the host's S3 Service URL. It can only talk to S3 server via its own internal
@@ -64,9 +67,10 @@ namespace Notesnook.API.Services
         private readonly S3FailoverHelper S3InternalClient;
         private readonly HttpClient httpClient = new();
 
-        public S3Service(ISyncItemsRepositoryAccessor syncItemsRepositoryAccessor, ILogger<S3Service> logger)
+        public S3Service(ISyncItemsRepositoryAccessor syncItemsRepositoryAccessor, WampServiceAccessor wampServiceAccessor, ILogger<S3Service> logger)
         {
             Repositories = syncItemsRepositoryAccessor;
+            ServiceAccessor = wampServiceAccessor;
             S3Client = new S3FailoverHelper(
                 S3ClientFactory.CreateS3Clients(
                     Constants.S3_SERVICE_URL,
@@ -240,8 +244,7 @@ namespace Notesnook.API.Services
 
             if (!Constants.IS_SELF_HOSTED)
             {
-                var subscriptionService = await WampServers.SubscriptionServer.GetServiceAsync<IUserSubscriptionService>(SubscriptionServerTopics.UserSubscriptionServiceTopic);
-                var subscription = await subscriptionService.GetUserSubscriptionAsync(Clients.Notesnook.Id, userId) ?? throw new Exception("User subscription not found.");
+                var subscription = await ServiceAccessor.UserSubscriptionService.GetUserSubscriptionAsync(Clients.Notesnook.Id, userId) ?? throw new Exception("User subscription not found.");
 
                 long fileSize = await GetMultipartUploadSizeAsync(userId, uploadRequest.Key, uploadRequest.UploadId);
                 if (StorageHelper.IsFileSizeExceeded(subscription, fileSize))

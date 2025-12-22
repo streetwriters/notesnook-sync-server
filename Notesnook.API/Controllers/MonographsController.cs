@@ -46,7 +46,7 @@ namespace Notesnook.API.Controllers
     [ApiController]
     [Route("monographs")]
     [Authorize("Sync")]
-    public class MonographsController(Repository<Monograph> monographs, IURLAnalyzer analyzer, ILogger<MonographsController> logger) : ControllerBase
+    public class MonographsController(Repository<Monograph> monographs, IURLAnalyzer analyzer, SyncDeviceService syncDeviceService, ILogger<MonographsController> logger) : ControllerBase
     {
         const string SVG_PIXEL = "<svg xmlns='http://www.w3.org/2000/svg' width='1' height='1'><circle r='9'/></svg>";
         private const int MAX_DOC_SIZE = 15 * 1024 * 1024;
@@ -317,32 +317,16 @@ namespace Notesnook.API.Controllers
             return Ok();
         }
 
-        private static async Task MarkMonographForSyncAsync(string userId, string monographId, string? deviceId, string? jti)
+        private async Task MarkMonographForSyncAsync(string userId, string monographId, string? deviceId, string? jti)
         {
             if (deviceId == null) return;
 
-            new SyncDeviceService(new SyncDevice(userId, deviceId)).AddIdsToOtherDevices([$"{monographId}:monograph"]);
-            await SendTriggerSyncEventAsync(userId, jti);
+            await syncDeviceService.AddIdsToOtherDevicesAsync(userId, deviceId, [new(monographId, "monograph")]);
         }
 
-        private static async Task MarkMonographForSyncAsync(string userId, string monographId)
+        private async Task MarkMonographForSyncAsync(string userId, string monographId)
         {
-            new SyncDeviceService(new SyncDevice(userId, string.Empty)).AddIdsToAllDevices([$"{monographId}:monograph"]);
-            await SendTriggerSyncEventAsync(userId, sendToAllDevices: true);
-        }
-
-        private static async Task SendTriggerSyncEventAsync(string userId, string? jti = null, bool sendToAllDevices = false)
-        {
-            await WampServers.MessengerServer.PublishMessageAsync(MessengerServerTopics.SendSSETopic, new SendSSEMessage
-            {
-                OriginTokenId = sendToAllDevices ? null : jti,
-                UserId = userId,
-                Message = new Message
-                {
-                    Type = "triggerSync",
-                    Data = JsonSerializer.Serialize(new { reason = "Monographs updated." })
-                }
-            });
+            await syncDeviceService.AddIdsToAllDevicesAsync(userId, [new(monographId, "monograph")]);
         }
 
         private async Task<string> CleanupContentAsync(ClaimsPrincipal user, string? content)

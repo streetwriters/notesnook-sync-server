@@ -30,9 +30,9 @@ using Notesnook.API.Interfaces;
 using Notesnook.API.Models;
 using Notesnook.API.Models.Responses;
 using Streetwriters.Common;
+using Streetwriters.Common.Accessors;
 using Streetwriters.Common.Enums;
 using Streetwriters.Common.Extensions;
-using Streetwriters.Common.Interfaces;
 using Streetwriters.Common.Messages;
 using Streetwriters.Common.Models;
 using Streetwriters.Data.Interfaces;
@@ -41,7 +41,7 @@ namespace Notesnook.API.Services
 {
     public class UserService(IHttpContextAccessor accessor,
         ISyncItemsRepositoryAccessor syncItemsRepositoryAccessor,
-        IUnitOfWork unitOfWork, IS3Service s3Service, ILogger<UserService> logger) : IUserService
+        IUnitOfWork unitOfWork, IS3Service s3Service, SyncDeviceService syncDeviceService, WampServiceAccessor serviceAccessor, ILogger<UserService> logger) : IUserService
     {
         private static readonly System.Security.Cryptography.RandomNumberGenerator Rng = System.Security.Cryptography.RandomNumberGenerator.Create();
         private readonly HttpClient httpClient = new();
@@ -88,9 +88,7 @@ namespace Notesnook.API.Services
 
         public async Task<UserResponse> GetUserAsync(string userId)
         {
-            var userService = await WampServers.IdentityServer.GetServiceAsync<IUserAccountService>(IdentityServerTopics.UserAccountServiceTopic);
-
-            var user = await userService.GetUserAsync(Clients.Notesnook.Id, userId) ?? throw new Exception("User not found.");
+            var user = await serviceAccessor.UserAccountService.GetUserAsync(Clients.Notesnook.Id, userId) ?? throw new Exception("User not found.");
 
             Subscription? subscription = null;
             if (Constants.IS_SELF_HOSTED)
@@ -109,8 +107,7 @@ namespace Notesnook.API.Services
             }
             else
             {
-                var subscriptionService = await WampServers.SubscriptionServer.GetServiceAsync<IUserSubscriptionService>(SubscriptionServerTopics.UserSubscriptionServiceTopic);
-                subscription = await subscriptionService.GetUserSubscriptionAsync(Clients.Notesnook.Id, userId) ?? throw new Exception("User subscription not found.");
+                subscription = await serviceAccessor.UserSubscriptionService.GetUserSubscriptionAsync(Clients.Notesnook.Id, userId) ?? throw new Exception("User subscription not found.");
             }
 
             var userSettings = await Repositories.UsersSettings.FindOneAsync((u) => u.UserId == user.UserId) ?? throw new Exception("User settings not found.");
@@ -185,8 +182,6 @@ namespace Notesnook.API.Services
 
         public async Task DeleteUserAsync(string userId)
         {
-            new SyncDeviceService(new SyncDevice(userId, userId)).ResetDevices();
-
             var cc = new CancellationTokenSource();
 
             Repositories.Notes.DeleteByUserId(userId);
@@ -209,6 +204,8 @@ namespace Notesnook.API.Services
             logger.LogInformation("User data deleted for user {UserId}: {Result}", userId, result);
             if (!result) throw new Exception("Could not delete user data.");
 
+            await syncDeviceService.ResetDevicesAsync(userId);
+
             if (!Constants.IS_SELF_HOSTED)
             {
                 await WampServers.SubscriptionServer.PublishMessageAsync(SubscriptionServerTopics.DeleteSubscriptionTopic, new DeleteSubscriptionMessage
@@ -225,8 +222,7 @@ namespace Notesnook.API.Services
         {
             logger.LogInformation("Deleting user account: {UserId}", userId);
 
-            var userService = await WampServers.IdentityServer.GetServiceAsync<IUserAccountService>(IdentityServerTopics.UserAccountServiceTopic);
-            await userService.DeleteUserAsync(Clients.Notesnook.Id, userId, password);
+            await serviceAccessor.UserAccountService.DeleteUserAsync(Clients.Notesnook.Id, userId, password);
 
             await DeleteUserAsync(userId);
 
@@ -246,7 +242,6 @@ namespace Notesnook.API.Services
 
         public async Task<bool> ResetUserAsync(string userId, bool removeAttachments)
         {
-            new SyncDeviceService(new SyncDevice(userId, userId)).ResetDevices();
 
             var cc = new CancellationTokenSource();
 
@@ -265,6 +260,8 @@ namespace Notesnook.API.Services
             Repositories.Monographs.DeleteMany((m) => m.UserId == userId);
             Repositories.InboxApiKey.DeleteMany((t) => t.UserId == userId);
             if (!await unit.Commit()) return false;
+
+            await syncDeviceService.ResetDevicesAsync(userId);
 
             var userSettings = await Repositories.UsersSettings.FindOneAsync((s) => s.UserId == userId);
 
