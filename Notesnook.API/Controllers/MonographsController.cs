@@ -180,7 +180,6 @@ namespace Notesnook.API.Controllers
                     monograph.Content = null;
 
                 monograph.DatePublished = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                monograph.Slug = GenerateSlug();
                 var result = await monographs.Collection.UpdateOneAsync(
                     CreateMonographFilter(userId, monograph),
                     Builders<Monograph>.Update
@@ -189,7 +188,6 @@ namespace Notesnook.API.Controllers
                     .Set(m => m.EncryptedContent, monograph.EncryptedContent)
                     .Set(m => m.SelfDestruct, monograph.SelfDestruct)
                     .Set(m => m.Title, monograph.Title)
-                    .Set(m => m.Slug, monograph.Slug)
                     .Set(m => m.Password, monograph.Password)
                 );
                 if (!result.IsAcknowledged) return BadRequest();
@@ -200,7 +198,7 @@ namespace Notesnook.API.Controllers
                 {
                     id = monograph.ItemId,
                     datePublished = monograph.DatePublished,
-                    publishUrl = monograph.ConstructPublishUrl()
+                    publishUrl = existingMonograph.ConstructPublishUrl()
                 });
             }
             catch (Exception e)
@@ -366,7 +364,7 @@ namespace Notesnook.API.Controllers
             });
         }
 
-        private static async Task MarkMonographForSyncAsync(string userId, string monographId, string? deviceId, string? jti)
+        private async Task MarkMonographForSyncAsync(string userId, string monographId, string? deviceId, string? jti)
         {
             if (deviceId == null) return;
 

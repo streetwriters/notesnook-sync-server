@@ -286,7 +286,7 @@ namespace Notesnook.API.Hubs
                         Title = m.Title,
                         ItemId = m.ItemId ?? m.Id.ToString(),
                         PublishUrl = m.ConstructPublishUrl()
-                    }).ToListAsync();
+                    }).ToList();
 
                     if (userMonographMetadatas.Count > 0 && !await Clients.Caller.SendMonographs(userMonographMetadatas).WaitAsync(TimeSpan.FromMinutes(10)))
                         throw new HubException("Client rejected monographs.");
