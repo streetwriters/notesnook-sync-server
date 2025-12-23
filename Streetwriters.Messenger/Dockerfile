@@ -1,7 +1,7 @@
-FROM mcr.microsoft.com/dotnet/runtime-deps:8.0-alpine AS base
+FROM mcr.microsoft.com/dotnet/runtime-deps:9.0-alpine AS base
 WORKDIR /app
 
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS build
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:9.0-alpine AS build
 ARG TARGETARCH
 ARG BUILDPLATFORM
 ENV DOTNET_TC_QuickJitForLoops="1" DOTNET_ReadyToRun="0" DOTNET_TieredPGO="1" DOTNET_SYSTEM_GLOBALIZATION_INVARIANT="true"
