@@ -1,0 +1,23 @@
+{
+  "name": "@streetwriters/cors-proxy",
+  "version": "1.0.0",
+  "description": "Production-ready CORS proxy server built with Bun",
+  "main": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "build": "bun build src/index.ts --outdir dist --target bun",
+    "start": "bun run dist/index.js",
+    "dev": "bun --watch src/index.ts"
+  },
+  "keywords": [
+    "cors",
+    "proxy",
+    "bun",
+    "server"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "bun-types": "latest"
+  }
+}
