@@ -4,6 +4,7 @@
  */
 
 const PORT = Bun.env.PORT || 3000;
+const HOST = Bun.env.HOST || "localhost";
 const ALLOWED_ORIGINS = Bun.env.ALLOWED_ORIGINS?.split(",") || ["*"];
 const MAX_REDIRECTS = 5;
 
@@ -114,6 +115,7 @@ async function proxyRequest(
 // Main server
 const server = Bun.serve({
   port: PORT,
+  hostname: HOST,
   async fetch(req) {
     const url = new URL(req.url);
 
@@ -222,6 +224,8 @@ const server = Bun.serve({
   },
 });
 
-console.log(`🚀 CORS Proxy Server running on http://localhost:${server.port}`);
-console.log(`📋 Health check: http://localhost:${server.port}/health`);
+console.log(
+  `🚀 CORS Proxy Server running on http://${server.hostname}:${server.port}`
+);
+console.log(`📋 Health check: http://${server.hostname}:${server.port}/health`);
 console.log(`🌍 Environment: ${Bun.env.NODE_ENV || "development"}`);
