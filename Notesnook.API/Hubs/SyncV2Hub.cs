@@ -247,7 +247,7 @@ namespace Notesnook.API.Hubs
                 var chunks = PrepareChunks(
                     userId,
                     ids,
-                    size: 1000,
+                    size: 100,
                     resetSync: device.IsSyncReset,
                     maxBytes: 7 * 1024 * 1024
                 );
