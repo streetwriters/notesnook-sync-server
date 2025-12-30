@@ -73,7 +73,7 @@ namespace Notesnook.API.Services
             return result;
         }
 
-        const int MaxIdsPerChunk = 400_000;
+        const int MaxIdsPerChunk = 25_000;
         public async Task AppendIdsAsync(string userId, string deviceId, string key, IEnumerable<ItemKey> ids)
         {
             var filter = DeviceIdsChunkFilter(userId, deviceId, key) & Builders<DeviceIdsChunk>.Filter.Where(x => x.Ids.Length < MaxIdsPerChunk);
