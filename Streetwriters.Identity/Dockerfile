@@ -27,8 +27,6 @@ FROM build AS publish
 RUN dotnet publish -c Release -o /app/publish \
   #--runtime alpine-x64 \
   --self-contained true \
-  /p:TrimMode=partial \
-  /p:PublishTrimmed=true \
   /p:PublishSingleFile=true \
   /p:JsonSerializerIsReflectionEnabledByDefault=true \
   -a $TARGETARCH
