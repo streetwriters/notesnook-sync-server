@@ -91,11 +91,7 @@ namespace Notesnook.API.Repositories
         public void DeleteByUserId(string userId)
         {
             var filter = Builders<SyncItem>.Filter.Eq("UserId", userId);
-            var writes = new List<WriteModel<SyncItem>>
-            {
-                new DeleteManyModel<SyncItem>(filter)
-            };
-            dbContext.AddCommand((handle, ct) => Collection.BulkWriteAsync(handle, writes, options: null, ct));
+            dbContext.AddCommand((handle, ct) => Collection.DeleteManyAsync(handle, filter, null, ct));
         }
 
         public void Upsert(SyncItem item, string userId, long dateSynced)

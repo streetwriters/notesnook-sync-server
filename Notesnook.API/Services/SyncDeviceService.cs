@@ -81,7 +81,7 @@ namespace Notesnook.API.Services
 
             if (chunk != null)
             {
-                var update = Builders<DeviceIdsChunk>.Update.PushEach(x => x.Ids, ids.Select(i => i.ToString()));
+                var update = Builders<DeviceIdsChunk>.Update.AddToSetEach(x => x.Ids, ids.Select(i => i.ToString()));
                 await repositories.DeviceIdsChunks.Collection.UpdateOneAsync(
                     Builders<DeviceIdsChunk>.Filter.Eq(x => x.Id, chunk.Id),
                     update
