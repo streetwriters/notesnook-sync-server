@@ -45,9 +45,24 @@ This guide walks you through replacing MinIO with GarageHQ (S3 Object Storage) i
     - Deploy the stack via Portainer or `docker compose up -d`.
     - **Note**: The `notesnook-server` will fail or be unhealthy initially because the access keys (`placeholder`) are invalid. This is expected. `garage` should start and be healthy.
 
-## Phase 3: Initialization (The "Single-Line" Commands)
+## Phase 3: Initialization
 
-You must run these commands via SSH on your Synology/Unraid server.
+You must run these commands via SSH on your server.
+
+### Option A: Automated Setup (Recommended)
+
+Run the provided setup script to automatically initialize the layout, create buckets, and generate keys.
+
+```bash
+chmod +x setup-garage.sh
+./setup-garage.sh
+```
+
+---
+
+### Option B: Manual Initialization (Fallback)
+
+If the automated script fails, follow these steps manually.
 
 **1. Initialize Garage Layout**
 This sets up your single node as the storage cluster.
