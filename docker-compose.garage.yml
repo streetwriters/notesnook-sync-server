@@ -79,37 +79,10 @@ services:
       - notesnook
     volumes:
       - s3data:/var/lib/garage
+      - ./garage.toml:/etc/garage.toml:ro
     env_file: *env-files
     environment:
       GARAGE_RPC_SECRET: ${GARAGE_RPC_SECRET}
-      GARAGE_RPC_BIND_ADDR: "[::]:3901"
-      GARAGE_RPC_PUBLIC_ADDR: "127.0.0.1:3901" # Single node hack
-    entrypoint: /bin/sh
-    command:
-      - -c
-      - |
-        # Generate configuration file if it doesn't exist or on every startup to ensure env vars are applied
-        cat <<EOF > /etc/garage.toml
-        metadata_dir = "/var/lib/garage/meta"
-        data_dir = "/var/lib/garage/data"
-        replication_factor = 1
-        consistency_mode = "consistent"
-        db_engine = "lmdb"
-
-        [s3_api]
-        api_bind_addr = "[::]:3900"
-        s3_region = "us-east-1"
-        root_domain = ".s3.garage"
-
-        [s3_web]
-        bind_addr = "[::]:3902"
-        root_domain = ".web.garage"
-
-        [admin]
-        api_bind_addr = "[::]:3903"
-        EOF
-
-        exec /garage server
     depends_on:
       validate:
         condition: service_completed_successfully
