@@ -97,12 +97,12 @@ namespace Streetwriters.Identity.Controllers
                     }
                 case TokenType.RESET_PASSWORD:
                     {
-                        if (!await UserManager.VerifyUserTokenAsync(user, TokenOptions.DefaultProvider, "ResetPassword", code))
-                            return BadRequest("Invalid token.");
+                        // if (!await UserManager.VerifyUserTokenAsync(user, TokenOptions.DefaultProvider, "ResetPassword", code))
+                        return BadRequest("Password reset is temporarily disabled due to some issues. It should be back soon. We apologize for the inconvenience.");
 
-                        var authorizationCode = await UserManager.GenerateUserTokenAsync(user, TokenOptions.DefaultProvider, "PasswordResetAuthorizationCode");
-                        var redirectUrl = $"{client.AccountRecoveryRedirectURL}?userId={userId}&code={authorizationCode}";
-                        return RedirectPermanent(redirectUrl);
+                        // var authorizationCode = await UserManager.GenerateUserTokenAsync(user, TokenOptions.DefaultProvider, "PasswordResetAuthorizationCode");
+                        // var redirectUrl = $"{client.AccountRecoveryRedirectURL}?userId={userId}&code={authorizationCode}";
+                        // return RedirectPermanent(redirectUrl);
                     }
                 default:
                     return BadRequest("Invalid type.");
@@ -149,21 +149,22 @@ namespace Streetwriters.Identity.Controllers
         [EnableRateLimiting("strict")]
         public async Task<IActionResult> ResetUserPassword([FromForm] ResetPasswordForm form)
         {
-            var client = Clients.FindClientById(form.ClientId);
-            if (client == null) return BadRequest("Invalid client_id.");
+            return BadRequest(new { error = "Password reset is temporarily disabled due to some issues. It should be back soon. We apologize for the inconvenience." });
+            //             var client = Clients.FindClientById(form.ClientId);
+            //             if (client == null) return BadRequest("Invalid client_id.");
 
-            var user = await UserManager.FindByEmailAsync(form.Email) ?? throw new Exception("User not found.");
-            if (!await UserService.IsUserValidAsync(UserManager, user, form.ClientId)) return Ok();
+            //             var user = await UserManager.FindByEmailAsync(form.Email) ?? throw new Exception("User not found.");
+            //             if (!await UserService.IsUserValidAsync(UserManager, user, form.ClientId)) return Ok();
 
-            var code = await UserManager.GenerateUserTokenAsync(user, TokenOptions.DefaultProvider, "ResetPassword");
-            var callbackUrl = Url.TokenLink(user.Id.ToString(), code, client.Id, TokenType.RESET_PASSWORD);
-#if (DEBUG || STAGING)
-            return Ok(callbackUrl);
-#else
-            logger.LogInformation("Password reset email sent to: {Email}, callback URL: {CallbackUrl}", user.Email, callbackUrl);
-            await EmailSender.SendPasswordResetEmailAsync(user.Email, callbackUrl, client);
-            return Ok();
-#endif
+            //             var code = await UserManager.GenerateUserTokenAsync(user, TokenOptions.DefaultProvider, "ResetPassword");
+            //             var callbackUrl = Url.TokenLink(user.Id.ToString(), code, client.Id, TokenType.RESET_PASSWORD);
+            // #if (DEBUG || STAGING)
+            //             return Ok(callbackUrl);
+            // #else
+            //             logger.LogInformation("Password reset email sent to: {Email}, callback URL: {CallbackUrl}", user.Email, callbackUrl);
+            //             await EmailSender.SendPasswordResetEmailAsync(user.Email, callbackUrl, client);
+            //             return Ok();
+            // #endif
         }
 
         [HttpPost("logout")]
@@ -250,31 +251,33 @@ namespace Streetwriters.Identity.Controllers
                     }
                 case "change_password":
                     {
-                        ArgumentNullException.ThrowIfNull(form.OldPassword);
-                        ArgumentNullException.ThrowIfNull(form.NewPassword);
-                        var result = await UserManager.ChangePasswordAsync(user, form.OldPassword, form.NewPassword);
-                        if (result.Succeeded)
-                        {
-                            await SendLogoutMessageAsync(user.Id.ToString(), "Password changed.");
-                            return Ok();
-                        }
-                        return BadRequest(result.Errors.ToErrors());
+                        return BadRequest(new { error = "Password change is temporarily disabled due to some issues. It should be back soon. We apologize for the inconvenience." });
+                        // ArgumentNullException.ThrowIfNull(form.OldPassword);
+                        // ArgumentNullException.ThrowIfNull(form.NewPassword);
+                        // var result = await UserManager.ChangePasswordAsync(user, form.OldPassword, form.NewPassword);
+                        // if (result.Succeeded)
+                        // {
+                        //     await SendLogoutMessageAsync(user.Id.ToString(), "Password changed.");
+                        //     return Ok();
+                        // }
+                        // return BadRequest(result.Errors.ToErrors());
                     }
                 case "reset_password":
                     {
-                        ArgumentNullException.ThrowIfNull(form.NewPassword);
-                        var result = await UserManager.RemovePasswordAsync(user);
-                        if (result.Succeeded)
-                        {
-                            await MFAService.ResetMFAAsync(user);
-                            result = await UserManager.AddPasswordAsync(user, form.NewPassword);
-                            if (result.Succeeded)
-                            {
-                                await SendLogoutMessageAsync(user.Id.ToString(), "Password reset.");
-                                return Ok();
-                            }
-                        }
-                        return BadRequest(result.Errors.ToErrors());
+                        return BadRequest(new { error = "Password reset is temporarily disabled due to some issues. It should be back soon. We apologize for the inconvenience." });
+                        // ArgumentNullException.ThrowIfNull(form.NewPassword);
+                        // var result = await UserManager.RemovePasswordAsync(user);
+                        // if (result.Succeeded)
+                        // {
+                        //     await MFAService.ResetMFAAsync(user);
+                        //     result = await UserManager.AddPasswordAsync(user, form.NewPassword);
+                        //     if (result.Succeeded)
+                        //     {
+                        //         await SendLogoutMessageAsync(user.Id.ToString(), "Password reset.");
+                        //         return Ok();
+                        //     }
+                        // }
+                        // return BadRequest(result.Errors.ToErrors());
                     }
                 case "change_marketing_consent":
                     {
