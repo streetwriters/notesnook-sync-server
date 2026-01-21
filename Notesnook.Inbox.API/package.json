@@ -22,7 +22,7 @@
   "dependencies": {
     "express": "^5.1.0",
     "express-rate-limit": "^8.1.0",
-    "libsodium-wrappers-sumo": "^0.7.15",
+    "openpgp": "^6.2.2",
     "zod": "^4.1.9"
   },
   "devDependencies": {

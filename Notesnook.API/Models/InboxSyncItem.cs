@@ -20,46 +20,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 using System.ComponentModel.DataAnnotations;
 using System.Runtime.Serialization;
 using System.Text.Json.Serialization;
+using MongoDB.Bson;
+using MongoDB.Bson.Serialization.Attributes;
 
 namespace Notesnook.API.Models
 {
 
     [MessagePack.MessagePackObject]
-    public class InboxSyncItem : SyncItem
+    public class InboxSyncItem
     {
-        [DataMember(Name = "key")]
-        [JsonPropertyName("key")]
-        [MessagePack.Key("key")]
-        [Required]
-        public required EncryptedKey Key { get; set; }
-
-        [DataMember(Name = "salt")]
-        [JsonPropertyName("salt")]
-        [MessagePack.Key("salt")]
-        [Required]
-        public required string Salt { get; set; }
-    }
-
-    [MessagePack.MessagePackObject]
-    public class EncryptedKey
-    {
-        [DataMember(Name = "alg")]
-        [JsonPropertyName("alg")]
-        [MessagePack.Key("alg")]
-        [Required]
-        public required string Algorithm { get; set; }
-
         [DataMember(Name = "cipher")]
         [JsonPropertyName("cipher")]
         [MessagePack.Key("cipher")]
         [Required]
-        public required string Cipher { get; set; }
+        public string Cipher
+        {
+            get; set;
+        }
 
-        [JsonPropertyName("length")]
-        [DataMember(Name = "length")]
-        [MessagePack.Key("length")]
+        [DataMember(Name = "userId")]
+        [JsonPropertyName("userId")]
+        [MessagePack.Key("userId")]
+        public string? UserId
+        {
+            get; set;
+        }
+
+        [DataMember(Name = "id")]
+        [JsonPropertyName("id")]
+        [MessagePack.Key("id")]
+        public string? ItemId
+        {
+            get; set;
+        }
+
+        [BsonId]
+        [BsonIgnoreIfDefault]
+        [BsonRepresentation(BsonType.ObjectId)]
+        [JsonIgnore]
+        [MessagePack.IgnoreMember]
+        public ObjectId Id
+        {
+            get; set;
+        }
+
+        [JsonPropertyName("v")]
+        [DataMember(Name = "v")]
+        [MessagePack.Key("v")]
         [Required]
-        public long Length
+        public double Version
+        {
+            get; set;
+        }
+
+        [JsonPropertyName("alg")]
+        [DataMember(Name = "alg")]
+        [MessagePack.Key("alg")]
+        [Required]
+        public string Algorithm
         {
             get; set;
         }
