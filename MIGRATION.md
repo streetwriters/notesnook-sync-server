@@ -115,7 +115,7 @@ docker exec $CONTAINER_NAME /garage bucket website --allow attachments
 
 1.  **Cloudflare Tunnel Configuration**:
 
-    - Ensure your public hostname `attach.clayauld.com` points to the **Garage Service** on port **3900** (S3 API).
+    - Ensure your public hostname `yourhost.com` points to the **Garage Service** on port **3900** (S3 API).
     - _Do not point it to 3902 (Website Port) as this will break file uploads._
 
 2.  **CORS & Public Access Policy**:
