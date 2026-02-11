@@ -79,7 +79,7 @@ namespace Streetwriters.Common
         public static string? SUBSCRIPTIONS_CERT_PATH => ReadSecret("SUBSCRIPTIONS_CERT_PATH");
         public static string? SUBSCRIPTIONS_CERT_KEY_PATH => ReadSecret("SUBSCRIPTIONS_CERT_KEY_PATH");
         public static string[] NOTESNOOK_CORS_ORIGINS => ReadSecret("NOTESNOOK_CORS")?.Split(",") ?? [];
-        public static string MONOGRAPH_PUBLIC_URL => ReadSecret("MONOGRAPH_PUBLIC_URL") ?? "https://monogr.phf";
+        public static string MONOGRAPH_PUBLIC_URL => ReadSecret("MONOGRAPH_PUBLIC_URL") ?? "https://monogr.ph";
 
         public static string? ReadSecret(string name)
         {
