@@ -225,24 +225,32 @@ namespace Notesnook.API.Controllers
             return Ok(userMonographs.Select((m) => m.ItemId ?? m.Id));
         }
 
-        [HttpGet("{slugOrId}")]
+        [HttpGet("{id}")]
         [AllowAnonymous]
-        public async Task<IActionResult> GetMonographAsync([FromRoute] string slugOrId)
+        public async Task<IActionResult> GetMonographAsync([FromRoute] string id)
         {
-            var monograph = await FindMonographBySlugAsync(slugOrId);
+            var monograph = await FindMonographAsync(id);
 
-            if (monograph == null)
+            if (monograph == null || monograph.Deleted)
             {
-                monograph = await FindMonographAsync(slugOrId);
-                if (!string.IsNullOrEmpty(monograph?.Slug))
+                return NotFound(new
                 {
-                    return NotFound(new
-                    {
-                        error = "invalid_id",
-                        error_description = $"No such monograph found."
-                    });
-                }
+                    error = "invalid_id",
+                    error_description = $"No such monograph found."
+                });
             }
+
+            if (monograph.EncryptedContent == null)
+                monograph.Content = monograph.CompressedContent?.DecompressBrotli();
+            monograph.ItemId ??= monograph.Id;
+            return Ok(monograph);
+        }
+
+        [HttpGet("slug/{slug}")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetMonographBySlugAsync([FromRoute] string slug)
+        {
+            var monograph = await FindMonographBySlugAsync(slug);
 
             if (monograph == null || monograph.Deleted)
             {
@@ -304,22 +312,6 @@ namespace Notesnook.API.Controllers
             return Content(SVG_PIXEL, "image/svg+xml");
         }
 
-        [HttpGet("{id}/analytics")]
-        public async Task<IActionResult> GetMonographAnalyticsAsync([FromRoute] string id)
-        {
-            if (!FeatureAuthorizationHelper.IsFeatureAllowed(Features.MONOGRAPH_ANALYTICS, Clients.Notesnook.Id, User))
-                return BadRequest(new { error = "Monograph analytics are only available on the Pro & Believer plans." });
-
-            var userId = this.User.GetUserId();
-            var monograph = await FindMonographAsync(id);
-            if (monograph == null || monograph.Deleted || monograph.UserId != userId)
-            {
-                return NotFound();
-            }
-
-            return Ok(new { totalViews = monograph.ViewCount });
-        }
-
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteAsync([FromQuery] string? deviceId, [FromRoute] string id)
         {
@@ -348,8 +340,8 @@ namespace Notesnook.API.Controllers
             return Ok();
         }
 
-        [HttpGet("{id}/publish-url")]
-        public async Task<IActionResult> GetPublishUrlAsync([FromRoute] string id)
+        [HttpGet("{id}/publish-info")]
+        public async Task<IActionResult> GetPublishInfoAsync([FromRoute] string id)
         {
             var userId = this.User.GetUserId();
             var monograph = await FindMonographAsync(id);
@@ -358,9 +350,16 @@ namespace Notesnook.API.Controllers
                 return NotFound();
             }
 
+            var isPro = FeatureAuthorizationHelper.IsFeatureAllowed(Features.MONOGRAPH_ANALYTICS, Clients.Notesnook.Id, User);
+            var totalViews = isPro ? monograph.ViewCount : 0;
+
             return Ok(new
             {
-                publishUrl = monograph.ConstructPublishUrl()
+                publishUrl = monograph.ConstructPublishUrl(),
+                analytics = new
+                {
+                    totalViews
+                }
             });
         }
 
