@@ -15,6 +15,11 @@ namespace Notesnook.API.Models.Responses
 
         [JsonPropertyName("monographPasswordsKey")]
         public EncryptedData? MonographPasswordsKey { get; set; }
+        [JsonPropertyName("dataEncryptionKey")]
+        public EncryptedData? DataEncryptionKey { get; set; }
+
+        [JsonPropertyName("legacyDataEncryptionKey")]
+        public EncryptedData? LegacyDataEncryptionKey { get; set; }
 
         [JsonPropertyName("inboxKeys")]
         public InboxKeys? InboxKeys { get; set; }

@@ -25,6 +25,7 @@ using System.Security.Claims;
 using System.Text.Json;
 using System.Threading.Tasks;
 using AspNetCore.Identity.Mongo.Model;
+using IdentityServer4.Extensions;
 using IdentityServer4.Stores;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -97,12 +98,12 @@ namespace Streetwriters.Identity.Controllers
                     }
                 case TokenType.RESET_PASSWORD:
                     {
-                        // if (!await UserManager.VerifyUserTokenAsync(user, TokenOptions.DefaultProvider, "ResetPassword", code))
-                        return BadRequest("Password reset is temporarily disabled due to some issues. It should be back soon. We apologize for the inconvenience.");
+                        if (!await UserManager.VerifyUserTokenAsync(user, TokenOptions.DefaultProvider, "ResetPassword", code))
+                            return BadRequest("Invalid token.");
 
-                        // var authorizationCode = await UserManager.GenerateUserTokenAsync(user, TokenOptions.DefaultProvider, "PasswordResetAuthorizationCode");
-                        // var redirectUrl = $"{client.AccountRecoveryRedirectURL}?userId={userId}&code={authorizationCode}";
-                        // return RedirectPermanent(redirectUrl);
+                        var authorizationCode = await UserManager.GenerateUserTokenAsync(user, TokenOptions.DefaultProvider, "PasswordResetAuthorizationCode");
+                        var redirectUrl = $"{client.AccountRecoveryRedirectURL}?userId={userId}&code={authorizationCode}";
+                        return RedirectPermanent(redirectUrl);
                     }
                 default:
                     return BadRequest("Invalid type.");
@@ -149,22 +150,22 @@ namespace Streetwriters.Identity.Controllers
         [EnableRateLimiting("strict")]
         public async Task<IActionResult> ResetUserPassword([FromForm] ResetPasswordForm form)
         {
-            return BadRequest(new { error = "Password reset is temporarily disabled due to some issues. It should be back soon. We apologize for the inconvenience." });
-            //             var client = Clients.FindClientById(form.ClientId);
-            //             if (client == null) return BadRequest("Invalid client_id.");
 
-            //             var user = await UserManager.FindByEmailAsync(form.Email) ?? throw new Exception("User not found.");
-            //             if (!await UserService.IsUserValidAsync(UserManager, user, form.ClientId)) return Ok();
+            var client = Clients.FindClientById(form.ClientId);
+            if (client == null) return BadRequest("Invalid client_id.");
 
-            //             var code = await UserManager.GenerateUserTokenAsync(user, TokenOptions.DefaultProvider, "ResetPassword");
-            //             var callbackUrl = Url.TokenLink(user.Id.ToString(), code, client.Id, TokenType.RESET_PASSWORD);
-            // #if (DEBUG || STAGING)
-            //             return Ok(callbackUrl);
-            // #else
-            //             logger.LogInformation("Password reset email sent to: {Email}, callback URL: {CallbackUrl}", user.Email, callbackUrl);
-            //             await EmailSender.SendPasswordResetEmailAsync(user.Email, callbackUrl, client);
-            //             return Ok();
-            // #endif
+            var user = await UserManager.FindByEmailAsync(form.Email) ?? throw new Exception("User not found.");
+            if (!await UserService.IsUserValidAsync(UserManager, user, form.ClientId)) return Ok();
+
+            var code = await UserManager.GenerateUserTokenAsync(user, TokenOptions.DefaultProvider, "ResetPassword");
+            var callbackUrl = Url.TokenLink(user.Id.ToString(), code, client.Id, TokenType.RESET_PASSWORD);
+#if (DEBUG || STAGING)
+            return Ok(callbackUrl);
+#else
+                        logger.LogInformation("Password reset email sent to: {Email}, callback URL: {CallbackUrl}", user.Email, callbackUrl);
+                        await EmailSender.SendPasswordResetEmailAsync(user.Email, callbackUrl, client);
+                        return Ok();
+#endif
         }
 
         [HttpPost("logout")]
@@ -249,36 +250,6 @@ namespace Streetwriters.Identity.Controllers
                         }
                         return BadRequest(result.Errors.ToErrors());
                     }
-                case "change_password":
-                    {
-                        return BadRequest(new { error = "Password change is temporarily disabled due to some issues. It should be back soon. We apologize for the inconvenience." });
-                        // ArgumentNullException.ThrowIfNull(form.OldPassword);
-                        // ArgumentNullException.ThrowIfNull(form.NewPassword);
-                        // var result = await UserManager.ChangePasswordAsync(user, form.OldPassword, form.NewPassword);
-                        // if (result.Succeeded)
-                        // {
-                        //     await SendLogoutMessageAsync(user.Id.ToString(), "Password changed.");
-                        //     return Ok();
-                        // }
-                        // return BadRequest(result.Errors.ToErrors());
-                    }
-                case "reset_password":
-                    {
-                        return BadRequest(new { error = "Password reset is temporarily disabled due to some issues. It should be back soon. We apologize for the inconvenience." });
-                        // ArgumentNullException.ThrowIfNull(form.NewPassword);
-                        // var result = await UserManager.RemovePasswordAsync(user);
-                        // if (result.Succeeded)
-                        // {
-                        //     await MFAService.ResetMFAAsync(user);
-                        //     result = await UserManager.AddPasswordAsync(user, form.NewPassword);
-                        //     if (result.Succeeded)
-                        //     {
-                        //         await SendLogoutMessageAsync(user.Id.ToString(), "Password reset.");
-                        //         return Ok();
-                        //     }
-                        // }
-                        // return BadRequest(result.Errors.ToErrors());
-                    }
                 case "change_marketing_consent":
                     {
                         var claimType = $"{client.Id}:marketing_consent";
@@ -297,38 +268,12 @@ namespace Streetwriters.Identity.Controllers
         [HttpPost("sessions/clear")]
         public async Task<IActionResult> ClearUserSessions([FromQuery] bool all, [FromForm] string? refresh_token)
         {
-            var client = Clients.FindClientById(User.FindFirstValue("client_id"));
-            if (client == null) return BadRequest("Invalid client_id.");
-
-            var user = await UserManager.GetUserAsync(User) ?? throw new Exception("User not found.");
-            if (!await UserService.IsUserValidAsync(UserManager, user, client.Id)) return BadRequest($"Unable to find user with ID '{user.Id}'.");
-
             var jti = User.FindFirstValue("jti");
-
-            var grants = await PersistedGrantStore.GetAllAsync(new PersistedGrantFilter
-            {
-                ClientId = client.Id,
-                SubjectId = user.Id.ToString()
-            });
-            string? refreshTokenKey = refresh_token != null ? GetHashedKey(refresh_token, PersistedGrantTypes.RefreshToken) : null;
-            var removedKeys = new List<string>();
-            foreach (var grant in grants)
-            {
-                if (!all && (grant.Data.Contains(jti) || grant.Key == refreshTokenKey)) continue;
-                await PersistedGrantStore.RemoveAsync(grant.Key);
-                removedKeys.Add(grant.Key);
-            }
-
-            await WampServers.NotesnookServer.PublishMessageAsync(IdentityServerTopics.ClearCacheTopic, new ClearCacheMessage(removedKeys));
-            await WampServers.MessengerServer.PublishMessageAsync(IdentityServerTopics.ClearCacheTopic, new ClearCacheMessage(removedKeys));
-            await WampServers.SubscriptionServer.PublishMessageAsync(IdentityServerTopics.ClearCacheTopic, new ClearCacheMessage(removedKeys));
-            await SendLogoutMessageAsync(user.Id.ToString(), "Session revoked.");
+            var userId = User.GetSubjectId();
+            var clientId = User.FindFirstValue("client_id");
+            if (await UserAccountService.ClearSessionsAsync(userId, clientId, all, refresh_token, jti))
+                await SendLogoutMessageAsync(userId, "Session revoked.");
             return Ok();
-        }
-
-        private static string GetHashedKey(string value, string grantType)
-        {
-            return (value + ":" + grantType).Sha256();
         }
 
         private async Task SendLogoutMessageAsync(string userId, string reason)

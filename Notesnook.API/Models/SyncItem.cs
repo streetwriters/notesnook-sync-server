@@ -98,6 +98,14 @@ namespace Notesnook.API.Models
             get; set;
         }
 
+        [JsonPropertyName("keyVersion")]
+        [DataMember(Name = "keyVersion")]
+        [MessagePack.Key("keyVersion")]
+        public int? KeyVersion
+        {
+            get; set;
+        }
+
         [JsonPropertyName("alg")]
         [DataMember(Name = "alg")]
         [MessagePack.Key("alg")]
