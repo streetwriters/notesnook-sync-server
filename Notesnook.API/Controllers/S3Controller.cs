@@ -21,20 +21,17 @@ using System;
 using System.Net.Http;
 using System.Security.Claims;
 using System.Threading.Tasks;
-using Amazon.S3.Model;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
-using Notesnook.API.Accessors;
 using Notesnook.API.Helpers;
 using Notesnook.API.Interfaces;
 using Notesnook.API.Models;
 using Streetwriters.Common;
 using Streetwriters.Common.Accessors;
 using Streetwriters.Common.Extensions;
-using Streetwriters.Common.Interfaces;
 using Streetwriters.Common.Models;
 
 namespace Notesnook.API.Controllers
@@ -210,6 +207,27 @@ namespace Notesnook.API.Controllers
             {
                 logger.LogError(ex, "Error deleting object for user.");
                 return BadRequest(new { error = "Failed to delete attachment." });
+            }
+        }
+
+        [HttpPost("bulk-delete")]
+        public async Task<IActionResult> DeleteBulkAsync([FromBody] DeleteBulkObjectsRequest request)
+        {
+            try
+            {
+                if (request.Names == null || request.Names.Length == 0)
+                {
+                    return BadRequest(new { error = "No files specified for deletion." });
+                }
+
+                var userId = this.User.GetUserId();
+                await s3Service.DeleteObjectsAsync(userId, request.Names);
+                return Ok();
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error deleting objects for user.");
+                return BadRequest(new { error = "Failed to delete attachments." });
             }
         }
     }
