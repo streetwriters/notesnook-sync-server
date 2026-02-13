@@ -312,6 +312,22 @@ namespace Notesnook.API.Controllers
             return Content(SVG_PIXEL, "image/svg+xml");
         }
 
+        [HttpGet("{id}/analytics")]
+        public async Task<IActionResult> GetMonographAnalyticsAsync([FromRoute] string id)
+        {
+            if (!FeatureAuthorizationHelper.IsFeatureAllowed(Features.MONOGRAPH_ANALYTICS, Clients.Notesnook.Id, User))
+                return BadRequest(new { error = "Monograph analytics are only available on the Pro & Believer plans." });
+
+            var userId = this.User.GetUserId();
+            var monograph = await FindMonographAsync(id);
+            if (monograph == null || monograph.Deleted || monograph.UserId != userId)
+            {
+                return NotFound();
+            }
+
+            return Ok(new { totalViews = monograph.ViewCount });
+        }
+
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteAsync([FromQuery] string? deviceId, [FromRoute] string id)
         {
