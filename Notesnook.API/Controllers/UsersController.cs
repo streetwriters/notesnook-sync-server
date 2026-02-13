@@ -110,7 +110,7 @@ namespace Notesnook.API.Controllers
                 await WampServers.MessengerServer.PublishMessageAsync(MessengerServerTopics.SendSSETopic, new SendSSEMessage
                 {
                     UserId = userId,
-                    OriginTokenId = User.FindFirstValue("jti"),
+                    OriginTokenId = jti,
                     Message = new Message
                     {
                         Type = "logout",
