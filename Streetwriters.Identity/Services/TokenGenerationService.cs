@@ -24,6 +24,7 @@ using IdentityModel;
 using IdentityServer4;
 using IdentityServer4.Configuration;
 using IdentityServer4.Models;
+using IdentityServer4.ResponseHandling;
 using IdentityServer4.Services;
 using IdentityServer4.Stores;
 using IdentityServer4.Validation;
@@ -41,12 +42,14 @@ namespace Streetwriters.Identity.Helpers
         private IdentityServerOptions ISOptions { get; set; }
         private IdentityServerTools Tools { get; set; }
         private IResourceStore ResourceStore { get; set; }
+        private readonly IRefreshTokenService refreshTokenService;
         public TokenGenerationService(ITokenService tokenService,
         IUserClaimsPrincipalFactory<User> principalFactory,
         IdentityServerOptions identityServerOptions,
         IPersistedGrantStore persistedGrantStore,
         IdentityServerTools tools,
-        IResourceStore resourceStore)
+        IResourceStore resourceStore,
+        IRefreshTokenService _refreshTokenService)
         {
             TokenService = tokenService;
             PrincipalFactory = principalFactory;
@@ -54,16 +57,25 @@ namespace Streetwriters.Identity.Helpers
             PersistedGrantStore = persistedGrantStore;
             Tools = tools;
             ResourceStore = resourceStore;
+            refreshTokenService = _refreshTokenService;
         }
 
-        public async Task<string> CreateAccessTokenAsync(User user, string clientId)
+        public async Task<string> CreateAccessTokenAsync(User user, string clientId, int lifetime = 1800)
         {
+            var client = Config.Clients.FirstOrDefault((c) => c.ClientId == clientId);
+            if (client == null)
+            {
+                throw new System.ArgumentException($"Client with ID '{clientId}' not found", nameof(clientId));
+            }
+
             var IdentityPricipal = await PrincipalFactory.CreateAsync(user);
-            var IdentityUser = new IdentityServerUser(user.Id.ToString());
-            IdentityUser.AdditionalClaims = IdentityPricipal.Claims.ToArray();
-            IdentityUser.DisplayName = user.UserName;
-            IdentityUser.AuthenticationTime = System.DateTime.UtcNow;
-            IdentityUser.IdentityProvider = IdentityServerConstants.LocalIdentityProvider;
+            var IdentityUser = new IdentityServerUser(user.Id.ToString())
+            {
+                AdditionalClaims = [.. IdentityPricipal.Claims],
+                DisplayName = user.UserName,
+                AuthenticationTime = System.DateTime.UtcNow,
+                IdentityProvider = IdentityServerConstants.LocalIdentityProvider
+            };
             var Request = new TokenCreationRequest
             {
                 Subject = IdentityUser.CreatePrincipal(),
@@ -71,14 +83,59 @@ namespace Streetwriters.Identity.Helpers
                 ValidatedRequest = new ValidatedRequest()
             };
             Request.ValidatedRequest.Subject = Request.Subject;
-            Request.ValidatedRequest.SetClient(Config.Clients.FirstOrDefault((c) => c.ClientId == clientId));
+            Request.ValidatedRequest.SetClient(client);
             Request.ValidatedRequest.AccessTokenType = AccessTokenType.Reference;
-            Request.ValidatedRequest.AccessTokenLifetime = 18000;
-            Request.ValidatedResources = new ResourceValidationResult(new Resources(Config.IdentityResources, Config.ApiResources, Config.ApiScopes));
+            Request.ValidatedRequest.AccessTokenLifetime = lifetime;
+            var requestedScopes = client.AllowedScopes.Select(s => new ParsedScopeValue(s));
+            Request.ValidatedResources = await ResourceStore.CreateResourceValidationResult(new ParsedScopesResult
+            {
+                ParsedScopes = [.. requestedScopes]
+            });
             Request.ValidatedRequest.Options = ISOptions;
             Request.ValidatedRequest.ClientClaims = IdentityUser.AdditionalClaims;
             var accessToken = await TokenService.CreateAccessTokenAsync(Request);
             return await TokenService.CreateSecurityTokenAsync(accessToken);
+        }
+
+        public async Task<TokenResponse?> CreateUserTokensAsync(User user, string clientId, int lifetime = 1800)
+        {
+            var client = Config.Clients.FirstOrDefault((c) => c.ClientId == clientId);
+            var principal = await PrincipalFactory.CreateAsync(user);
+            if (client == null || principal == null) return null;
+            var IdentityUser = new IdentityServerUser(user.Id.ToString())
+            {
+                AdditionalClaims = [.. principal.Claims],
+                DisplayName = user.UserName,
+                AuthenticationTime = System.DateTime.UtcNow,
+                IdentityProvider = IdentityServerConstants.LocalIdentityProvider
+            };
+            var Request = new TokenCreationRequest
+            {
+                Subject = IdentityUser.CreatePrincipal(),
+                IncludeAllIdentityClaims = true,
+                ValidatedRequest = new ValidatedRequest()
+            };
+            Request.ValidatedRequest.Subject = Request.Subject;
+            Request.ValidatedRequest.SetClient(client);
+            Request.ValidatedRequest.AccessTokenType = AccessTokenType.Reference;
+            Request.ValidatedRequest.AccessTokenLifetime = lifetime;
+            var requestedScopes = client.AllowedScopes.Select(s => new ParsedScopeValue(s));
+            Request.ValidatedResources = await ResourceStore.CreateResourceValidationResult(new ParsedScopesResult
+            {
+                ParsedScopes = [.. requestedScopes]
+            });
+            Request.ValidatedRequest.Options = ISOptions;
+            Request.ValidatedRequest.ClientClaims = IdentityUser.AdditionalClaims;
+            var accessToken = await TokenService.CreateAccessTokenAsync(Request);
+            var refreshToken = await refreshTokenService.CreateRefreshTokenAsync(principal, accessToken, client);
+
+            return new TokenResponse
+            {
+                AccessToken = await TokenService.CreateSecurityTokenAsync(accessToken),
+                AccessTokenLifetime = lifetime,
+                RefreshToken = refreshToken,
+                Scope = string.Join(" ", accessToken.Scopes)
+            };
         }
 
         public async Task<ClaimsPrincipal> TransformTokenRequestAsync(ValidatedTokenRequest request, User user, string grantType, string[] scopes, int lifetime = 20 * 60)
