@@ -38,6 +38,7 @@ using Streetwriters.Common.Interfaces;
 using Streetwriters.Common.Messages;
 using Streetwriters.Common.Models;
 using Streetwriters.Identity.Enums;
+using Streetwriters.Identity.Extensions;
 using Streetwriters.Identity.Interfaces;
 using Streetwriters.Identity.Models;
 using Streetwriters.Identity.Services;
@@ -125,7 +126,7 @@ namespace Streetwriters.Identity.Controllers
             {
                 ArgumentNullException.ThrowIfNull(user.Email);
                 var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
-                var callbackUrl = Url.TokenLink(user.Id.ToString(), code, client.Id, TokenType.CONFRIM_EMAIL);
+                var callbackUrl = UrlExtensions.TokenLink(user.Id.ToString(), code, client.Id, TokenType.CONFRIM_EMAIL);
                 await EmailSender.SendConfirmationEmailAsync(user.Email, callbackUrl, client);
             }
             else
@@ -158,7 +159,7 @@ namespace Streetwriters.Identity.Controllers
             if (!await UserService.IsUserValidAsync(UserManager, user, form.ClientId)) return Ok();
 
             var code = await UserManager.GenerateUserTokenAsync(user, TokenOptions.DefaultProvider, "ResetPassword");
-            var callbackUrl = Url.TokenLink(user.Id.ToString(), code, client.Id, TokenType.RESET_PASSWORD);
+            var callbackUrl = UrlExtensions.TokenLink(user.Id.ToString(), code, client.Id, TokenType.RESET_PASSWORD);
 #if (DEBUG || STAGING)
             return Ok(callbackUrl);
 #else

@@ -51,15 +51,16 @@ namespace Notesnook.API.Services
         private IS3Service S3Service { get; set; } = s3Service;
         private readonly IUnitOfWork unit = unitOfWork;
 
-        public async Task CreateUserAsync()
+        public async Task<SignupResponse> CreateUserAsync(SignupForm form)
         {
-            SignupResponse response = await httpClient.ForwardAsync<SignupResponse>(this.HttpContextAccessor, $"{Servers.IdentityServer}/signup", HttpMethod.Post);
-            if (!response.Success || (response.Errors != null && response.Errors.Length > 0) || response.UserId == null)
+            SignupResponse response = await serviceAccessor.UserAccountService.CreateUserAsync(form.ClientId, form.Email, form.Password, HttpContextAccessor.HttpContext?.Request.Headers["User-Agent"].ToString());
+
+            if ((response.Errors != null && response.Errors.Length > 0) || response.UserId == null)
             {
                 logger.LogError("Failed to sign up user: {Response}", JsonSerializer.Serialize(response));
                 if (response.Errors != null && response.Errors.Length > 0)
                     throw new Exception(string.Join(" ", response.Errors));
-                else throw new Exception("Could not create a new account. Error code: " + response.StatusCode);
+                else throw new Exception("Could not create a new account.");
             }
 
             await Repositories.UsersSettings.InsertAsync(new UserSettings
@@ -84,7 +85,7 @@ namespace Notesnook.API.Services
                 });
             }
 
-            logger.LogInformation("New user created: {Response}", JsonSerializer.Serialize(response));
+            return response;
         }
 
         public async Task<UserResponse> GetUserAsync(string userId)

@@ -1,22 +1,29 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Claims;
 using System.Text.Json;
 using System.Threading.Tasks;
+using AspNetCore.Identity.Mongo.Model;
 using IdentityServer4;
 using IdentityServer4.Stores;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Streetwriters.Common;
 using Streetwriters.Common.Enums;
 using Streetwriters.Common.Interfaces;
 using Streetwriters.Common.Messages;
 using Streetwriters.Common.Models;
+using Streetwriters.Common.Services;
+using Streetwriters.Identity.Enums;
+using Streetwriters.Identity.Extensions;
 using Streetwriters.Identity.Interfaces;
 using Streetwriters.Identity.Models;
 
 namespace Streetwriters.Identity.Services
 {
-    public class UserAccountService(UserManager<User> userManager, IMFAService mfaService, IPersistedGrantStore persistedGrantStore) : IUserAccountService
+    public class UserAccountService(UserManager<User> userManager, IMFAService mfaService, IPersistedGrantStore persistedGrantStore, RoleManager<MongoRole> roleManager, EmailAddressValidator emailValidator, ITemplatedEmailSender emailSender, ITokenGenerationService tokenGenerationService, ILogger<UserAccountService> logger) : IUserAccountService
     {
         public async Task<UserModel?> GetUserAsync(string clientId, string userId)
         {
@@ -109,6 +116,89 @@ namespace Streetwriters.Identity.Services
             return true;
         }
 
+        public async Task<SignupResponse> CreateUserAsync(string clientId, string email, string password, string? userAgent = null)
+        {
+            if (Constants.DISABLE_SIGNUPS)
+                return new SignupResponse
+                {
+                    Errors = ["Creating new accounts is not allowed."]
+                };
+
+            try
+            {
+                var client = Clients.FindClientById(clientId);
+                if (client == null) return new SignupResponse
+                {
+                    Errors = ["Invalid client id."]
+                };
+
+                if (await roleManager.FindByNameAsync(clientId) == null)
+                    await roleManager.CreateAsync(new MongoRole(clientId));
+
+                // email addresses must be case-insensitive
+                email = email.ToLowerInvariant();
+
+                if (!await emailValidator.IsEmailAddressValidAsync(email))
+                    return new SignupResponse
+                    {
+                        Errors = ["Invalid email address."]
+                    };
+
+                var result = await userManager.CreateAsync(new User
+                {
+                    Email = email,
+                    EmailConfirmed = Constants.IS_SELF_HOSTED,
+                    UserName = email,
+                }, password);
+
+                if (result.Succeeded)
+                {
+                    var user = await userManager.FindByEmailAsync(email);
+                    if (user == null) return SignupResponse.Error(["User not found after creation."]);
+
+                    await userManager.AddToRoleAsync(user, client.Id);
+                    if (Constants.IS_SELF_HOSTED)
+                    {
+                        await userManager.AddClaimAsync(user, new Claim(UserService.GetClaimKey(client.Id), "believer"));
+                    }
+                    else
+                    {
+                        if (userAgent != null) await userManager.AddClaimAsync(user, new Claim("platform", PlatformFromUserAgent(userAgent)));
+                        var code = await userManager.GenerateEmailConfirmationTokenAsync(user);
+                        var callbackUrl = UrlExtensions.TokenLink(user.Id.ToString(), code, client.Id, TokenType.CONFRIM_EMAIL);
+                        if (!string.IsNullOrEmpty(user.Email) && callbackUrl != null)
+                        {
+                            await emailSender.SendConfirmationEmailAsync(user.Email, callbackUrl, client);
+                        }
+                    }
+
+                    var response = await tokenGenerationService.CreateUserTokensAsync(user, client.Id, 3600);
+                    if (response == null) return SignupResponse.Error(["Failed  to generate access token."]);
+
+                    return new SignupResponse
+                    {
+                        AccessToken = response.AccessToken,
+                        AccessTokenLifetime = response.AccessTokenLifetime,
+                        RefreshToken = response.RefreshToken,
+                        Scope = response.Scope,
+                        UserId = user.Id.ToString()
+                    };
+                }
+
+                return SignupResponse.Error(result.Errors.ToErrors());
+            }
+            catch (System.Exception ex)
+            {
+                logger.LogError(ex, "Failed to create user account for email: {Email}", email);
+                return SignupResponse.Error(["Failed to create an account."]);
+            }
+        }
+
+        private static string PlatformFromUserAgent(string? userAgent)
+        {
+            if (string.IsNullOrEmpty(userAgent)) return "unknown";
+            return userAgent.Contains("okhttp/") ? "android" : userAgent.Contains("Darwin/") || userAgent.Contains("CFNetwork/") ? "ios" : "web";
+        }
         private static string GetHashedKey(string value, string grantType)
         {
             return (value + ":" + grantType).Sha256();

@@ -33,6 +33,7 @@ using Streetwriters.Common;
 using Streetwriters.Common.Accessors;
 using Streetwriters.Common.Extensions;
 using Streetwriters.Common.Messages;
+using Streetwriters.Common.Models;
 
 namespace Notesnook.API.Controllers
 {
@@ -43,12 +44,11 @@ namespace Notesnook.API.Controllers
     {
         [HttpPost]
         [AllowAnonymous]
-        public async Task<IActionResult> Signup()
+        public async Task<IActionResult> Signup([FromForm] SignupForm form)
         {
             try
             {
-                await UserService.CreateUserAsync();
-                return Ok();
+                return Ok(await UserService.CreateUserAsync(form));
             }
             catch (Exception ex)
             {
