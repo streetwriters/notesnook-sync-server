@@ -78,7 +78,7 @@ namespace Notesnook.API.Authorization
                     return AuthenticateResult.Fail("API key has expired");
                 }
 
-                inboxApiKey.LastUsedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+                inboxApiKey.LastUsedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
                 await _inboxApiKeyRepository.UpsertAsync(inboxApiKey, k => k.Key == apiKey);
 
                 var claims = new[]

@@ -49,7 +49,7 @@ namespace Notesnook.API.Repositories
             this.logger = logger;
         }
 
-        private readonly List<string> ALGORITHMS = [Algorithms.Default, Algorithms.XSAL_X25519_7];
+        private readonly List<string> ALGORITHMS = [Algorithms.Default];
         private bool IsValidAlgorithm(string algorithm)
         {
             return ALGORITHMS.Contains(algorithm);

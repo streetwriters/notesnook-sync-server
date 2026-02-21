@@ -134,6 +134,9 @@ namespace Notesnook.API.Hubs
                 var UpsertItems = UpsertActionsMap[pushItem.Type] ?? throw new Exception($"Invalid item type: {pushItem.Type}.");
                 UpsertItems(pushItem.Items, userId, 1);
 
+                var itemIds = pushItem.Items.Select(i => i.ItemId).ToList();
+                await Repositories.InboxItems.DeleteManyAsync(i => i.UserId == userId && itemIds.Contains(i.ItemId));
+
                 if (!await unit.Commit()) return 0;
 
                 await SyncDeviceService.AddIdsToOtherDevicesAsync(userId, deviceId, pushItem.Items.Select((i) => new ItemKey(i.ItemId, pushItem.Type)));
