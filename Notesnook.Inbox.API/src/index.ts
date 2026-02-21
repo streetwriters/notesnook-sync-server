@@ -39,6 +39,20 @@ interface EncryptedInboxItem {
   salt: string;
 }
 
+/**
+ * Encrypts raw data using a hybrid encryption scheme combining symmetric and asymmetric cryptography.
+ *
+ * The encryption process follows these steps:
+ * - Generate a random symmetric password using XChaCha20-Poly1305-IETF key generation
+ * - Generate a random salt for key derivation
+ * - Derive an encryption key from the password using Argon2i13
+ * - Generate a random nonce (IV) for the symmetric encryption
+ * - Encrypt the data using XChaCha20-Poly1305-IETF with the derived key
+ * - Encrypt the derived key using the recipient's public key (X25519 sealed box)
+ *
+ * @param {string} rawData - The plaintext data to encrypt
+ * @param {string} publicKey - The recipient's X25519 public key encoded in base64 URL-safe format without padding.
+ */
 function encrypt(rawData: string, publicKey: string): EncryptedInboxItem {
   try {
     const password = sodium.crypto_aead_xchacha20poly1305_ietf_keygen();
@@ -133,7 +147,10 @@ app.use(
     limit: 60,
   })
 );
-app.post("/inbox", async (req, res) => {
+app.get("/health", (_, res) => {
+  return res.status(200).json({ status: "ok" });
+});
+app.post("/", async (req, res) => {
   try {
     const apiKey = req.headers["authorization"];
     if (!apiKey) {
