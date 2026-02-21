@@ -266,6 +266,116 @@ namespace Streetwriters.Identity.Controllers
             return BadRequest("Invalid type.");
         }
 
+        [HttpGet("sessions")]
+        public async Task<IActionResult> GetActiveSessions()
+        {
+            var client = Clients.FindClientById(User.FindFirstValue("client_id"));
+            if (client == null) return BadRequest("Invalid client_id.");
+
+            var user = await UserManager.GetUserAsync(User) ?? throw new Exception("User not found.");
+            if (!await UserService.IsUserValidAsync(UserManager, user, client.Id))
+                return BadRequest($"Unable to find user with ID '{user.Id}'.");
+
+            var jti = User.FindFirstValue("jti");
+
+            var refreshTokens = await PersistedGrantStore.GetAllAsync(new PersistedGrantFilter
+            {
+                ClientId = client.Id,
+                SubjectId = user.Id.ToString(),
+                Type = PersistedGrantTypes.RefreshToken
+            });
+
+            var now = DateTime.UtcNow;
+            var activeSessions = refreshTokens
+                .Where(grant => grant.Expiration == null || grant.Expiration > now)
+                .Select(grant =>
+                {
+                    var session = new DeviceSession
+                    {
+                        SessionKey = grant.Key,
+                        CreatedAt = grant.CreationTime
+                    };
+
+                    try
+                    {
+                        using var refreshData = JsonDocument.Parse(grant.Data);
+
+                        if (refreshData.RootElement.TryGetProperty("AccessToken", out var accessTokenElement) &&
+                            accessTokenElement.TryGetProperty("Claims", out var claimsElement))
+                        {
+                            foreach (var claim in claimsElement.EnumerateArray())
+                            {
+                                if (claim.TryGetProperty("Type", out var typeElement) &&
+                                    claim.TryGetProperty("Value", out var valueElement))
+                                {
+                                    var type = typeElement.GetString();
+                                    var value = valueElement.GetString();
+
+                                    switch (type)
+                                    {
+                                        case "jti":
+                                            session.IsCurrentDevice = jti != null && value == jti;
+                                            break;
+                                        case "device_browser":
+                                            session.Browser = value;
+                                            break;
+                                        case "device_platform":
+                                            session.Platform = value;
+                                            break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        logger.LogWarning("Failed to parse device info from refresh token data for session {SessionId}", grant.Key);
+
+                    }
+
+                    return session;
+                })
+                .OrderByDescending(session => session.CreatedAt)
+
+
+             .ToList(); return Ok(activeSessions);
+        }
+
+        [HttpPost("clear-session")]
+        public async Task<IActionResult> LogoutSession([FromForm] string sessionKey)
+        {
+            var client = Clients.FindClientById(User.FindFirstValue("client_id"));
+            if (client == null) return BadRequest("Invalid client_id.");
+
+            var user = await UserManager.GetUserAsync(User) ?? throw new Exception("User not found.");
+            if (!await UserService.IsUserValidAsync(UserManager, user, client.Id))
+                return BadRequest($"Unable to find user with ID '{user.Id}'.");
+
+            var grants = await PersistedGrantStore.GetAllAsync(new PersistedGrantFilter
+            {
+                ClientId = client.Id,
+                SubjectId = user.Id.ToString()
+            });
+
+            var grantToRemove = grants.FirstOrDefault(g => g.Key == sessionKey);
+            if (grantToRemove == null)
+                return NotFound("Session not found.");
+
+            var currentJti = User.FindFirstValue("jti");
+            if (currentJti != null && grantToRemove.Data.Contains(currentJti))
+                return BadRequest("Cannot logout current session. Use logout endpoint instead.");
+
+            await PersistedGrantStore.RemoveAsync(grantToRemove.Key);
+
+            var removedKeys = new List<string> { grantToRemove.Key };
+            await WampServers.NotesnookServer.PublishMessageAsync(IdentityServerTopics.ClearCacheTopic, new ClearCacheMessage(removedKeys));
+            await WampServers.MessengerServer.PublishMessageAsync(IdentityServerTopics.ClearCacheTopic, new ClearCacheMessage(removedKeys));
+            await WampServers.SubscriptionServer.PublishMessageAsync(IdentityServerTopics.ClearCacheTopic, new ClearCacheMessage(removedKeys));
+            await SendLogoutMessageAsync(user.Id.ToString(), "Session revoked.");
+
+            return Ok();
+        }
+
         [HttpPost("sessions/clear")]
         public async Task<IActionResult> ClearUserSessions([FromQuery] bool all, [FromForm] string? refresh_token)
         {
