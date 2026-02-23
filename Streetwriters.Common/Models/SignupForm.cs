@@ -21,7 +21,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Runtime.Serialization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace Streetwriters.Identity.Models
+namespace Streetwriters.Common.Models
 {
     public class SignupForm
     {

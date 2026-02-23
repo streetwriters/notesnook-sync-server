@@ -18,7 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 using System;
+using System.Net.Http;
 using System.Security.Claims;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Timeouts;
@@ -28,22 +30,25 @@ using Notesnook.API.Interfaces;
 using Notesnook.API.Models;
 using Notesnook.API.Models.Responses;
 using Streetwriters.Common;
+using Streetwriters.Common.Accessors;
+using Streetwriters.Common.Extensions;
+using Streetwriters.Common.Messages;
+using Streetwriters.Common.Models;
 
 namespace Notesnook.API.Controllers
 {
     [ApiController]
     [Authorize]
     [Route("users")]
-    public class UsersController(IUserService UserService, ILogger<UsersController> logger) : ControllerBase
+    public class UsersController(IUserService UserService, WampServiceAccessor serviceAccessor, ILogger<UsersController> logger) : ControllerBase
     {
         [HttpPost]
         [AllowAnonymous]
-        public async Task<IActionResult> Signup()
+        public async Task<IActionResult> Signup([FromForm] SignupForm form)
         {
             try
             {
-                await UserService.CreateUserAsync();
-                return Ok();
+                return Ok(await UserService.CreateUserAsync(form));
             }
             catch (Exception ex)
             {
@@ -81,6 +86,43 @@ namespace Notesnook.API.Controllers
             catch (Exception ex)
             {
                 logger.LogError(ex, "Failed to update user with id: {UserId}", userId);
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
+        [HttpPatch("password/{type}")]
+        public async Task<IActionResult> ChangePassword([FromRoute] string type, [FromBody] ChangePasswordForm form)
+        {
+            var userId = User.GetUserId();
+            var clientId = User.FindFirstValue("client_id");
+            var jti = User.FindFirstValue("jti");
+            var isPasswordReset = type == "reset";
+            try
+            {
+                var result = isPasswordReset ? await serviceAccessor.UserAccountService.ResetPasswordAsync(userId, form.NewPassword) : await serviceAccessor.UserAccountService.ChangePasswordAsync(userId, form.OldPassword, form.NewPassword);
+                if (!result)
+                    return BadRequest("Failed to change password.");
+
+                await UserService.SetUserKeysAsync(userId, form.UserKeys);
+
+                await serviceAccessor.UserAccountService.ClearSessionsAsync(userId, clientId, all: false, jti, null);
+
+                await WampServers.MessengerServer.PublishMessageAsync(MessengerServerTopics.SendSSETopic, new SendSSEMessage
+                {
+                    UserId = userId,
+                    OriginTokenId = jti,
+                    Message = new Message
+                    {
+                        Type = "logout",
+                        Data = JsonSerializer.Serialize(new { reason = "Password changed." })
+                    }
+                });
+
+                return Ok();
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to change password");
                 return BadRequest(new { error = ex.Message });
             }
         }

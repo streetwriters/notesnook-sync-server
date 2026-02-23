@@ -25,25 +25,24 @@ using Streetwriters.Common;
 using Streetwriters.Identity.Controllers;
 using Streetwriters.Identity.Enums;
 
-namespace Microsoft.AspNetCore.Mvc
+namespace Streetwriters.Identity.Extensions
 {
-    public static class UrlHelperExtensions
+    public static class UrlExtensions
     {
-        public static string? TokenLink(this IUrlHelper urlHelper, string userId, string code, string clientId, TokenType type)
+        public static string? TokenLink(string userId, string code, string clientId, TokenType type)
         {
-
-            return urlHelper.ActionLink(
+            var url = new UriBuilder();
 #if (DEBUG || STAGING)
-            host: $"{Servers.IdentityServer.Hostname}:{Servers.IdentityServer.Port}",
-            protocol: "http",
+            url.Host = $"{Servers.IdentityServer.Hostname}";
+            url.Port = Servers.IdentityServer.Port;
+            url.Scheme = "http";
 #else
-            host: Servers.IdentityServer.PublicURL.Host,
-            protocol: Servers.IdentityServer.PublicURL.Scheme,
+            url.Host = Servers.IdentityServer.PublicURL.Host;
+            url.Scheme = Servers.IdentityServer.PublicURL.Scheme;
 #endif
-            action: nameof(AccountController.ConfirmToken),
-            controller: "Account",
-            values: new { userId, code, clientId, type });
-
+            url.Path = "account/confirm";
+            url.Query = $"userId={Uri.EscapeDataString(userId)}&code={Uri.EscapeDataString(code)}&clientId={Uri.EscapeDataString(clientId)}&type={Uri.EscapeDataString(type.ToString())}";
+            return url.ToString();
         }
     }
 }

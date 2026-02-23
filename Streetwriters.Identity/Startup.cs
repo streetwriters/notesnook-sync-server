@@ -53,6 +53,7 @@ using Streetwriters.Identity.Interfaces;
 using Streetwriters.Identity.Jobs;
 using Streetwriters.Identity.Services;
 using Streetwriters.Identity.Validation;
+using IdentityServer4.MongoDB.Configuration;
 
 namespace Streetwriters.Identity
 {
@@ -107,11 +108,6 @@ namespace Streetwriters.Identity
                 options.UsersCollection = "users";
                 // options.MigrationCollection = "migration";
                 options.ConnectionString = connectionString;
-                options.ClusterConfigurator = builder =>
-                {
-                    builder.ConfigureConnectionPool((c) => c.With(maxConnections: 500, minConnections: 0));
-                    builder.ConfigureServer(s => s.With(heartbeatInterval: TimeSpan.FromSeconds(60)));
-                };
             }).AddDefaultTokenProviders();
 
             services.AddIdentityServer(
@@ -136,6 +132,11 @@ namespace Streetwriters.Identity
             .AddInMemoryIdentityResources(Config.IdentityResources)
             .AddKeyManagement()
             .AddFileSystemPersistence(Path.Combine(WebHostEnvironment.ContentRootPath, @"keystore"));
+
+            services.Configure<MongoDBConfiguration>(options =>
+            {
+                options.ConnectionString = connectionString;
+            });
 
             services.Configure<DataProtectionTokenProviderOptions>(options =>
             {

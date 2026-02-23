@@ -24,21 +24,15 @@ using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Amazon;
-using Amazon.Runtime;
 using Amazon.S3;
 using Amazon.S3.Model;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using MongoDB.Driver;
-using Notesnook.API.Accessors;
 using Notesnook.API.Helpers;
 using Notesnook.API.Interfaces;
 using Notesnook.API.Models;
 using Streetwriters.Common;
 using Streetwriters.Common.Accessors;
-using Streetwriters.Common.Enums;
-using Streetwriters.Common.Interfaces;
-using Streetwriters.Common.Models;
 
 namespace Notesnook.API.Services
 {
@@ -108,6 +102,70 @@ namespace Notesnook.API.Services
 
             if (!IsSuccessStatusCode((int)response.HttpStatusCode))
                 throw new Exception("Could not delete object.");
+        }
+
+        public async Task DeleteObjectsAsync(string userId, string[] names)
+        {
+            var objectsToDelete = new List<KeyVersion>();
+
+            foreach (var name in names)
+            {
+                var objectName = GetFullObjectName(userId, name);
+                if (objectName == null) continue;
+
+                objectsToDelete.Add(new KeyVersion { Key = objectName });
+            }
+
+            if (objectsToDelete.Count == 0)
+            {
+                return;
+            }
+
+            // S3 DeleteObjectsRequest supports max 1000 keys per request
+            var batchSize = 1000;
+            var deleteErrors = new List<DeleteError>();
+            var failedBatches = 0;
+
+            for (int i = 0; i < objectsToDelete.Count; i += batchSize)
+            {
+                var batch = objectsToDelete.Skip(i).Take(batchSize).ToList();
+                var deleteObjectsResponse = await S3InternalClient.ExecuteWithFailoverAsync(
+                    (client) => client.DeleteObjectsAsync(new DeleteObjectsRequest
+                    {
+                        BucketName = INTERNAL_BUCKET_NAME,
+                        Objects = batch,
+                    }),
+                    operationName: "DeleteObjects",
+                    isWriteOperation: true
+                );
+
+                if (!IsSuccessStatusCode((int)deleteObjectsResponse.HttpStatusCode))
+                {
+                    failedBatches++;
+                }
+
+                if (deleteObjectsResponse.DeleteErrors.Count > 0)
+                {
+                    deleteErrors.AddRange(deleteObjectsResponse.DeleteErrors);
+                }
+            }
+
+            if (failedBatches > 0 || deleteErrors.Count > 0)
+            {
+                var errorParts = new List<string>();
+
+                if (failedBatches > 0)
+                {
+                    errorParts.Add($"{failedBatches} batch(es) failed with unsuccessful status code");
+                }
+
+                if (deleteErrors.Count > 0)
+                {
+                    errorParts.Add(string.Join(", ", deleteErrors.Select(e => $"{e.Key}: {e.Message}")));
+                }
+
+                throw new Exception(string.Join("; ", errorParts));
+            }
         }
 
         public async Task DeleteDirectoryAsync(string userId)

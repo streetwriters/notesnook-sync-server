@@ -20,12 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 using System.Threading.Tasks;
 using Notesnook.API.Models;
 using Notesnook.API.Models.Responses;
+using Streetwriters.Common.Models;
 
 namespace Notesnook.API.Interfaces
 {
     public interface IUserService
     {
-        Task CreateUserAsync();
+        Task<SignupResponse> CreateUserAsync(SignupForm form);
         Task DeleteUserAsync(string userId);
         Task DeleteUserAsync(string userId, string? jti, string password);
         Task<bool> ResetUserAsync(string userId, bool removeAttachments);

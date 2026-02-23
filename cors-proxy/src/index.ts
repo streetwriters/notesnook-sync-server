@@ -210,7 +210,21 @@ const server = Bun.serve({
       });
     }
 
-    // Proxy the request
+    // Check if it's a YouTube URL and redirect instead of proxying
+    if (isYouTubeEmbed(targetUrl)) {
+      // YouTube URL detected, redirect to youtube-nocookie.com
+      logRequest(req.method, targetUrl, 200);
+      return new Response(serveYouTubeEmbed(targetUrl), {
+        status: 200,
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Content-Security-Policy": "frame-ancestors *",
+          "X-Frame-Options": "ALLOWALL",
+        },
+      });
+    }
+
+    // Proxy the request for non-YouTube URLs
     const response = await proxyRequest(targetUrl);
     logRequest(req.method, targetUrl, response.status);
     return response;
@@ -229,3 +243,80 @@ console.log(
 );
 console.log(`📋 Health check: http://${server.hostname}:${server.port}/health`);
 console.log(`🌍 Environment: ${Bun.env.NODE_ENV || "development"}`);
+
+/**
+ * This is required to bypass YouTube's Referrer Policy restrictions when
+ * embedding videos on the mobile app. It basically "proxies" the Referrer and
+ * allows any YouTube video to be embedded anywhere without restrictions.
+ */
+function serveYouTubeEmbed(url: string) {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <meta name="robots" content="noindex,nofollow">
+    <title>YouTube Video Embed</title>
+    <style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing:border-box
+    }
+
+    body, html {
+        overflow: hidden;
+        background:#000
+    }
+
+    iframe {
+        border: 0;
+        width: 100vw;
+        height: 100vh;
+        display: block
+    }
+    </style>
+</head>
+<body>
+    <iframe src="${transformYouTubeUrl(
+      url
+    )}" allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture;web-share" allowfullscreen referrerpolicy="strict-origin-when-cross-origin" title="Video player"></iframe>
+</body>
+</html>`;
+}
+
+// Check if URL is a YouTube embed (including youtube-nocookie.com)
+function isYouTubeEmbed(urlString: string) {
+  const url = new URL(urlString);
+  return (
+    (url.hostname === "www.youtube.com" ||
+      url.hostname === "youtube.com" ||
+      url.hostname === "m.youtube.com" ||
+      url.hostname === "www.youtube-nocookie.com" ||
+      url.hostname === "youtube-nocookie.com") &&
+    url.pathname.startsWith("/embed/")
+  );
+}
+
+// Transform YouTube URLs to use youtube-nocookie.com for enhanced privacy
+function transformYouTubeUrl(urlString: string): string {
+  try {
+    const url = new URL(urlString);
+
+    // Check if it's a YouTube domain
+    if (
+      url.hostname === "www.youtube.com" ||
+      url.hostname === "youtube.com" ||
+      url.hostname === "m.youtube.com"
+    ) {
+      // Replace with youtube-nocookie.com
+      url.hostname = "www.youtube-nocookie.com";
+      return url.toString();
+    }
+
+    return urlString;
+  } catch {
+    return urlString;
+  }
+}

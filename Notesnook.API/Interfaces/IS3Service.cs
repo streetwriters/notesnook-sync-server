@@ -17,18 +17,16 @@ You should have received a copy of the Affero GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-using System.Threading;
 using System.Threading.Tasks;
 using Amazon.S3.Model;
 using Notesnook.API.Models;
-using Notesnook.API.Models.Responses;
-using Streetwriters.Common.Interfaces;
 
 namespace Notesnook.API.Interfaces
 {
     public interface IS3Service
     {
         Task DeleteObjectAsync(string userId, string name);
+        Task DeleteObjectsAsync(string userId, string[] names);
         Task DeleteDirectoryAsync(string userId);
         Task<long> GetObjectSizeAsync(string userId, string name);
         Task<string?> GetUploadObjectUrlAsync(string userId, string name);

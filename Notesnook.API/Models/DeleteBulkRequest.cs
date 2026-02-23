@@ -17,20 +17,9 @@ You should have received a copy of the Affero GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-namespace Notesnook.API.Models
-{
-    public class UserKeys
-    {
-        public EncryptedData? AttachmentsKey { get; set; }
-        public EncryptedData? MonographPasswordsKey { get; set; }
-        public InboxKeys? InboxKeys { get; set; }
-        public EncryptedData? DataEncryptionKey { get; set; }
-        public EncryptedData? LegacyDataEncryptionKey { get; set; }
-    }
+namespace Notesnook.API.Models;
 
-    public class InboxKeys
-    {
-        public string? Public { get; set; }
-        public EncryptedData? Private { get; set; }
-    }
+public class DeleteBulkObjectsRequest
+{
+    public required string[] Names { get; set; }
 }

@@ -33,9 +33,6 @@ namespace Streetwriters.Data.DbContexts
         public static IMongoClient CreateMongoDbClient(IDbSettings dbSettings)
         {
             var settings = MongoClientSettings.FromConnectionString(dbSettings.ConnectionString);
-            settings.MaxConnectionPoolSize = 500;
-            settings.MinConnectionPoolSize = 0;
-            settings.HeartbeatInterval = TimeSpan.FromSeconds(60);
             return new MongoClient(settings);
         }
 
