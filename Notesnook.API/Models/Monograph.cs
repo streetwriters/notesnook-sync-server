@@ -83,5 +83,8 @@ namespace Notesnook.API.Models
 
         [JsonPropertyName("viewCount")]
         public int ViewCount { get; set; }
+
+        [JsonIgnore]
+        public ContentSanitizationLevel ContentSanitizationLevel { get; set; }
     }
 }

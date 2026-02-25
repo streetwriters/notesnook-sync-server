@@ -35,6 +35,8 @@ using Notesnook.API.Authorization;
 using Notesnook.API.Models;
 using Notesnook.API.Services;
 using Streetwriters.Common;
+using Streetwriters.Common.Accessors;
+using Streetwriters.Common.Enums;
 using Streetwriters.Common.Helpers;
 using Streetwriters.Common.Interfaces;
 using Streetwriters.Common.Messages;
@@ -46,7 +48,7 @@ namespace Notesnook.API.Controllers
     [ApiController]
     [Route("monographs")]
     [Authorize("Sync")]
-    public class MonographsController(Repository<Monograph> monographs, IURLAnalyzer analyzer, SyncDeviceService syncDeviceService, ILogger<MonographsController> logger) : ControllerBase
+    public class MonographsController(Repository<Monograph> monographs, IURLAnalyzer analyzer, SyncDeviceService syncDeviceService, WampServiceAccessor serviceAccessor, ILogger<MonographsController> logger) : ControllerBase
     {
         const string SVG_PIXEL = "<svg xmlns='http://www.w3.org/2000/svg' width='1' height='1'><circle r='9'/></svg>";
         private const int MAX_DOC_SIZE = 15 * 1024 * 1024;
@@ -107,7 +109,11 @@ namespace Notesnook.API.Controllers
                 if (existingMonograph != null && !existingMonograph.Deleted) return await UpdateAsync(deviceId, monograph);
 
                 if (monograph.EncryptedContent == null)
-                    monograph.CompressedContent = (await CleanupContentAsync(User, monograph.Content)).CompressBrotli();
+                {
+                    var sanitizationLevel = User.IsUserSubscribed() ? ContentSanitizationLevel.Partial : ContentSanitizationLevel.Full;
+                    monograph.CompressedContent = (await SanitizeContentAsync(monograph.Content, sanitizationLevel)).CompressBrotli();
+                    monograph.ContentSanitizationLevel = sanitizationLevel;
+                }
                 monograph.UserId = userId;
                 monograph.DatePublished = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
@@ -158,8 +164,12 @@ namespace Notesnook.API.Controllers
                 if (monograph.EncryptedContent?.Cipher.Length > MAX_DOC_SIZE || monograph.CompressedContent?.Length > MAX_DOC_SIZE)
                     return base.BadRequest("Monograph is too big. Max allowed size is 15mb.");
 
+                var sanitizationLevel = ContentSanitizationLevel.Unknown;
                 if (monograph.EncryptedContent == null)
-                    monograph.CompressedContent = (await CleanupContentAsync(User, monograph.Content)).CompressBrotli();
+                {
+                    sanitizationLevel = User.IsUserSubscribed() ? ContentSanitizationLevel.Partial : ContentSanitizationLevel.Full;
+                    monograph.CompressedContent = (await SanitizeContentAsync(monograph.Content, sanitizationLevel)).CompressBrotli();
+                }
                 else
                     monograph.Content = null;
 
@@ -173,6 +183,7 @@ namespace Notesnook.API.Controllers
                     .Set(m => m.SelfDestruct, monograph.SelfDestruct)
                     .Set(m => m.Title, monograph.Title)
                     .Set(m => m.Password, monograph.Password)
+                    .Set(m => m.ContentSanitizationLevel, sanitizationLevel)
                 );
                 if (!result.IsAcknowledged) return BadRequest();
 
@@ -223,7 +234,22 @@ namespace Notesnook.API.Controllers
             }
 
             if (monograph.EncryptedContent == null)
+            {
+                var isContentUnsanitized = monograph.ContentSanitizationLevel == ContentSanitizationLevel.Partial || monograph.ContentSanitizationLevel == ContentSanitizationLevel.Unknown;
+                if (!Constants.IS_SELF_HOSTED && isContentUnsanitized && serviceAccessor.UserSubscriptionService != null && !await serviceAccessor.UserSubscriptionService.IsUserSubscribedAsync(Clients.Notesnook.Id, monograph.UserId!))
+                {
+                    var cleaned = await SanitizeContentAsync(monograph.CompressedContent?.DecompressBrotli(), ContentSanitizationLevel.Full);
+                    monograph.CompressedContent = cleaned.CompressBrotli();
+                    await monographs.Collection.UpdateOneAsync(
+                        CreateMonographFilter(monograph.UserId!, monograph),
+                        Builders<Monograph>.Update
+                            .Set(m => m.CompressedContent, monograph.CompressedContent)
+                            .Set(m => m.ContentSanitizationLevel, ContentSanitizationLevel.Full)
+                    );
+                }
                 monograph.Content = monograph.CompressedContent?.DecompressBrotli();
+            }
+
             monograph.ItemId ??= monograph.Id;
             return Ok(monograph);
         }
@@ -241,7 +267,7 @@ namespace Notesnook.API.Controllers
             if (monograph.SelfDestruct)
             {
                 await monographs.Collection.ReplaceOneAsync(
-                    CreateMonographFilter(monograph.UserId, monograph),
+                    CreateMonographFilter(monograph.UserId!, monograph),
                     new Monograph
                     {
                         ItemId = id,
@@ -251,12 +277,12 @@ namespace Notesnook.API.Controllers
                         ViewCount = 0
                     }
                 );
-                await MarkMonographForSyncAsync(monograph.UserId, id);
+                await MarkMonographForSyncAsync(monograph.UserId!, id);
             }
             else if (!hasVisitedBefore)
             {
                 await monographs.Collection.UpdateOneAsync(
-                    CreateMonographFilter(monograph.UserId, monograph),
+                    CreateMonographFilter(monograph.UserId!, monograph),
                     Builders<Monograph>.Update.Inc(m => m.ViewCount, 1)
                 );
 
@@ -329,7 +355,20 @@ namespace Notesnook.API.Controllers
             await syncDeviceService.AddIdsToAllDevicesAsync(userId, [new(monographId, "monograph")]);
         }
 
-        private async Task<string> CleanupContentAsync(ClaimsPrincipal user, string? content)
+        // (selector, url-bearing attribute) pairs to inspect
+        private static readonly (string Selector, string Attribute)[] urlElements =
+        [
+            ("a", "href"),
+            ("img", "src"),
+            ("iframe", "src"),
+            ("embed", "src"),
+            ("object", "data"),
+            ("source", "src"),
+            ("video", "src"),
+            ("audio", "src"),
+        ];
+
+        private async Task<string> SanitizeContentAsync(string? content, ContentSanitizationLevel level)
         {
             if (string.IsNullOrEmpty(content)) return string.Empty;
             if (Constants.IS_SELF_HOSTED) return content;
@@ -338,31 +377,36 @@ namespace Notesnook.API.Controllers
                 var json = JsonSerializer.Deserialize<MonographContent>(content) ?? throw new Exception("Invalid monograph content.");
                 var html = json.Data;
 
-                if (user.IsUserSubscribed())
+                if (level == ContentSanitizationLevel.Full)
                 {
                     var config = Configuration.Default.WithDefaultLoader();
                     var context = BrowsingContext.New(config);
                     var document = await context.OpenAsync(r => r.Content(html));
-                    foreach (var element in document.QuerySelectorAll("a"))
+
+                    foreach (var (selector, attribute) in urlElements)
                     {
-                        var href = element.GetAttribute("href");
-                        if (string.IsNullOrEmpty(href)) continue;
-                        if (!await analyzer.IsURLSafeAsync(href))
+                        foreach (var element in document.QuerySelectorAll(selector))
                         {
-                            logger.LogInformation("Malicious URL detected: {Url}", href);
-                            element.RemoveAttribute("href");
+                            var url = element.GetAttribute(attribute);
+                            if (string.IsNullOrEmpty(url)) continue;
+                            if (!await analyzer.IsURLSafeAsync(url))
+                            {
+                                logger.LogInformation("Malicious URL detected in <{Selector} {Attribute}>: {Url}", selector, attribute, url);
+                                element.RemoveAttribute(attribute);
+                            }
                         }
                     }
+
                     html = document.ToHtml();
                 }
-                else
+                else if (level == ContentSanitizationLevel.Full)
                 {
                     var config = Configuration.Default.WithDefaultLoader();
                     var context = BrowsingContext.New(config);
                     var document = await context.OpenAsync(r => r.Content(html));
                     foreach (var element in document.QuerySelectorAll("a,iframe,img,object,svg,button,link"))
                     {
-                        foreach (var attr in element.Attributes)
+                        foreach (var attr in element.Attributes.ToList())
                             element.RemoveAttribute(attr.Name);
                     }
                     html = document.ToHtml();
