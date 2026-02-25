@@ -377,7 +377,7 @@ namespace Notesnook.API.Controllers
                 var json = JsonSerializer.Deserialize<MonographContent>(content) ?? throw new Exception("Invalid monograph content.");
                 var html = json.Data;
 
-                if (level == ContentSanitizationLevel.Full)
+                if (level == ContentSanitizationLevel.Partial)
                 {
                     var config = Configuration.Default.WithDefaultLoader();
                     var context = BrowsingContext.New(config);
