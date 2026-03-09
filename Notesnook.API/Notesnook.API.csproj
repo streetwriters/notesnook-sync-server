@@ -17,6 +17,7 @@
     <PackageReference Include="AspNetCore.HealthChecks.MongoDb" Version="6.0.1-rc2.2" />
     <PackageReference Include="AWSSDK.S3" Version="3.7.310.8" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" Version="6.0.3" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" Version="9.0.13" />
     <PackageReference Include="Microsoft.AspNetCore.Server.Kestrel.Https" Version="2.2.0" />
     <PackageReference Include="Nanoid" Version="3.1.0" />
     <PackageReference Include="OpenTelemetry.Exporter.Prometheus.AspNetCore" Version="1.9.0-alpha.2" />

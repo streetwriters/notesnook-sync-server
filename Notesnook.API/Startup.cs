@@ -210,12 +210,15 @@ namespace Notesnook.API
 
             services.AddHealthChecks();
 
-            services.AddSignalR((hub) =>
+            var signalR = services.AddSignalR((hub) =>
             {
                 hub.MaximumReceiveMessageSize = 100 * 1024 * 1024;
                 hub.ClientTimeoutInterval = TimeSpan.FromMinutes(10);
                 hub.EnableDetailedErrors = true;
             }).AddMessagePackProtocol().AddJsonProtocol();
+
+            if (!string.IsNullOrEmpty(Constants.SIGNALR_REDIS_CONNECTION_STRING))
+                signalR.AddStackExchangeRedis(Constants.SIGNALR_REDIS_CONNECTION_STRING);
 
             services.AddResponseCompression(options =>
             {
