@@ -210,25 +210,25 @@ namespace Notesnook.API.Controllers
             }
         }
 
-        [HttpPost("bulk-delete")]
-        public async Task<IActionResult> DeleteBulkAsync([FromBody] DeleteBulkObjectsRequest request)
-        {
-            try
-            {
-                if (request.Names == null || request.Names.Length == 0)
-                {
-                    return BadRequest(new { error = "No files specified for deletion." });
-                }
+        // [HttpPost("bulk-delete")]
+        // public async Task<IActionResult> DeleteBulkAsync([FromBody] DeleteBulkObjectsRequest request)
+        // {
+        //     try
+        //     {
+        //         if (request.Names == null || request.Names.Length == 0)
+        //         {
+        //             return BadRequest(new { error = "No files specified for deletion." });
+        //         }
 
-                var userId = this.User.GetUserId();
-                await s3Service.DeleteObjectsAsync(userId, request.Names);
-                return Ok();
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Error deleting objects for user.");
-                return BadRequest(new { error = "Failed to delete attachments." });
-            }
-        }
+        //         var userId = this.User.GetUserId();
+        //         await s3Service.DeleteObjectsAsync(userId, request.Names);
+        //         return Ok();
+        //     }
+        //     catch (Exception ex)
+        //     {
+        //         logger.LogError(ex, "Error deleting objects for user.");
+        //         return BadRequest(new { error = "Failed to delete attachments." });
+        //     }
+        // }
     }
 }
