@@ -82,7 +82,7 @@ namespace Notesnook.API.Services
             if (chunk != null)
             {
                 var update = Builders<DeviceIdsChunk>.Update.AddToSetEach(x => x.Ids, ids.Select(i => i.ToString()));
-                await repositories.DeviceIdsChunks.Collection.UpdateOneAsync(
+                await repositories.DeviceIdsChunks.Collection.WithWriteConcern(WriteConcern.W1).UpdateOneAsync(
                     Builders<DeviceIdsChunk>.Filter.Eq(x => x.Id, chunk.Id),
                     update
                 );
@@ -96,11 +96,11 @@ namespace Notesnook.API.Services
                     Key = key,
                     Ids = [.. ids.Select(i => i.ToString())]
                 };
-                await repositories.DeviceIdsChunks.Collection.InsertOneAsync(newChunk);
+                await repositories.DeviceIdsChunks.Collection.WithWriteConcern(WriteConcern.W1).InsertOneAsync(newChunk);
             }
 
             var emptyChunksFilter = DeviceIdsChunkFilter(userId, deviceId, key) & Builders<DeviceIdsChunk>.Filter.Size(x => x.Ids, 0);
-            await repositories.DeviceIdsChunks.Collection.DeleteManyAsync(emptyChunksFilter);
+            await repositories.DeviceIdsChunks.Collection.WithWriteConcern(WriteConcern.W1).DeleteManyAsync(emptyChunksFilter);
         }
 
         public async Task WriteIdsAsync(string userId, string deviceId, string key, IEnumerable<ItemKey> ids)
@@ -121,7 +121,7 @@ namespace Notesnook.API.Services
                 };
                 writes.Add(new InsertOneModel<DeviceIdsChunk>(newChunk));
             }
-            await repositories.DeviceIdsChunks.Collection.BulkWriteAsync(writes);
+            await repositories.DeviceIdsChunks.Collection.WithWriteConcern(WriteConcern.W1).BulkWriteAsync(writes);
         }
 
         public async Task<HashSet<ItemKey>> FetchUnsyncedIdsAsync(string userId, string deviceId)
