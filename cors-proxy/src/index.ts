@@ -39,7 +39,7 @@ function isValidUrl(urlString: string): boolean {
 // Handle proxied request with redirect support
 async function proxyRequest(
   targetUrl: string,
-  redirectCount = 0
+  redirectCount = 0,
 ): Promise<Response> {
   if (redirectCount >= MAX_REDIRECTS) {
     return new Response("Too many redirects", {
@@ -147,7 +147,7 @@ const server = Bun.serve({
           method2: "GET /?url=<encoded-url>",
           example1: `${url.origin}/https://example.com/image.jpg`,
           example2: `${url.origin}/?url=${encodeURIComponent(
-            "https://example.com/image.jpg"
+            "https://example.com/image.jpg",
           )}`,
         },
         endpoints: {
@@ -190,7 +190,7 @@ const server = Bun.serve({
         {
           status: 400,
           headers: corsHeaders,
-        }
+        },
       );
     }
 
@@ -218,7 +218,7 @@ const server = Bun.serve({
         status: 200,
         headers: {
           "Content-Type": "text/html; charset=utf-8",
-          "Content-Security-Policy": "frame-ancestors *",
+          // "Content-Security-Policy": "frame-ancestors *",
           "X-Frame-Options": "ALLOWALL",
         },
       });
@@ -239,7 +239,7 @@ const server = Bun.serve({
 });
 
 console.log(
-  `🚀 CORS Proxy Server running on http://${server.hostname}:${server.port}`
+  `🚀 CORS Proxy Server running on http://${server.hostname}:${server.port}`,
 );
 console.log(`📋 Health check: http://${server.hostname}:${server.port}/health`);
 console.log(`🌍 Environment: ${Bun.env.NODE_ENV || "development"}`);
@@ -280,7 +280,7 @@ function serveYouTubeEmbed(url: string) {
 </head>
 <body>
     <iframe src="${transformYouTubeUrl(
-      url
+      url,
     )}" allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture;web-share" allowfullscreen referrerpolicy="strict-origin-when-cross-origin" title="Video player"></iframe>
 </body>
 </html>`;
