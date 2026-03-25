@@ -39,6 +39,7 @@ namespace Streetwriters.Common.Models
         public required string SenderName { get; set; }
         public required string EmailConfirmedRedirectURL { get; set; }
         public required string AccountRecoveryRedirectURL { get; set; }
+        public required string PackageName { get; set; }
 
         public Func<string, Task>? OnEmailConfirmed { get; set; }
     }
