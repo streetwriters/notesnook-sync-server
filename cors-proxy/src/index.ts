@@ -219,7 +219,7 @@ const server = Bun.serve({
         headers: {
           "Content-Type": "text/html; charset=utf-8",
           // "Content-Security-Policy": "frame-ancestors *",
-          "X-Frame-Options": "ALLOWALL",
+          // "X-Frame-Options": "ALLOWALL",
         },
       });
     }
