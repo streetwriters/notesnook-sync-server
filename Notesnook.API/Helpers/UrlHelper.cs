@@ -20,14 +20,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 using Notesnook.API.Models;
 using Streetwriters.Common;
 
-namespace Notesnook.API.Extensions
+namespace Notesnook.API.Helpers
 {
-    public static class MonographExtensions
+    public class UrlHelper
     {
-        public static string ConstructPublishUrl(this Monograph monograph)
+        public static string ConstructPublishUrl(string slug)
         {
             var baseUrl = Constants.MONOGRAPH_PUBLIC_URL;
-            return $"{baseUrl}/{monograph.Slug ?? monograph.ItemId}";
+            return $"{baseUrl}/{slug}";
+        }
+        public static string ConstructPublishUrl(Monograph monograph)
+        {
+            return ConstructPublishUrl(monograph.Slug ?? monograph.ItemId ?? monograph.Id);
+        }
+
+        public static string ConstructPublishUrl(MonographMetadata metadata)
+        {
+            return ConstructPublishUrl(metadata.PublishUrl ?? metadata.ItemId);
         }
     }
 }
