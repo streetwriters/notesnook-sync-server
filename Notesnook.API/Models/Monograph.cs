@@ -56,6 +56,9 @@ namespace Notesnook.API.Models
         [JsonPropertyName("title")]
         public string? Title { get; set; }
 
+        [JsonPropertyName("slug")]
+        public string? Slug { get; set; }
+
         [JsonPropertyName("userId")]
         public string? UserId { get; set; }
 

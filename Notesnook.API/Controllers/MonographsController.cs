@@ -18,20 +18,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 using System.Text.Json;
 using System.Threading.Tasks;
 using AngleSharp;
-using AngleSharp.Dom;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using MongoDB.Bson;
 using MongoDB.Driver;
-using Notesnook.API.Authorization;
+using NanoidDotNet;
+using Notesnook.API.Extensions;
 using Notesnook.API.Models;
 using Notesnook.API.Services;
 using Streetwriters.Common;
@@ -40,7 +39,6 @@ using Streetwriters.Common.Enums;
 using Streetwriters.Common.Helpers;
 using Streetwriters.Common.Interfaces;
 using Streetwriters.Common.Messages;
-using Streetwriters.Data.Interfaces;
 using Streetwriters.Data.Repositories;
 
 namespace Notesnook.API.Controllers
@@ -70,13 +68,15 @@ namespace Notesnook.API.Controllers
                 );
         }
 
-        private static FilterDefinition<Monograph> CreateMonographFilter(string itemId)
+        private static FilterDefinition<Monograph> CreateMonographFilter(string itemIdOrSlug)
         {
-            return ObjectId.TryParse(itemId, out ObjectId id)
+            return ObjectId.TryParse(itemIdOrSlug, out ObjectId id)
             ? Builders<Monograph>.Filter.Or(
                 Builders<Monograph>.Filter.Eq("_id", id),
-                Builders<Monograph>.Filter.Eq("ItemId", itemId))
-            : Builders<Monograph>.Filter.Eq("ItemId", itemId);
+                Builders<Monograph>.Filter.Eq("ItemId", itemIdOrSlug))
+            : Builders<Monograph>.Filter.Or(
+                Builders<Monograph>.Filter.Eq("Slug", itemIdOrSlug),
+                Builders<Monograph>.Filter.Eq("ItemId", itemIdOrSlug));
         }
 
         private async Task<Monograph> FindMonographAsync(string userId, Monograph monograph)
@@ -88,13 +88,18 @@ namespace Notesnook.API.Controllers
             return await result.FirstOrDefaultAsync();
         }
 
-        private async Task<Monograph> FindMonographAsync(string itemId)
+        private async Task<Monograph> FindMonographAsync(string itemIdOrSlug)
         {
-            var result = await monographs.Collection.FindAsync(CreateMonographFilter(itemId), new FindOptions<Monograph>
+            var result = await monographs.Collection.FindAsync(CreateMonographFilter(itemIdOrSlug), new FindOptions<Monograph>
             {
                 Limit = 1
             });
             return await result.FirstOrDefaultAsync();
+        }
+
+        private static string GenerateSlug()
+        {
+            return Nanoid.Generate(size: 24);
         }
 
         [HttpPost]
@@ -126,6 +131,7 @@ namespace Notesnook.API.Controllers
                 }
                 monograph.Deleted = false;
                 monograph.ViewCount = 0;
+                monograph.Slug = GenerateSlug();
                 await monographs.Collection.ReplaceOneAsync(
                     CreateMonographFilter(userId, monograph),
                     monograph,
@@ -137,7 +143,8 @@ namespace Notesnook.API.Controllers
                 return Ok(new
                 {
                     id = monograph.ItemId,
-                    datePublished = monograph.DatePublished
+                    datePublished = monograph.DatePublished,
+                    publishUrl = Helpers.UrlHelper.ConstructPublishUrl(monograph)
                 });
             }
             catch (Exception e)
@@ -192,7 +199,8 @@ namespace Notesnook.API.Controllers
                 return Ok(new
                 {
                     id = monograph.ItemId,
-                    datePublished = monograph.DatePublished
+                    datePublished = monograph.DatePublished,
+                    publishUrl = Helpers.UrlHelper.ConstructPublishUrl(existingMonograph)
                 });
             }
             catch (Exception e)
@@ -224,7 +232,7 @@ namespace Notesnook.API.Controllers
         public async Task<IActionResult> GetMonographAsync([FromRoute] string id)
         {
             var monograph = await FindMonographAsync(id);
-            if (monograph == null || monograph.Deleted)
+            if (monograph == null || monograph.Deleted || (monograph.Slug != null && monograph.Slug != id))
             {
                 return NotFound(new
                 {
@@ -259,7 +267,8 @@ namespace Notesnook.API.Controllers
         public async Task<IActionResult> TrackView([FromRoute] string id)
         {
             var monograph = await FindMonographAsync(id);
-            if (monograph == null || monograph.Deleted) return Content(SVG_PIXEL, "image/svg+xml");
+            if (monograph == null || monograph.Deleted || (monograph.Slug != null && monograph.Slug != id))
+                return Content(SVG_PIXEL, "image/svg+xml");
 
             var cookieName = $"viewed_{id}";
             var hasVisitedBefore = Request.Cookies.ContainsKey(cookieName);
@@ -300,6 +309,7 @@ namespace Notesnook.API.Controllers
         }
 
         [HttpGet("{id}/analytics")]
+        [Obsolete("This endpoint is deprecated and will be removed in future versions. Use GET /monographs/{id}/metadata instead.")]
         public async Task<IActionResult> GetMonographAnalyticsAsync([FromRoute] string id)
         {
             if (!FeatureAuthorizationHelper.IsFeatureAllowed(Features.MONOGRAPH_ANALYTICS, Clients.Notesnook.Id, User))
@@ -341,6 +351,29 @@ namespace Notesnook.API.Controllers
             await MarkMonographForSyncAsync(userId, id, deviceId, jti);
 
             return Ok();
+        }
+
+        [HttpGet("{id}/metadata")]
+        public async Task<IActionResult> GetMetadataAsync([FromRoute] string id)
+        {
+            var userId = this.User.GetUserId();
+            var monograph = await FindMonographAsync(id);
+            if (monograph == null || monograph.Deleted || monograph.UserId != userId)
+            {
+                return NotFound();
+            }
+
+            var isPro = FeatureAuthorizationHelper.IsFeatureAllowed(Features.MONOGRAPH_ANALYTICS, Clients.Notesnook.Id, User);
+            var totalViews = isPro ? monograph.ViewCount : 0;
+
+            return Ok(new
+            {
+                publishUrl = Helpers.UrlHelper.ConstructPublishUrl(monograph),
+                analytics = new
+                {
+                    totalViews
+                }
+            });
         }
 
         private async Task MarkMonographForSyncAsync(string userId, string monographId, string? deviceId, string? jti)
