@@ -132,16 +132,19 @@ namespace Notesnook.API.Hubs
             var stopwatch = Stopwatch.StartNew();
             try
             {
-
                 var UpsertItems = UpsertActionsMap[pushItem.Type] ?? throw new Exception($"Invalid item type: {pushItem.Type}.");
                 UpsertItems(pushItem.Items, userId, 1);
-
-                var itemIds = pushItem.Items.Select(i => i.ItemId).ToList();
-                await Repositories.InboxItems.DeleteManyAsync(i => i.UserId == userId && itemIds.Contains(i.ItemId));
 
                 if (!await unit.Commit()) return 0;
 
                 await SyncDeviceService.AddIdsToOtherDevicesAsync(userId, deviceId, pushItem.Items.Select((i) => new ItemKey(i.ItemId, pushItem.Type)));
+
+                // we need to delete the inbox items from the inbox collection
+                // after syncing to prevent them from being sent again in the 
+                // next fetch.
+                var itemIds = pushItem.Items.Select(i => i.ItemId).ToList();
+                await Repositories.InboxItems.DeleteManyAsync(i => i.UserId == userId && itemIds.Contains(i.ItemId));
+
                 return 1;
             }
             finally
