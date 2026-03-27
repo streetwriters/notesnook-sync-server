@@ -33,9 +33,15 @@ interface EncryptedInboxItem {
   alg: string;
 }
 
+/**
+ * Encrypts raw data using OpenPGP with the recipient's public key
+ *
+ * @param {string} rawData - The plaintext data to encrypt
+ * @param {string} rawPublicKey - The recipient's OpenPGP public key
+ */
 async function encrypt(
   rawData: string,
-  rawPublicKey: string
+  rawPublicKey: string,
 ): Promise<EncryptedInboxItem> {
   const publicKey = await openpgp.readKey({ armoredKey: rawPublicKey });
   const message = await openpgp.createMessage({ text: rawData });
@@ -57,11 +63,11 @@ async function getInboxPublicEncryptionKey(apiKey: string) {
       headers: {
         Authorization: apiKey,
       },
-    }
+    },
   );
   if (!response.ok) {
     throw new Error(
-      `failed to fetch inbox public encryption key: ${await response.text()}`
+      `failed to fetch inbox public encryption key: ${await response.text()}`,
     );
   }
 
@@ -71,7 +77,7 @@ async function getInboxPublicEncryptionKey(apiKey: string) {
 
 async function postEncryptedInboxItem(
   apiKey: string,
-  item: EncryptedInboxItem
+  item: EncryptedInboxItem,
 ) {
   const response = await fetch(`${NOTESNOOK_API_SERVER_URL}/inbox/items`, {
     method: "POST",
@@ -92,8 +98,11 @@ app.use(
   rateLimit({
     windowMs: 1 * 60 * 1000, // 1 minute
     limit: 60,
-  })
+  }),
 );
+app.get("/health", (_, res) => {
+  return res.status(200).json({ status: "ok" });
+});
 app.post("/inbox", async (req, res) => {
   try {
     const apiKey = req.headers["authorization"];
@@ -117,7 +126,7 @@ app.post("/inbox", async (req, res) => {
 
     const encryptedItem = await encrypt(
       JSON.stringify(validationResult.data),
-      inboxPublicKey
+      inboxPublicKey,
     );
     console.log("[info] encrypted item");
 
