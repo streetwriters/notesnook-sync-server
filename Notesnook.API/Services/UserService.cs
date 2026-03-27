@@ -184,6 +184,8 @@ namespace Notesnook.API.Services
                     };
                     await Repositories.InboxApiKey.InsertAsync(defaultInboxKey);
                 }
+
+                await Repositories.InboxItems.DeleteManyAsync(t => t.UserId == userId);
             }
 
             await Repositories.UsersSettings.UpdateAsync(userSettings.Id, userSettings);
