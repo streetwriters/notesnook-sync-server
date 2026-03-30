@@ -50,6 +50,8 @@ services:
   notesnook-db:
     image: mongo:7.0.12
     hostname: notesnook-db
+    ports:
+      - 27017:27017
     volumes:
       - dbdata:/data/db
     networks:
@@ -69,6 +71,7 @@ services:
     image: minio/minio:RELEASE.2024-07-29T22-14-52Z
     ports:
       - 9000:9000
+      - 9090:9090
     networks:
       - notesnook
     volumes:
