@@ -55,14 +55,26 @@ namespace Streetwriters.Identity.Controllers
         private IPersistedGrantStore PersistedGrantStore { get; set; }
         private ITokenGenerationService TokenGenerationService { get; set; }
         private IUserAccountService UserAccountService { get; set; }
+        private EmailAddressValidator EmailValidator { get; set; }
         private readonly ILogger<AccountController> logger;
-        public AccountController(UserManager<User> _userManager, ITemplatedEmailSender _emailSender,
-        SignInManager<User> _signInManager, RoleManager<MongoRole> _roleManager, IPersistedGrantStore store,
-        ITokenGenerationService tokenGenerationService, IMFAService _mfaService, IUserAccountService userAccountService, ILogger<AccountController> logger) : base(_userManager, _emailSender, _signInManager, _roleManager, _mfaService)
+
+        public AccountController(
+            UserManager<User> _userManager,
+            ITemplatedEmailSender _emailSender,
+            SignInManager<User> _signInManager,
+            RoleManager<MongoRole> _roleManager,
+            IPersistedGrantStore store,
+            ITokenGenerationService tokenGenerationService,
+            IMFAService _mfaService,
+            IUserAccountService userAccountService,
+            ILogger<AccountController> logger,
+            EmailAddressValidator emailValidator
+        ) : base(_userManager, _emailSender, _signInManager, _roleManager, _mfaService)
         {
             PersistedGrantStore = store;
             TokenGenerationService = tokenGenerationService;
             UserAccountService = userAccountService;
+            EmailValidator = emailValidator;
             this.logger = logger;
         }
 
@@ -131,6 +143,11 @@ namespace Streetwriters.Identity.Controllers
             }
             else
             {
+                if (!await EmailValidator.IsEmailAddressValidAsync(newEmail.ToLowerInvariant()))
+                {
+                    return BadRequest("Invalid email address.");
+                }
+
                 var code = await UserManager.GenerateChangeEmailTokenAsync(user, newEmail);
                 await EmailSender.SendChangeEmailConfirmationAsync(newEmail, code, client);
             }
