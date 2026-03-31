@@ -1,0 +1,11 @@
+# Production override: replaces upstream streetwriters/* images with your own Docker Hub images.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+services:
+  identity-server:
+    image: vincentephan/identity:latest
+
+  notesnook-server:
+    image: vincentephan/notesnook-sync:latest
+
+  sse-server:
+    image: vincentephan/sse:latest
