@@ -36,6 +36,10 @@ jobs:
           - image: streetwriters/sse
             file: ./Streetwriters.Messenger/Dockerfile
             context: .
+
+          - image: streetwriters/notesnook-inbox
+            file: ./Notesnook.Inbox.API/Dockerfile
+            context: ./Notesnook.Inbox.API/
     permissions:
       packages: write
       contents: read
