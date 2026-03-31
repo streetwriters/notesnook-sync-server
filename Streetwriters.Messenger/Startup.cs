@@ -72,7 +72,7 @@ namespace Streetwriters.Messenger
             services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddOAuth2Introspection("introspection", options =>
             {
-                options.Authority = Servers.IdentityServer.ToString();
+                options.Authority = Servers.IdentityServer.PublicURL?.ToString() ?? Servers.IdentityServer.ToString();
                 options.ClientSecret = Constants.NOTESNOOK_API_SECRET;
                 options.ClientId = "notesnook";
                 options.DiscoveryPolicy.RequireHttps = false;

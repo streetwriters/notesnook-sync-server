@@ -116,7 +116,7 @@ namespace Streetwriters.Identity
                 options.Events.RaiseSuccessEvents = true;
                 options.Events.RaiseFailureEvents = true;
                 options.Events.RaiseErrorEvents = true;
-                options.IssuerUri = Servers.IdentityServer.ToString();
+                options.IssuerUri = Servers.IdentityServer.PublicURL?.ToString() ?? Servers.IdentityServer.ToString();
             })
             .AddExtensionGrantValidator<EmailGrantValidator>()
             .AddExtensionGrantValidator<MFAGrantValidator>()
