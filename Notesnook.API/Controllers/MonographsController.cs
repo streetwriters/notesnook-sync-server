@@ -97,10 +97,10 @@ namespace Notesnook.API.Controllers
             return await result.FirstOrDefaultAsync();
         }
 
-        private static string GenerateSlug()
-        {
-            return Nanoid.Generate(size: 24);
-        }
+        // private static string GenerateSlug()
+        // {
+        //     return Nanoid.Generate(size: 24);
+        // }
 
         [HttpPost]
         public async Task<IActionResult> PublishAsync([FromQuery] string? deviceId, [FromBody] Monograph monograph)
@@ -131,7 +131,7 @@ namespace Notesnook.API.Controllers
                 }
                 monograph.Deleted = false;
                 monograph.ViewCount = 0;
-                monograph.Slug = GenerateSlug();
+                // monograph.Slug = GenerateSlug();
                 await monographs.Collection.ReplaceOneAsync(
                     CreateMonographFilter(userId, monograph),
                     monograph,
@@ -232,7 +232,7 @@ namespace Notesnook.API.Controllers
         public async Task<IActionResult> GetMonographAsync([FromRoute] string id)
         {
             var monograph = await FindMonographAsync(id);
-            if (monograph == null || monograph.Deleted || (monograph.Slug != null && monograph.Slug != id))
+            if (monograph == null || monograph.Deleted)
             {
                 return NotFound(new
                 {
@@ -267,7 +267,7 @@ namespace Notesnook.API.Controllers
         public async Task<IActionResult> TrackView([FromRoute] string id)
         {
             var monograph = await FindMonographAsync(id);
-            if (monograph == null || monograph.Deleted || (monograph.Slug != null && monograph.Slug != id))
+            if (monograph == null || monograph.Deleted)
                 return Content(SVG_PIXEL, "image/svg+xml");
 
             var cookieName = $"viewed_{id}";
