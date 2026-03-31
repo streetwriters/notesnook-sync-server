@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker compose:*)",
+      "Bash(docker exec:*)",
+      "Bash(curl:*)",
+      "Bash(docker top:*)",
+      "Bash(docker restart:*)",
+      "Bash(git remote:*)",
+      "Bash(git fetch:*)"
+    ]
+  }
+}

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Notesnook Sync Server is a self-hosted backend for the Notesnook note-taking app. It is a .NET 9.0 microservices solution with MongoDB, MinIO (S3-compatible storage), Redis, and SignalR for real-time sync.
+Notesnook Sync Server is a self-hosted backend for the Notesnook note-taking app. It is a .NET 9.0 microservices solution with MongoDB, MinIO (S3-compatible storage), and SignalR for real-time sync. Redis is optional and only required when scaling horizontally (multiple server instances).
 
 ## Common Commands
 
@@ -48,7 +48,7 @@ Client
   ├── Notesnook.API           (sync + attachments, port 5264)
   │     ├── MongoDB           (note data, users, devices)
   │     ├── MinIO             (S3 attachment blobs)
-  │     └── SignalR Hub       (real-time device push, backed by Redis)
+  │     └── SignalR Hub       (real-time device push, in-memory by default)
   ├── Streetwriters.Messenger (SSE real-time events, port 7264)
   └── Notesnook.Inbox.API     (email inbox with OpenPGP, port 3000, Bun)
 ```
@@ -60,7 +60,7 @@ Client
 - **Repository + Unit of Work** (`Streetwriters.Data/`) wraps MongoDB.Driver. All data access goes through `UnitOfWork`.
 - **MongoDB transactions** are disabled in `DEBUG`/`STAGING` build configs (replica set not required locally).
 - **OAuth2 Introspection** — Notesnook.API validates tokens against Identity's introspection endpoint; it does not parse JWTs itself.
-- **SignalR** uses MessagePack protocol and scales out via Redis backplane.
+- **SignalR** uses MessagePack protocol. Runs in-memory by default (single instance). Set `SIGNALR_REDIS_CONNECTION_STRING` env var to enable Redis backplane for multi-instance horizontal scaling.
 - **Quartz.NET** handles background jobs in Notesnook.API (e.g., cleanup, device-chunk maintenance).
 
 ### Collection names
@@ -81,6 +81,7 @@ All runtime config is environment-variable driven via `.env`. Key variables:
 | `*_PUBLIC_URL` | Public-facing URLs for each service |
 | `MINIO_ROOT_USER/PASSWORD` | S3 credentials |
 | `MONGODB_CONNECTION_STRING` | MongoDB connection |
+| `SIGNALR_REDIS_CONNECTION_STRING` | Optional Redis for SignalR backplane (multi-instance only) |
 
 The `docker-compose.yml` validates required env vars at startup and initializes the MongoDB replica set automatically on first run.
 

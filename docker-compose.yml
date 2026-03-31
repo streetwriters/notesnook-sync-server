@@ -47,6 +47,22 @@ services:
     # Ensure the validate service runs first
     restart: "no"
 
+  notesnook-redis:
+    image: redis:7-alpine
+    hostname: notesnook-redis
+    ports:
+      - 6379:6379
+    networks:
+      - notesnook
+    depends_on:
+      validate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: redis-cli ping || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
   notesnook-db:
     image: mongo:7.0.12
     hostname: notesnook-db
@@ -139,6 +155,7 @@ services:
       - notesnook-s3
       - setup-s3
       - identity-server
+      - notesnook-redis
     healthcheck:
       test: wget --tries=1 -nv -q  http://localhost:5264/health -O- || exit 1
       interval: 40s
@@ -156,6 +173,7 @@ services:
       S3_SERVICE_URL: "${ATTACHMENTS_SERVER_PUBLIC_URL}"
       S3_REGION: "us-east-1"
       S3_BUCKET_NAME: "attachments"
+      SIGNALR_REDIS_CONNECTION_STRING: "notesnook-redis:6379"
 
   sse-server:
     image: streetwriters/sse:latest
@@ -195,6 +213,8 @@ services:
       <<: *server-discovery
       API_HOST: http://notesnook-server:5264
       PUBLIC_URL: ${MONOGRAPH_PUBLIC_URL}
+      HOSTNAME: "0.0.0.0"
+      HOST: "0.0.0.0"
 
   autoheal:
     image: willfarrell/autoheal:latest
