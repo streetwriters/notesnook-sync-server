@@ -9,7 +9,10 @@
       "Bash(git remote:*)",
       "Bash(git fetch:*)",
       "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(''''issuer:'''', d[''''issuer'''']\\)\")",
-      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(''''issuer:'''', d[''''issuer'''']\\); print\\(''''jwks_uri:'''', d[''''jwks_uri'''']\\)\")"
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(''''issuer:'''', d[''''issuer'''']\\); print\\(''''jwks_uri:'''', d[''''jwks_uri'''']\\)\")",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ]
   }
 }

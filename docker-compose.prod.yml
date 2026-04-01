@@ -9,7 +9,3 @@ services:
 
   sse-server:
     image: vincentephan/sse:latest
-
-  monograph-server:
-    profiles:
-      - disabled
