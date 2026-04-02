@@ -68,15 +68,13 @@ namespace Notesnook.API.Controllers
                 );
         }
 
-        private static FilterDefinition<Monograph> CreateMonographFilter(string itemIdOrSlug)
+        private static FilterDefinition<Monograph> CreateMonographFilter(string itemId)
         {
-            return ObjectId.TryParse(itemIdOrSlug, out ObjectId id)
+            return ObjectId.TryParse(itemId, out ObjectId id)
             ? Builders<Monograph>.Filter.Or(
                 Builders<Monograph>.Filter.Eq("_id", id),
-                Builders<Monograph>.Filter.Eq("ItemId", itemIdOrSlug))
-            : Builders<Monograph>.Filter.Or(
-                Builders<Monograph>.Filter.Eq("Slug", itemIdOrSlug),
-                Builders<Monograph>.Filter.Eq("ItemId", itemIdOrSlug));
+                Builders<Monograph>.Filter.Eq("ItemId", itemId))
+            : Builders<Monograph>.Filter.Eq("ItemId", itemId);
         }
 
         private async Task<Monograph> FindMonographAsync(string userId, Monograph monograph)
@@ -88,19 +86,37 @@ namespace Notesnook.API.Controllers
             return await result.FirstOrDefaultAsync();
         }
 
-        private async Task<Monograph> FindMonographAsync(string itemIdOrSlug)
+        private async Task<Monograph> FindMonographAsync(string itemId)
         {
-            var result = await monographs.Collection.FindAsync(CreateMonographFilter(itemIdOrSlug), new FindOptions<Monograph>
+            var result = await monographs.Collection.FindAsync(CreateMonographFilter(itemId), new FindOptions<Monograph>
             {
                 Limit = 1
             });
             return await result.FirstOrDefaultAsync();
         }
 
-        // private static string GenerateSlug()
-        // {
-        //     return Nanoid.Generate(size: 24);
-        // }
+        private async Task<Monograph> FindMonographBySlugAsync(string slug)
+        {
+            var result = await monographs.Collection.FindAsync(
+                Builders<Monograph>.Filter.Eq("Slug", slug), new FindOptions<Monograph>
+                {
+                    Limit = 1
+                });
+            return await result.FirstOrDefaultAsync();
+        }
+
+        private async Task<string> GenerateUniqueSlugAsync(int length = 10, int maxAttempts = 5)
+        {
+            for (var i = 0; i < maxAttempts; i++)
+            {
+                var slug = Nanoid.Generate(size: length);
+                var exists = await monographs.Collection.Find(Builders<Monograph>.Filter.Eq("Slug", slug))
+                .Limit(1)
+                .AnyAsync();
+                if (!exists) return slug;
+            }
+            throw new Exception("Failed to generate unique slug");
+        }
 
         [HttpPost]
         public async Task<IActionResult> PublishAsync([FromQuery] string? deviceId, [FromBody] Monograph monograph)
@@ -113,25 +129,52 @@ namespace Notesnook.API.Controllers
                 var existingMonograph = await FindMonographAsync(userId, monograph);
                 if (existingMonograph != null && !existingMonograph.Deleted) return await UpdateAsync(deviceId, monograph);
 
-                if (monograph.EncryptedContent == null)
+                monograph = await CreateMonographAsync(monograph, userId);
+                if (existingMonograph != null)
                 {
-                    var sanitizationLevel = User.IsUserSubscribed() ? ContentSanitizationLevel.Partial : ContentSanitizationLevel.Full;
-                    monograph.CompressedContent = (await SanitizeContentAsync(monograph.Content, sanitizationLevel)).CompressBrotli();
-                    monograph.ContentSanitizationLevel = sanitizationLevel;
+                    monograph.Id = existingMonograph.Id;
                 }
-                monograph.UserId = userId;
-                monograph.DatePublished = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
-                if (monograph.EncryptedContent?.Cipher.Length > MAX_DOC_SIZE || monograph.CompressedContent?.Length > MAX_DOC_SIZE)
-                    return base.BadRequest("Monograph is too big. Max allowed size is 15mb.");
+                await monographs.Collection.ReplaceOneAsync(
+                    CreateMonographFilter(userId, monograph),
+                    monograph,
+                    new ReplaceOptions { IsUpsert = true }
+                );
+
+                await MarkMonographForSyncAsync(userId, monograph.ItemId ?? monograph.Id, deviceId, jti);
+
+                return Ok(new
+                {
+                    id = monograph.ItemId,
+                    datePublished = monograph.DatePublished,
+                });
+            }
+            catch (Exception e)
+            {
+                logger.LogError(e, "Failed to publish monograph");
+                return BadRequest(new { error = e.Message });
+            }
+        }
+
+        [HttpPost("v2")]
+        public async Task<IActionResult> PublishV2Async([FromQuery] string? deviceId, [FromBody] Monograph monograph)
+        {
+            try
+            {
+                var userId = this.User.GetUserId();
+                var jti = this.User.FindFirstValue("jti");
+
+                var existingMonograph = await FindMonographAsync(userId, monograph);
+                if (existingMonograph != null && !existingMonograph.Deleted) return await UpdateAsync(deviceId, monograph);
+
+                monograph = await CreateMonographAsync(monograph, userId);
+                monograph.Slug = await GenerateUniqueSlugAsync();
 
                 if (existingMonograph != null)
                 {
                     monograph.Id = existingMonograph.Id;
                 }
-                monograph.Deleted = false;
-                monograph.ViewCount = 0;
-                // monograph.Slug = GenerateSlug();
+
                 await monographs.Collection.ReplaceOneAsync(
                     CreateMonographFilter(userId, monograph),
                     monograph,
@@ -150,7 +193,7 @@ namespace Notesnook.API.Controllers
             catch (Exception e)
             {
                 logger.LogError(e, "Failed to publish monograph");
-                return BadRequest();
+                return BadRequest(new { error = e.Message });
             }
         }
 
@@ -206,7 +249,7 @@ namespace Notesnook.API.Controllers
             catch (Exception e)
             {
                 logger.LogError(e, "Failed to update monograph");
-                return BadRequest();
+                return BadRequest(new { error = e.Message });
             }
         }
 
@@ -241,25 +284,7 @@ namespace Notesnook.API.Controllers
                 });
             }
 
-            if (monograph.EncryptedContent == null)
-            {
-                var isContentUnsanitized = monograph.ContentSanitizationLevel == ContentSanitizationLevel.Partial || monograph.ContentSanitizationLevel == ContentSanitizationLevel.Unknown;
-                if (!Constants.IS_SELF_HOSTED && isContentUnsanitized && serviceAccessor.UserSubscriptionService != null && !await serviceAccessor.UserSubscriptionService.IsUserSubscribedAsync(Clients.Notesnook.Id, monograph.UserId!))
-                {
-                    var cleaned = await SanitizeContentAsync(monograph.CompressedContent?.DecompressBrotli(), ContentSanitizationLevel.Full);
-                    monograph.CompressedContent = cleaned.CompressBrotli();
-                    await monographs.Collection.UpdateOneAsync(
-                        CreateMonographFilter(monograph.UserId!, monograph),
-                        Builders<Monograph>.Update
-                            .Set(m => m.CompressedContent, monograph.CompressedContent)
-                            .Set(m => m.ContentSanitizationLevel, ContentSanitizationLevel.Full)
-                    );
-                }
-                monograph.Content = monograph.CompressedContent?.DecompressBrotli();
-            }
-
-            monograph.ItemId ??= monograph.Id;
-            return Ok(monograph);
+            return Ok(await ProcessMonographAsync(monograph));
         }
 
         [HttpGet("{id}/view")]
@@ -271,41 +296,39 @@ namespace Notesnook.API.Controllers
                 return Content(SVG_PIXEL, "image/svg+xml");
 
             var cookieName = $"viewed_{id}";
-            var hasVisitedBefore = Request.Cookies.ContainsKey(cookieName);
-
-            if (monograph.SelfDestruct)
-            {
-                await monographs.Collection.ReplaceOneAsync(
-                    CreateMonographFilter(monograph.UserId!, monograph),
-                    new Monograph
-                    {
-                        ItemId = id,
-                        Id = monograph.Id,
-                        Deleted = true,
-                        UserId = monograph.UserId,
-                        ViewCount = 0
-                    }
-                );
-                await MarkMonographForSyncAsync(monograph.UserId!, id);
-            }
-            else if (!hasVisitedBefore)
-            {
-                await monographs.Collection.UpdateOneAsync(
-                    CreateMonographFilter(monograph.UserId!, monograph),
-                    Builders<Monograph>.Update.Inc(m => m.ViewCount, 1)
-                );
-
-                var cookieOptions = new CookieOptions
-                {
-                    Path = $"/monographs/{id}",
-                    HttpOnly = true,
-                    Secure = Request.IsHttps,
-                    Expires = DateTimeOffset.UtcNow.AddMonths(1)
-                };
-                Response.Cookies.Append(cookieName, "1", cookieOptions);
-            }
+            await TrackViewAsync(monograph, cookieName, $"/monographs/{id}");
 
             return Content(SVG_PIXEL, "image/svg+xml");
+        }
+
+        [HttpGet("v2/{slug}/view")]
+        [AllowAnonymous]
+        public async Task<IActionResult> TrackViewV2([FromRoute] string slug)
+        {
+            var monograph = await FindMonographBySlugAsync(slug);
+            if (monograph == null || monograph.Deleted)
+                return Content(SVG_PIXEL, "image/svg+xml");
+
+            var cookieName = $"viewed_{slug}";
+            await TrackViewAsync(monograph, cookieName, $"/monographs/v2/{slug}");
+            return Content(SVG_PIXEL, "image/svg+xml");
+        }
+
+        [HttpGet("v2/{slug}")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetMonographBySlugAsync([FromRoute] string slug)
+        {
+            var monograph = await FindMonographBySlugAsync(slug);
+            if (monograph == null || monograph.Deleted)
+            {
+                return NotFound(new
+                {
+                    error = "invalid_id",
+                    error_description = $"No such monograph found."
+                });
+            }
+
+            return Ok(await ProcessMonographAsync(monograph));
         }
 
         [HttpGet("{id}/analytics")]
@@ -400,6 +423,88 @@ namespace Notesnook.API.Controllers
             ("video", "src"),
             ("audio", "src"),
         ];
+
+        private async Task<Monograph> CreateMonographAsync(Monograph monograph, string userId)
+        {
+            if (monograph.EncryptedContent == null)
+            {
+                var sanitizationLevel = User.IsUserSubscribed() ? ContentSanitizationLevel.Partial : ContentSanitizationLevel.Full;
+                monograph.CompressedContent = (await SanitizeContentAsync(monograph.Content, sanitizationLevel)).CompressBrotli();
+                monograph.ContentSanitizationLevel = sanitizationLevel;
+            }
+
+            monograph.UserId = userId;
+            monograph.DatePublished = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+            if (monograph.EncryptedContent?.Cipher.Length > MAX_DOC_SIZE || monograph.CompressedContent?.Length > MAX_DOC_SIZE)
+                throw new Exception("Monograph is too big. Max allowed size is 15mb.");
+
+            monograph.Deleted = false;
+            monograph.ViewCount = 0;
+
+            return monograph;
+        }
+
+        private async Task TrackViewAsync(Monograph monograph, string cookieName, string cookiePath)
+        {
+            var hasVisitedBefore = Request.Cookies.ContainsKey(cookieName);
+
+            if (monograph.SelfDestruct)
+            {
+                await monographs.Collection.ReplaceOneAsync(
+                    CreateMonographFilter(monograph.UserId!, monograph),
+                    new Monograph
+                    {
+                        ItemId = monograph.ItemId,
+                        Id = monograph.Id,
+                        Deleted = true,
+                        UserId = monograph.UserId,
+                        ViewCount = 0
+                    }
+                );
+                await MarkMonographForSyncAsync(monograph.UserId!, monograph.ItemId ?? monograph.Id);
+            }
+            else if (!hasVisitedBefore)
+            {
+                await monographs.Collection.UpdateOneAsync(
+                    CreateMonographFilter(monograph.UserId!, monograph),
+                    Builders<Monograph>.Update.Inc(m => m.ViewCount, 1)
+                );
+
+                var cookieOptions = new CookieOptions
+                {
+                    Path = cookiePath,
+                    HttpOnly = true,
+                    Secure = Request.IsHttps,
+                    Expires = DateTimeOffset.UtcNow.AddMonths(1)
+                };
+                Response.Cookies.Append(cookieName, "1", cookieOptions);
+            }
+        }
+
+        private async Task<Monograph> ProcessMonographAsync(Monograph monograph)
+        {
+
+            if (monograph.EncryptedContent == null)
+            {
+                var isContentUnsanitized = monograph.ContentSanitizationLevel == ContentSanitizationLevel.Partial || monograph.ContentSanitizationLevel == ContentSanitizationLevel.Unknown;
+                if (!Constants.IS_SELF_HOSTED && isContentUnsanitized && serviceAccessor.UserSubscriptionService != null && !await serviceAccessor.UserSubscriptionService.IsUserSubscribedAsync(Clients.Notesnook.Id, monograph.UserId!))
+                {
+                    var cleaned = await SanitizeContentAsync(monograph.CompressedContent?.DecompressBrotli(), ContentSanitizationLevel.Full);
+                    monograph.CompressedContent = cleaned.CompressBrotli();
+                    await monographs.Collection.UpdateOneAsync(
+                        CreateMonographFilter(monograph.UserId!, monograph),
+                        Builders<Monograph>.Update
+                            .Set(m => m.CompressedContent, monograph.CompressedContent)
+                            .Set(m => m.ContentSanitizationLevel, ContentSanitizationLevel.Full)
+                    );
+                }
+                monograph.Content = monograph.CompressedContent?.DecompressBrotli();
+            }
+
+            monograph.ItemId ??= monograph.Id;
+            return monograph;
+        }
 
         private async Task<string> SanitizeContentAsync(string? content, ContentSanitizationLevel level)
         {
