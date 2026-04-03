@@ -31,11 +31,19 @@ namespace Notesnook.API.Helpers
         }
         public static string ConstructPublishUrl(Monograph monograph)
         {
-            return ConstructPublishUrl(monograph.Slug ?? monograph.ItemId ?? monograph.Id);
+            if (!string.IsNullOrEmpty(monograph.Slug))
+            {
+                return ConstructPublishUrl("s/" + monograph.Slug);
+            }
+            return ConstructPublishUrl(monograph.ItemId ?? monograph.Id);
         }
 
         public static string ConstructPublishUrl(MonographMetadata metadata)
         {
+            if (!string.IsNullOrEmpty(metadata.PublishUrl))
+            {
+                return ConstructPublishUrl("s/" + metadata.PublishUrl);
+            }
             return ConstructPublishUrl(metadata.PublishUrl ?? metadata.ItemId);
         }
     }

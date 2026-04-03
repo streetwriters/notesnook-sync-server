@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Email Confirmation Failed - Notesnook</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
+          Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+        background: #ffffff;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        overflow-y: auto;
+        font-size: 16px;
+      }
+
+      .main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+      }
+
+      .icon-wrapper {
+        background: #fdecea;
+        border-radius: 100px;
+        padding: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .icon-wrapper svg {
+        width: 72px;
+        height: 72px;
+        fill: #c0392b;
+      }
+
+      .heading {
+        font-size: 2.5em;
+        font-weight: 700;
+        text-align: center;
+        margin-top: 20px;
+        color: #000;
+      }
+
+      .subheading {
+        font-size: 1.5em;
+        font-weight: 600;
+        text-align: center;
+        margin-top: 8px;
+        color: #5b5b5b;
+      }
+
+      .body-text {
+        font-size: 1.2em;
+        text-align: center;
+        margin-top: 8px;
+        color: #808080;
+        word-wrap: break-word;
+      }
+
+      .footer {
+        background: #f0f0f0;
+        padding: 40px 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .footer-heading {
+        font-size: 1.2em;
+        font-weight: bold;
+        text-align: center;
+      }
+
+      .footer-subtext {
+        font-size: 1em;
+        text-align: center;
+        margin-top: 8px;
+        color: #5b5b5b;
+      }
+
+      @media (max-width: 480px) {
+        body {
+          font-size: 14px;
+        }
+      }
+
+      @media (min-width: 769px) {
+        body {
+          font-size: 18px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="main">
+      <div class="icon-wrapper">
+        <!-- Mail X Icon -->
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+          <path
+            d="M13 19C13 18.66 13.04 18.33 13.09 18H4V8L12 13L20 8V13.09C20.72 13.21 21.39 13.46 22 13.81V6C22 4.9 21.1 4 20 4H4C2.9 4 2 4.9 2 6V18C2 19.1 2.9 20 4 20H13.09C13.04 19.67 13 19.34 13 19M20 6L12 11L4 6H20M21.12 15.46L19 17.59L16.88 15.46L15.47 16.88L17.59 19L15.47 21.12L16.88 22.54L19 20.41L21.12 22.54L22.54 21.12L20.41 19L22.54 16.88L21.12 15.46Z"
+          />
+        </svg>
+      </div>
+      <h1 class="heading">Uh oh!</h1>
+      <p class="subheading">Email confirmation failed. Please try again!</p>
+      <p class="body-text">{{errors}}</p>
+    </div>
+    <div class="footer">
+      <h2 class="footer-heading">Notesnook</h2>
+      <p class="footer-subtext">Privacy for everyone</p>
+    </div>
+  </body>
+</html>

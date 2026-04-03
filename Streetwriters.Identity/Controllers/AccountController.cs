@@ -34,6 +34,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Logging;
 using Streetwriters.Common;
 using Streetwriters.Common.Enums;
+using Streetwriters.Common.Helpers;
 using Streetwriters.Common.Interfaces;
 using Streetwriters.Common.Messages;
 using Streetwriters.Common.Models;
@@ -52,6 +53,9 @@ namespace Streetwriters.Identity.Controllers
     [Authorize(LocalApi.PolicyName)]
     public class AccountController : IdentityControllerBase
     {
+        private static readonly string emailConfirmedPageHtml = HtmlHelper.ReadMinifiedHtmlFile("Templates/EmailConfirmedPage.html");
+        private static readonly string emailConfirmErrorPageHtml = HtmlHelper.ReadMinifiedHtmlFile("Templates/EmailConfirmErrorPage.html");
+
         private IPersistedGrantStore PersistedGrantStore { get; set; }
         private ITokenGenerationService TokenGenerationService { get; set; }
         private IUserAccountService UserAccountService { get; set; }
@@ -93,10 +97,22 @@ namespace Streetwriters.Identity.Controllers
             {
                 case TokenType.CONFRIM_EMAIL:
                     {
-                        if (await UserManager.IsEmailConfirmedAsync(user)) return Ok("Email already verified.");
+                        if (await UserManager.IsEmailConfirmedAsync(user))
+                        {
+                            return Content(
+                                emailConfirmedPageHtml.Replace("{{subheading}}", "Your email is already verified."),
+                                "text/html"
+                            );
+                        }
 
                         var result = await UserManager.ConfirmEmailAsync(user, code);
-                        if (!result.Succeeded) return BadRequest(result.Errors.ToErrors());
+                        if (!result.Succeeded)
+                        {
+                            return Content(
+                                emailConfirmErrorPageHtml.Replace("{{errors}}", string.Join(" ", result.Errors.ToErrors())),
+                                "text/html"
+                            );
+                        }
 
                         if (await UserManager.IsInRoleAsync(user, client.Id) && client.OnEmailConfirmed != null)
                         {
@@ -106,8 +122,10 @@ namespace Streetwriters.Identity.Controllers
                         if (!await UserManager.GetTwoFactorEnabledAsync(user))
                             await MFAService.EnableMFAAsync(user, MFAMethods.Email);
 
-                        var redirectUrl = $"{client.EmailConfirmedRedirectURL}?userId={userId}";
-                        return RedirectPermanent(redirectUrl);
+                        return Content(
+                            emailConfirmedPageHtml.Replace("{{subheading}}", "Your email has been confirmed."),
+                            "text/html"
+                        );
                     }
                 case TokenType.RESET_PASSWORD:
                     {
