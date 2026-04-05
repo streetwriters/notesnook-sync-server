@@ -185,7 +185,14 @@ namespace Streetwriters.Identity.Services
                     };
                 }
 
-                return SignupResponse.Error(result.Errors.ToErrors());
+                var otherErrors = result.Errors
+                    .Where(e => e.Code != "DuplicateUserName" && e.Code != "DuplicateEmail")
+                    .ToErrors();
+                var hasDuplicate = result.Errors.Any(e => e.Code == "DuplicateUserName" || e.Code == "DuplicateEmail");
+                var errors = hasDuplicate
+                    ? ["Unable to create an account on this email.", .. otherErrors]
+                    : otherErrors;
+                return SignupResponse.Error(errors);
             }
             catch (System.Exception ex)
             {
