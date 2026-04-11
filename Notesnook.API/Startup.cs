@@ -213,6 +213,7 @@ namespace Notesnook.API
             var signalR = services.AddSignalR((hub) =>
             {
                 hub.MaximumReceiveMessageSize = 100 * 1024 * 1024;
+                hub.KeepAliveInterval = TimeSpan.FromSeconds(15);
                 hub.ClientTimeoutInterval = TimeSpan.FromMinutes(10);
                 hub.EnableDetailedErrors = true;
             }).AddMessagePackProtocol().AddJsonProtocol();
@@ -269,6 +270,12 @@ namespace Notesnook.API
 
             app.UseOpenTelemetryPrometheusScrapingEndpoint((context) => context.Request.Path == "/metrics" && context.Connection.LocalPort == 5067);
             app.UseResponseCompression();
+
+            app.UseWebSockets(new Microsoft.AspNetCore.Builder.WebSocketOptions
+            {
+                KeepAliveInterval = TimeSpan.FromSeconds(30),
+                KeepAliveTimeout = TimeSpan.FromSeconds(60),
+            });
 
             app.UseCors("notesnook");
             app.UseVersion(Servers.NotesnookAPI);
