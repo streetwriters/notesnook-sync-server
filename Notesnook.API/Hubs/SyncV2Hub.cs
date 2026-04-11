@@ -257,7 +257,7 @@ namespace Notesnook.API.Hubs
                     ids,
                     size: 100,
                     resetSync: device.IsSyncReset,
-                    maxBytes: 7 * 1024 * 1024
+                    maxBytes: 3 * 1024 * 1024
                 );
 
                 await foreach (var chunk in chunks)
