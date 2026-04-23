@@ -18,28 +18,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 using System.Linq;
+using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Lib.AspNetCore.ServerSentEvents;
 using System.Security.Claims;
+using System.Collections.Generic;
 
 namespace Streetwriters.Messenger.Helpers
 {
     public class SSEHelper
     {
-        public static async Task SendEventToUserAsync(string data, IServerSentEventsService sseService, string userId, string? originTokenId = null)
+        public static async Task SendEventToUserAsync(string data, IServerSentEventsService sseService, string userId, string? originTokenId = null, CancellationToken cancellationToken = default)
         {
-            var clients = sseService.GetClients().Where(c => c.User.FindFirstValue("sub") == userId);
-            foreach (var client in clients)
-            {
-                if (originTokenId != null && client.User.FindFirstValue("jti") == originTokenId) continue;
-                if (!client.IsConnected) continue;
-                await client.SendEventAsync(data);
-            }
+            var clients = sseService.GetClients()
+                .Where(c => c.User?.FindFirstValue("sub") == userId)
+                .Where(c => originTokenId == null || c.User?.FindFirstValue("jti") != originTokenId);
+
+            await SendEventToClientsAsync(clients, data, cancellationToken);
         }
 
-        public static async Task SendEventToAllUsersAsync(string data, IServerSentEventsService sseService)
+        public static async Task SendEventToAllUsersAsync(string data, IServerSentEventsService sseService, CancellationToken cancellationToken = default)
         {
-            await sseService.SendEventAsync(data);
+            await SendEventToClientsAsync(sseService.GetClients(), data, cancellationToken);
+        }
+
+        private static async Task SendEventToClientsAsync(IEnumerable<IServerSentEventsClient> clients, string data, CancellationToken cancellationToken)
+        {
+            foreach (var client in clients)
+            {
+                if (!client.IsConnected) continue;
+
+                try
+                {
+                    await client.SendEventAsync(data, cancellationToken);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    break;
+                }
+                catch
+                {
+                }
+            }
         }
     }
 }

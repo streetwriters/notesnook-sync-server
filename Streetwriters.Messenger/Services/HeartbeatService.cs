@@ -21,6 +21,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Lib.AspNetCore.ServerSentEvents;
 using Streetwriters.Messenger.Helpers;
 using System.Text.Json;
@@ -33,12 +34,14 @@ namespace Streetwriters.Messenger.Services
         private const string HEARTBEAT_MESSAGE_FORMAT = "Streetwriters Heartbeat ({0} UTC)";
 
         private readonly IServerSentEventsService _serverSentEventsService;
+        private readonly ILogger<HeartbeatService> _logger;
         #endregion
 
         #region Constructor
-        public HeartbeatService(IServerSentEventsService serverSentEventsService)
+        public HeartbeatService(IServerSentEventsService serverSentEventsService, ILogger<HeartbeatService> logger)
         {
             _serverSentEventsService = serverSentEventsService;
+            _logger = logger;
         }
         #endregion
 
@@ -47,15 +50,28 @@ namespace Streetwriters.Messenger.Services
         {
             while (!stoppingToken.IsCancellationRequested)
             {
-                var message = JsonSerializer.Serialize(new
+                try
                 {
-                    type = "heartbeat",
-                    data = JsonSerializer.Serialize(new
+                    var message = JsonSerializer.Serialize(new
                     {
-                        t = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
-                    })
-                });
-                await SSEHelper.SendEventToAllUsersAsync(message, _serverSentEventsService);
+                        type = "heartbeat",
+                        data = JsonSerializer.Serialize(new
+                        {
+                            t = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+                        })
+                    });
+
+                    await SSEHelper.SendEventToAllUsersAsync(message, _serverSentEventsService, stoppingToken);
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to send SSE heartbeat to one or more clients.");
+                }
+
                 await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
             }
         }
