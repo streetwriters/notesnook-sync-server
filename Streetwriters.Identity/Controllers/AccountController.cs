@@ -190,8 +190,8 @@ namespace Streetwriters.Identity.Controllers
             var client = Clients.FindClientById(form.ClientId);
             if (client == null) return BadRequest("Invalid client_id.");
 
-            var user = await UserManager.FindByEmailAsync(form.Email) ?? throw new Exception("User not found.");
-            if (!await UserService.IsUserValidAsync(UserManager, user, form.ClientId)) return Ok();
+            var user = await UserManager.FindByEmailAsync(form.Email);
+            if (user == null || !await UserService.IsUserValidAsync(UserManager, user, form.ClientId)) return Ok();
 
             var code = await UserManager.GenerateUserTokenAsync(user, TokenOptions.DefaultProvider, "ResetPassword");
             var callbackUrl = UrlExtensions.TokenLink(user.Id.ToString(), code, client.Id, TokenType.RESET_PASSWORD);
