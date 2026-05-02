@@ -25,6 +25,7 @@ using System.Text;
 using System.Text.Encodings.Web;
 using System.Threading.Tasks;
 using Amazon.Runtime;
+using StackExchange.Redis;
 using IdentityModel.AspNetCore.OAuth2Introspection;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -219,7 +220,20 @@ namespace Notesnook.API
             }).AddMessagePackProtocol().AddJsonProtocol();
 
             if (!string.IsNullOrEmpty(Constants.SIGNALR_REDIS_CONNECTION_STRING))
-                signalR.AddStackExchangeRedis(Constants.SIGNALR_REDIS_CONNECTION_STRING);
+            {
+                services.AddHealthChecks()
+                        .AddRedis(Constants.SIGNALR_REDIS_CONNECTION_STRING, tags: ["ready"]);
+                signalR.AddStackExchangeRedis(options =>
+                {
+                    options.Configuration = ConfigurationOptions.Parse(Constants.SIGNALR_REDIS_CONNECTION_STRING);
+                    options.Configuration.AbortOnConnectFail = false;
+                    options.Configuration.ConnectRetry = 5;
+                    options.Configuration.ReconnectRetryPolicy = new ExponentialRetry(5000, 30000);
+                    options.Configuration.KeepAlive = 60;
+                    options.Configuration.ConnectTimeout = 5000;
+                    options.Configuration.SyncTimeout = 5000;
+                });
+            }
 
             services.AddResponseCompression(options =>
             {
