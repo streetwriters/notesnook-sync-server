@@ -122,6 +122,19 @@ namespace Notesnook.API.Hubs
             await base.OnConnectedAsync();
         }
 
+        public override async Task OnDisconnectedAsync(Exception? exception)
+        {
+            if (exception != null)
+            {
+                Logger.LogWarning(exception, "Connection {ConnectionId} disconnected with error (server-side drop)", Context.ConnectionId);
+            }
+            else
+            {
+                Logger.LogInformation("Connection {ConnectionId} disconnected cleanly (client-initiated)", Context.ConnectionId);
+            }
+            await base.OnDisconnectedAsync(exception);
+        }
+
 
         public async Task<int> PushItems(string deviceId, SyncTransferItemV2 pushItem)
         {
