@@ -18,5 +18,6 @@ namespace Notesnook.API
         public const string InboxApiKeysKey = "inbox_api_keys";
         public const string SyncDevicesKey = "sync_devices";
         public const string DeviceIdsChunksKey = "device_ids_chunks";
+        public const string InboxItemsHistoryKey = "inbox_items_history";
     }
 }
