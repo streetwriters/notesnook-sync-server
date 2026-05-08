@@ -186,6 +186,8 @@ namespace Streetwriters.Identity.Services
                     ArgumentNullException.ThrowIfNull(form.PhoneNumber);
                     await UserManager.SetPhoneNumberAsync(user, form.PhoneNumber);
                     var id = await SMSSender.SendOTPAsync(form.PhoneNumber, client);
+                    if (string.IsNullOrEmpty(id)) throw new Exception("Failed to send SMS. Please try again.");
+
                     logger.LogInformation("SMS OTP sent for user: {UserId}, SMS ID: {SmsId}", user.Id, id);
                     await this.ReplaceClaimAsync(user, MFAService.SMS_ID_CLAIM, id);
                     break;

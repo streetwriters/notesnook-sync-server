@@ -23,36 +23,56 @@ using Streetwriters.Common;
 using Twilio.Rest.Verify.V2.Service;
 using Twilio;
 using System.Threading.Tasks;
+using System;
+using Microsoft.Extensions.Logging;
 
 namespace Streetwriters.Identity.Services
 {
     public class SMSSender : ISMSSender
     {
-        public SMSSender()
+        private readonly ILogger<SMSSender> Logger;
+        public SMSSender(ILogger<SMSSender> logger)
         {
+            Logger = logger;
             if (!string.IsNullOrEmpty(Constants.TWILIO_ACCOUNT_SID) && !string.IsNullOrEmpty(Constants.TWILIO_AUTH_TOKEN))
             {
                 TwilioClient.Init(Constants.TWILIO_ACCOUNT_SID, Constants.TWILIO_AUTH_TOKEN);
             }
         }
 
-        public async Task<string> SendOTPAsync(string number, IClient app)
+        public async Task<string?> SendOTPAsync(string number, IClient app)
         {
-            var verification = await VerificationResource.CreateAsync(
-                to: number,
-                channel: "sms",
-                pathServiceSid: Constants.TWILIO_SERVICE_SID
-            );
-            return verification.Sid;
+            try
+            {
+                var verification = await VerificationResource.CreateAsync(
+                    to: number,
+                    channel: "sms",
+                    pathServiceSid: Constants.TWILIO_SERVICE_SID
+                );
+                return verification.Sid;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error sending OTP with Twilio");
+                return null;
+            }
         }
 
         public async Task<bool> VerifyOTPAsync(string id, string code)
         {
-            return (await VerificationCheckResource.CreateAsync(
-                verificationSid: id,
-                pathServiceSid: Constants.TWILIO_SERVICE_SID,
-                code: code
-            )).Status == "approved";
+            try
+            {
+                return (await VerificationCheckResource.CreateAsync(
+                    verificationSid: id,
+                    pathServiceSid: Constants.TWILIO_SERVICE_SID,
+                    code: code
+                )).Status == "approved";
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error verifying OTP with Twilio");
+                return false;
+            }
         }
     }
 }

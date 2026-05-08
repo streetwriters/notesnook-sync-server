@@ -24,7 +24,7 @@ namespace Streetwriters.Identity.Interfaces
 {
     public interface ISMSSender
     {
-        Task<string> SendOTPAsync(string number, IClient client);
+        Task<string?> SendOTPAsync(string number, IClient client);
         Task<bool> VerifyOTPAsync(string id, string code);
     }
 }
