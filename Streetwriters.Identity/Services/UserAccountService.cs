@@ -157,6 +157,7 @@ namespace Streetwriters.Identity.Services
                     }
                     else
                     {
+                        await mfaService.EnableMFAAsync(user, MFAMethods.Email);
                         if (userAgent != null) await userManager.AddClaimAsync(user, new Claim("platform", PlatformFromUserAgent(userAgent)));
                         var code = await userManager.GenerateEmailConfirmationTokenAsync(user);
                         var callbackUrl = UrlExtensions.TokenLink(user.Id.ToString(), code, client.Id, TokenType.CONFRIM_EMAIL);
