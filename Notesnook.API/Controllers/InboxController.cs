@@ -72,9 +72,9 @@ namespace Notesnook.API.Controllers
                 {
                     return BadRequest(new { error = "Api key name is required." });
                 }
-                if (request.ExpiryDate <= -1)
+                if (request.ExpiryDate == null)
                 {
-                    return BadRequest(new { error = "Valid expiry date is required." });
+                    return BadRequest(new { error = "Expiry date is required." });
                 }
 
                 var count = await inboxApiKeysRepository.CountAsync(t => t.UserId == userId);
