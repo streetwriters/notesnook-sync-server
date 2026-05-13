@@ -56,7 +56,9 @@ async function encrypt(
   };
 }
 
-async function getInboxPublicEncryptionKey(apiKey: string) {
+async function getInboxPublicEncryptionKey(
+  apiKey: string,
+): Promise<{ status: "unauthorized" } | { status: "ok"; key: string | null }> {
   const response = await fetch(
     `${NOTESNOOK_API_SERVER_URL}/inbox/public-encryption-key`,
     {
@@ -65,6 +67,9 @@ async function getInboxPublicEncryptionKey(apiKey: string) {
       },
     },
   );
+  if (response.status === 401) {
+    return { status: "unauthorized" };
+  }
   if (!response.ok) {
     throw new Error(
       `failed to fetch inbox public encryption key: ${await response.text()}`,
@@ -72,7 +77,7 @@ async function getInboxPublicEncryptionKey(apiKey: string) {
   }
 
   const data = (await response.json()) as unknown as any;
-  return (data?.key as string) || null;
+  return { status: "ok", key: (data?.key as string) || null };
 }
 
 async function postEncryptedInboxItem(
@@ -110,10 +115,14 @@ app.post("/", async (req, res) => {
       return res.status(401).json({ error: "unauthorized" });
     }
 
-    const inboxPublicKey = await getInboxPublicEncryptionKey(apiKey);
-    if (!inboxPublicKey) {
+    const encryptionKeyResult = await getInboxPublicEncryptionKey(apiKey);
+    if (encryptionKeyResult.status === "unauthorized") {
+      return res.status(401).json({ error: "unauthorized" });
+    }
+    if (!encryptionKeyResult.key) {
       return res.status(403).json({ error: "inbox public key not found" });
     }
+    const inboxPublicKey = encryptionKeyResult.key;
     console.log("[info] fetched inbox public key");
 
     const validationResult = RawInboxItemSchema.safeParse(req.body);
