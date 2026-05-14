@@ -120,7 +120,7 @@ app.post("/", async (req, res) => {
       return res.status(401).json({ error: "unauthorized" });
     }
     if (!encryptionKeyResult.key) {
-      return res.status(403).json({ error: "inbox public key not found" });
+      return res.status(404).json({ error: "inbox public key not found" });
     }
     const inboxPublicKey = encryptionKeyResult.key;
     console.log("[info] fetched inbox public key");
