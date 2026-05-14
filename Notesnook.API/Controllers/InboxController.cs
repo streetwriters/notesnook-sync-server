@@ -133,7 +133,7 @@ namespace Notesnook.API.Controllers
                 var userSetting = await userSettingsRepository.FindOneAsync(u => u.UserId == userId);
                 if (string.IsNullOrWhiteSpace(userSetting?.InboxKeys?.Public))
                 {
-                    return BadRequest(new { error = "Inbox public key is not configured." });
+                    return NotFound(new { error = "Inbox public key is not configured." });
                 }
                 return Ok(new { key = userSetting.InboxKeys.Public });
             }
