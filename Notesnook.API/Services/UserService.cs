@@ -174,15 +174,6 @@ namespace Notesnook.API.Services
                 else
                 {
                     userSettings.InboxKeys = keys.InboxKeys;
-                    var defaultInboxKey = new InboxApiKey
-                    {
-                        UserId = userId,
-                        Name = "Default",
-                        DateCreated = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                        ExpiryDate = DateTimeOffset.UtcNow.AddYears(1).ToUnixTimeMilliseconds(),
-                        LastUsedAt = 0
-                    };
-                    await Repositories.InboxApiKey.InsertAsync(defaultInboxKey);
                 }
 
                 await Repositories.InboxItems.DeleteManyAsync(t => t.UserId == userId);
