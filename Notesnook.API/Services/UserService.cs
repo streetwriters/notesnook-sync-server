@@ -199,6 +199,7 @@ namespace Notesnook.API.Services
             Repositories.Colors.DeleteByUserId(userId);
             Repositories.Tags.DeleteByUserId(userId);
             Repositories.Vaults.DeleteByUserId(userId);
+            Repositories.InboxItemsHistory.DeleteByUserId(userId);
             Repositories.UsersSettings.Delete((u) => u.UserId == userId);
             Repositories.Monographs.DeleteMany((m) => m.UserId == userId);
             Repositories.InboxApiKey.DeleteMany((t) => t.UserId == userId);
@@ -260,6 +261,7 @@ namespace Notesnook.API.Services
             Repositories.Colors.DeleteByUserId(userId);
             Repositories.Tags.DeleteByUserId(userId);
             Repositories.Vaults.DeleteByUserId(userId);
+            Repositories.InboxItemsHistory.DeleteByUserId(userId);
             Repositories.Monographs.DeleteMany((m) => m.UserId == userId);
             Repositories.InboxApiKey.DeleteMany((t) => t.UserId == userId);
             if (!await unit.Commit()) return false;

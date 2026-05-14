@@ -197,7 +197,8 @@ namespace Notesnook.API
                     .AddMongoCollection(Collections.ColorsKey)
                     .AddMongoCollection(Collections.VaultsKey)
                     .AddMongoCollection(Collections.InboxItemsKey)
-                    .AddMongoCollection(Collections.InboxApiKeysKey);
+                    .AddMongoCollection(Collections.InboxApiKeysKey)
+                    .AddMongoCollection(Collections.InboxItemsHistoryKey);
 
             services.AddScoped<ISyncItemsRepositoryAccessor, SyncItemsRepositoryAccessor>();
             services.AddScoped<SyncDeviceService>();

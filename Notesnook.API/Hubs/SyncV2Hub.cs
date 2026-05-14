@@ -68,6 +68,7 @@ namespace Notesnook.API.Hubs
             "color",
             "tag",
             "vault",
+            "inboxitemhistory",
             "relation", // relations must sync at the end to prevent invalid state
         ];
         private readonly FrozenDictionary<string, Action<IEnumerable<SyncItem>, string, long>> UpsertActionsMap;
@@ -92,6 +93,7 @@ namespace Notesnook.API.Hubs
                 Repositories.Colors.FindItemsById,
                 Repositories.Tags.FindItemsById,
                 Repositories.Vaults.FindItemsById,
+                Repositories.InboxItemsHistory.FindItemsById,
                 Repositories.Relations.FindItemsById,
             ];
             UpsertActionsMap = new Dictionary<string, Action<IEnumerable<SyncItem>, string, long>> {
@@ -106,6 +108,7 @@ namespace Notesnook.API.Hubs
                 { "color", Repositories.Colors.UpsertMany },
                 { "vault", Repositories.Vaults.UpsertMany },
                 { "tag", Repositories.Tags.UpsertMany },
+                { "inboxitemhistory", Repositories.InboxItemsHistory.UpsertMany },
             }.ToFrozenDictionary();
         }
 
