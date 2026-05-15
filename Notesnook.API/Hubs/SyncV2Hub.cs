@@ -328,7 +328,7 @@ namespace Notesnook.API.Hubs
                     var unsyncedInboxItemIds = ids.Where(k => k.Type == "inbox_item").Select(k => k.ItemId);
                     var userInboxItems = device.IsSyncReset
                         ? await Repositories.InboxItems.FindAsync(m => m.UserId == userId)
-                        : await Repositories.InboxItems.FindAsync(m => m.UserId == userId && unsyncedInboxItemIds.Contains(m.ItemId ?? m.Id.ToString()));
+                        : await Repositories.InboxItems.FindAsync(m => m.UserId == userId && unsyncedInboxItemIds.Contains(m.ItemId));
                     if (userInboxItems.Any() && !await Clients.Caller.SendInboxItems(userInboxItems).WaitAsync(TimeSpan.FromMinutes(10)))
                     {
                         throw new HubException("Client rejected inbox items.");
