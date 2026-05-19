@@ -57,22 +57,9 @@ namespace Notesnook.API.Hubs
         private ISyncItemsRepositoryAccessor Repositories { get; }
         private SyncDeviceService SyncDeviceService { get; }
         private readonly IUnitOfWork unit;
-        private static readonly string[] CollectionKeys = [
-            "settingitem",
-            "attachment",
-            "note",
-            "notebook",
-            "content",
-            "shortcut",
-            "reminder",
-            "color",
-            "tag",
-            "vault",
-            "inboxitemhistory",
-            "relation", // relations must sync at the end to prevent invalid state
-        ];
         private readonly FrozenDictionary<string, Action<IEnumerable<SyncItem>, string, long>> UpsertActionsMap;
-        private readonly Func<string, IEnumerable<string>, bool, int, Task<IAsyncCursor<SyncItem>>>[] Collections;
+        private readonly CollectionDef[] BaseCollectionDefs;
+        private readonly CollectionDef[] V4CollectionDefs;
         ILogger<SyncV2Hub> Logger { get; }
 
         public SyncV2Hub(ISyncItemsRepositoryAccessor syncItemsRepositoryAccessor, IUnitOfWork unitOfWork, SyncDeviceService syncDeviceService, ILogger<SyncV2Hub> logger)
@@ -82,19 +69,32 @@ namespace Notesnook.API.Hubs
             unit = unitOfWork;
             SyncDeviceService = syncDeviceService;
 
-            Collections = [
-                Repositories.Settings.FindItemsById,
-                Repositories.Attachments.FindItemsById,
-                Repositories.Notes.FindItemsById,
-                Repositories.Notebooks.FindItemsById,
-                Repositories.Contents.FindItemsById,
-                Repositories.Shortcuts.FindItemsById,
-                Repositories.Reminders.FindItemsById,
-                Repositories.Colors.FindItemsById,
-                Repositories.Tags.FindItemsById,
-                Repositories.Vaults.FindItemsById,
-                Repositories.InboxItemsHistory.FindItemsById,
-                Repositories.Relations.FindItemsById,
+            BaseCollectionDefs = [
+                new("settingitem", Repositories.Settings.FindItemsById),
+                new("attachment", Repositories.Attachments.FindItemsById),
+                new("note", Repositories.Notes.FindItemsById),
+                new("notebook", Repositories.Notebooks.FindItemsById),
+                new("content", Repositories.Contents.FindItemsById),
+                new("shortcut", Repositories.Shortcuts.FindItemsById),
+                new("reminder", Repositories.Reminders.FindItemsById),
+                new("color", Repositories.Colors.FindItemsById),
+                new("tag", Repositories.Tags.FindItemsById),
+                new("vault", Repositories.Vaults.FindItemsById),
+                new("relation", Repositories.Relations.FindItemsById), // relations must sync at the end to prevent invalid state
+            ];
+            V4CollectionDefs = [
+                new("settingitem", Repositories.Settings.FindItemsById),
+                new("attachment", Repositories.Attachments.FindItemsById),
+                new("note", Repositories.Notes.FindItemsById),
+                new("notebook", Repositories.Notebooks.FindItemsById),
+                new("content", Repositories.Contents.FindItemsById),
+                new("shortcut", Repositories.Shortcuts.FindItemsById),
+                new("reminder", Repositories.Reminders.FindItemsById),
+                new("color", Repositories.Colors.FindItemsById),
+                new("tag", Repositories.Tags.FindItemsById),
+                new("vault", Repositories.Vaults.FindItemsById),
+                new("inboxitemhistory", Repositories.InboxItemsHistory.FindItemsById),
+                new("relation", Repositories.Relations.FindItemsById), // relations must sync at the end to prevent invalid state
             ];
             UpsertActionsMap = new Dictionary<string, Action<IEnumerable<SyncItem>, string, long>> {
                 { "settingitem", Repositories.Settings.UpsertMany },
@@ -184,17 +184,17 @@ namespace Notesnook.API.Hubs
             return true;
         }
 
-        private async IAsyncEnumerable<SyncTransferItemV2> PrepareChunks(string userId, HashSet<ItemKey> ids, int size, bool resetSync, long maxBytes)
+        private async IAsyncEnumerable<SyncTransferItemV2> PrepareChunks(string userId, HashSet<ItemKey> ids, int size, bool resetSync, long maxBytes, CollectionDef[] collectionDefs)
         {
             var itemsProcessed = 0;
-            for (int i = 0; i < Collections.Length; i++)
+            foreach (var def in collectionDefs)
             {
-                var type = CollectionKeys[i];
+                var type = def.Key;
 
                 var filteredIds = ids.Where((id) => id.Type == type).Select((id) => id.ItemId).ToArray();
                 if (!resetSync && filteredIds.Length == 0) continue;
 
-                using var cursor = await Collections[i](userId, filteredIds, resetSync, size);
+                using var cursor = await def.FindItems(userId, filteredIds, resetSync, size);
 
                 var chunk = new List<SyncItem>();
                 long totalBytes = 0;
@@ -236,20 +236,25 @@ namespace Notesnook.API.Hubs
 
         public async Task<SyncV2Metadata> RequestFetch(string deviceId)
         {
-            return await HandleRequestFetch(deviceId, false, false);
+            return await HandleRequestFetch(deviceId, false, false, BaseCollectionDefs);
         }
 
         public async Task<SyncV2Metadata> RequestFetchV2(string deviceId)
         {
-            return await HandleRequestFetch(deviceId, true, false);
+            return await HandleRequestFetch(deviceId, true, false, BaseCollectionDefs);
         }
 
         public async Task<SyncV2Metadata> RequestFetchV3(string deviceId)
         {
-            return await HandleRequestFetch(deviceId, true, true);
+            return await HandleRequestFetch(deviceId, true, true, BaseCollectionDefs);
         }
 
-        private async Task<SyncV2Metadata> HandleRequestFetch(string deviceId, bool includeMonographs, bool includeInboxItems)
+        public async Task<SyncV2Metadata> RequestFetchV4(string deviceId)
+        {
+            return await HandleRequestFetch(deviceId, true, true, V4CollectionDefs);
+        }
+
+        private async Task<SyncV2Metadata> HandleRequestFetch(string deviceId, bool includeMonographs, bool includeInboxItems, CollectionDef[] collectionDefs)
         {
             var userId = Context.User?.FindFirstValue("sub") ?? throw new HubException("Please login to sync.");
 
@@ -273,7 +278,8 @@ namespace Notesnook.API.Hubs
                     ids,
                     size: 100,
                     resetSync: device.IsSyncReset,
-                    maxBytes: 3 * 1024 * 1024
+                    maxBytes: 3 * 1024 * 1024,
+                    collectionDefs
                 );
 
                 await foreach (var chunk in chunks)
@@ -347,6 +353,11 @@ namespace Notesnook.API.Hubs
                 SyncEventCounterSource.Log.RecordFetchDuration(stopwatch.ElapsedMilliseconds);
             }
         }
+
+        private record CollectionDef(
+            string Key,
+            Func<string, IEnumerable<string>, bool, int, Task<IAsyncCursor<SyncItem>>> FindItems
+        );
     }
 
     [MessagePack.MessagePackObject]
