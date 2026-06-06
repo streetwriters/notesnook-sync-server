@@ -183,8 +183,8 @@ namespace Notesnook.API.Controllers
             try
             {
                 var userId = this.User.GetUserId();
-                var size = await s3Service.GetObjectSizeAsync(userId, name);
-                HttpContext.Response.Headers.ContentLength = size;
+                var size = await s3Service.GetObjectSizeAsync(userId, name); Response.Headers.ContentLength = size;
+                Response.Headers["X-Object-Size"] = size.ToString();
                 return Ok();
             }
             catch (Exception ex)
