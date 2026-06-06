@@ -52,7 +52,8 @@ namespace Streetwriters.Common.Extensions
                         b.WithOrigins(Constants.NOTESNOOK_CORS_ORIGINS);
 
                     b.AllowAnyMethod()
-                    .AllowAnyHeader();
+                    .AllowAnyHeader()
+                    .WithExposedHeaders(["X-Object-Size", "Content-Length"]);
                 });
             });
             return services;
