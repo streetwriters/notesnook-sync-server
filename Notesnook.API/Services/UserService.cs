@@ -177,6 +177,16 @@ namespace Notesnook.API.Services
                 }
 
                 await Repositories.InboxItems.DeleteManyAsync(t => t.UserId == userId);
+                await WampServers.MessengerServer.PublishMessageAsync(MessengerServerTopics.SendSSETopic, new SendSSEMessage
+                {
+                    OriginTokenId = null,
+                    UserId = userId,
+                    Message = new Message
+                    {
+                        Type = "inboxUpdated",
+                        Data = JsonSerializer.Serialize(new { reason = "Inbox PGP keys added, updated, or removed." })
+                    }
+                });
             }
 
             await Repositories.UsersSettings.UpdateAsync(userSettings.Id, userSettings);
