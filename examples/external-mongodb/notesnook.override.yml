@@ -1,0 +1,31 @@
+services:
+  notesnook-db:
+    profiles: [embedded-disabled]
+
+  identity-server:
+    depends_on: !override
+      validate:
+        condition: service_completed_successfully
+    networks:
+      - notesnook
+      - notesnook-shared
+    environment:
+      MONGODB_CONNECTION_STRING: ${MONGODB_CONNECTION_STRING_IDENTITY}
+
+  notesnook-server:
+    networks:
+      - notesnook
+      - notesnook-shared
+    depends_on: !override
+      notesnook-s3:
+        condition: service_started
+      setup-s3:
+        condition: service_started
+      identity-server:
+        condition: service_started
+    environment:
+      MONGODB_CONNECTION_STRING: ${MONGODB_CONNECTION_STRING}
+
+networks:
+  notesnook-shared:
+    external: true

@@ -1,0 +1,20 @@
+services:
+  notesnook-s3:
+    profiles: [embedded-disabled]
+
+  setup-s3:
+    profiles: [embedded-disabled]
+
+  notesnook-server:
+    networks:
+      - notesnook
+      - notesnook-shared
+    depends_on: !override
+      identity-server:
+        condition: service_started
+    environment:
+      S3_INTERNAL_SERVICE_URL: "http://notesnook-minio:9000"
+
+networks:
+  notesnook-shared:
+    external: true

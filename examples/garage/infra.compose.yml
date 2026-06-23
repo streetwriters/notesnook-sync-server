@@ -1,0 +1,31 @@
+name: notesnook-garage-infra
+
+services:
+  notesnook-garage:
+    image: dxflrs/garage:v2.3.0
+    hostname: notesnook-garage
+    restart: unless-stopped
+    ports:
+      - 3900:3900
+      - 3901:3901
+      - 3902:3902
+    networks:
+      - notesnook-shared
+    volumes:
+      - s3data:/var/lib/garage
+      - ./garage.toml:/etc/garage.toml:ro
+    environment:
+      GARAGE_RPC_SECRET: ${GARAGE_RPC_SECRET}
+    healthcheck:
+      test: ["CMD", "/garage", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+networks:
+  notesnook-shared:
+    name: notesnook-shared
+
+volumes:
+  s3data:
