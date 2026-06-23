@@ -230,7 +230,8 @@ services:
     networks:
       - notesnook
     depends_on:
-      - setup-themes
+      setup-themes:
+        condition: service_completed_successfully
     healthcheck:
       test: >
         bun -e "fetch('http://127.0.0.1:9000/health')
