@@ -85,6 +85,13 @@ namespace Streetwriters.Identity.Services
 
             await mfaService.ResetMFAAsync(user);
             result = await userManager.AddPasswordAsync(user, newPassword);
+
+            // force change email to lowercase if it is not already
+            if (user.Email != null && user.Email != user.Email.ToLower())
+            {
+                var token = await userManager.GenerateChangeEmailTokenAsync(user, user.Email.ToLower());
+                result = await userManager.ChangeEmailAsync(user, user.Email.ToLower(), token);
+            }
             return result.Succeeded;
         }
 
