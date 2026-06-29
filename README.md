@@ -55,17 +55,26 @@ dotnet run --project Streetwriters.Identity/Streetwriters.Identity.csproj
 
 The sync server can easily be started using Docker.
 
+Download `docker-compose.yml` and [`.env`](.env):
+
 ```bash
 wget https://raw.githubusercontent.com/streetwriters/notesnook-sync-server/master/docker-compose.yml
+wget https://raw.githubusercontent.com/streetwriters/notesnook-sync-server/master/.env
 ```
 
-And then use Docker Compose to start the servers:
+Edit `.env` and set at least `NOTESNOOK_API_SECRET`. See `.env` for all configuration options.
+
+Then start the stack:
 
 ```bash
 docker compose up
 ```
 
-This takes care of setting up everything including MongoDB, Minio etc.
+This sets up MongoDB, MinIO, and the Notesnook services.
+
+Optional services (`themes-server`, `cors-proxy`, `inbox-api`): `docker compose --profile extras up`
+
+For external MongoDB, MinIO, or Garage deployments, see [`examples/`](examples/).
 
 ## TODO Self-hosting
 

@@ -25,14 +25,11 @@ services:
           "INSTANCE_NAME"
           "NOTESNOOK_API_SECRET"
           "DISABLE_SIGNUPS"
-          "SMTP_USERNAME"
-          "SMTP_PASSWORD"
-          "SMTP_HOST"
-          "SMTP_PORT"
           "AUTH_SERVER_PUBLIC_URL"
           "NOTESNOOK_APP_PUBLIC_URL"
           "MONOGRAPH_PUBLIC_URL"
           "ATTACHMENTS_SERVER_PUBLIC_URL"
+          "NOTESNOOK_API_PUBLIC_URL"
         )
 
         # Check each required environment variable
@@ -42,6 +39,23 @@ services:
             exit 1
           fi
         done
+
+        if [ -z "$$SMTP_HOST" ] || [ -z "$$SMTP_PORT" ] || [ -z "$$SMTP_USERNAME" ] || [ -z "$$SMTP_PASSWORD" ]; then
+          cat <<'EOF'
+
+        ================================================================================
+         WARNING: SMTP IS NOT CONFIGURED
+        ================================================================================
+         Email-based 2FA codes and password-reset emails will NOT be sent.
+
+         Newly created users MUST switch 2FA to an Authenticator app:
+           Settings > Auth > Change 2FA method
+
+         Configure SMTP_* in .env if you need email-based 2FA or password reset.
+        ================================================================================
+
+        EOF
+        fi
 
         echo "All required environment variables are set."
     # Ensure the validate service runs first
@@ -153,6 +167,7 @@ services:
       S3_SERVICE_URL: "${ATTACHMENTS_SERVER_PUBLIC_URL}"
       S3_REGION: "us-east-1"
       S3_BUCKET_NAME: "attachments"
+      NOTESNOOK_CORS: ${NOTESNOOK_CORS_ORIGINS:-}
 
   sse-server:
     image: streetwriters/sse:latest
@@ -183,15 +198,103 @@ services:
     networks:
       - notesnook
     healthcheck:
-      test: wget --tries=1 -nv -q  http://localhost:3000/api/health -O- || exit 1
+      test: >
+        bun -e "fetch('http://127.0.0.1:3000/api/health')
+        .then(r => { if (!r.ok) process.exit(1); })
+        .catch(() => process.exit(1))"
       interval: 40s
       timeout: 30s
       retries: 3
       start_period: 60s
     environment:
       <<: *server-discovery
-      API_HOST: http://notesnook-server:5264
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      API_HOST: ${NOTESNOOK_API_PUBLIC_URL:-http://localhost:5264}
       PUBLIC_URL: ${MONOGRAPH_PUBLIC_URL}
+
+  setup-themes:
+    profiles: [extras]
+    image: busybox:latest
+    networks:
+      - notesnook
+    volumes:
+      - themesdata:/data
+    command: ['sh', '-c', 'if [ ! -f /data/installs.json ]; then echo "{}" > /data/installs.json; fi']
+
+  themes-server:
+    profiles: [extras]
+    image: streetwriters/themes-server:latest
+    ports:
+      - 9200:9000
+    networks:
+      - notesnook
+    depends_on:
+      setup-themes:
+        condition: service_completed_successfully
+    healthcheck:
+      test: >
+        bun -e "fetch('http://127.0.0.1:9000/health')
+        .then(r => { if (!r.ok) process.exit(1); })
+        .catch(() => process.exit(1))"
+      interval: 40s
+      timeout: 30s
+      retries: 3
+      start_period: 60s
+    environment:
+      HOST: 0.0.0.0
+      PORT: 9000
+      THEMES_REPO_URL: ${THEMES_REPO_URL:-https://github.com/streetwriters/notesnook-themes.git}
+    volumes:
+      - type: volume
+        source: themesdata
+        target: /installs.json
+        volume:
+          subpath: installs.json
+
+  cors-proxy:
+    profiles: [extras]
+    image: streetwriters/cors-proxy:latest
+    ports:
+      - 3001:3000
+    networks:
+      - notesnook
+    healthcheck:
+      test: >
+        bun -e "fetch('http://127.0.0.1:3000/health')
+        .then(r => { if (!r.ok) process.exit(1); })
+        .catch(() => process.exit(1))"
+      interval: 40s
+      timeout: 30s
+      retries: 3
+      start_period: 60s
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3000
+      ALLOWED_ORIGINS: ${CORS_PROXY_ALLOWED_ORIGINS:-*}
+
+  inbox-api:
+    profiles: [extras]
+    image: streetwriters/notesnook-inbox:latest
+    ports:
+      - 5181:5181
+    networks:
+      - notesnook
+    depends_on:
+      - notesnook-server
+    healthcheck:
+      test: >
+        bun -e "fetch('http://127.0.0.1:5181/health')
+        .then(r => { if (!r.ok) process.exit(1); })
+        .catch(() => process.exit(1))"
+      interval: 40s
+      timeout: 30s
+      retries: 3
+      start_period: 60s
+    environment:
+      HOST: 0.0.0.0
+      PORT: 5181
+      NOTESNOOK_API_SERVER_URL: http://notesnook-server:5264
 
   autoheal:
     image: willfarrell/autoheal:latest
@@ -212,4 +315,4 @@ networks:
 volumes:
   dbdata:
   s3data:
-
+  themesdata:
