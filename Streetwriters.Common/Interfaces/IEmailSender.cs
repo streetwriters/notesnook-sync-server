@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Net.Mail;
 using System.Threading.Tasks;
 using MimeKit;
 using MimeKit.Cryptography;
@@ -11,7 +12,7 @@ namespace Streetwriters.Common.Interfaces
         Task SendEmailAsync(
             string email,
             EmailTemplate template,
-            IClient client,
+            MailAddress from,
             GnuPGContext? gpgContext = null,
             Dictionary<string, byte[]>? attachments = null
         );

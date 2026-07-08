@@ -27,7 +27,7 @@ namespace Streetwriters.Common.Services
         public async Task SendEmailAsync(
             string email,
             EmailTemplate template,
-            IClient client,
+            System.Net.Mail.MailAddress from,
             GnuPGContext? gpgContext = null,
             Dictionary<string, byte[]>? attachments = null
         )
@@ -55,8 +55,7 @@ namespace Streetwriters.Common.Services
                 );
 
             var message = new MimeMessage();
-            var sender = new MailboxAddress(client.SenderName, client.SenderEmail);
-            message.From.Add(sender);
+            message.From.Add(new MailboxAddress(from.DisplayName, from.Address));
             message.To.Add(new MailboxAddress("", email));
             message.Subject = await Template.Parse(template.Subject).RenderAsync(template.Data);
 
@@ -65,8 +64,7 @@ namespace Streetwriters.Common.Services
 
             message.Body = await GetEmailBodyAsync(
                 template,
-                client,
-                sender,
+                new MailboxAddress(from.DisplayName, from.Address),
                 gpgContext,
                 attachments
             );
@@ -76,7 +74,6 @@ namespace Streetwriters.Common.Services
 
         private async Task<MimeEntity> GetEmailBodyAsync(
             EmailTemplate template,
-            IClient client,
             MailboxAddress sender,
             GnuPGContext? gpgContext = null,
             Dictionary<string, byte[]>? attachments = null
@@ -107,7 +104,7 @@ namespace Streetwriters.Common.Services
                         }
                         outputStream.Seek(0, SeekOrigin.Begin);
                         builder.Attachments.Add(
-                            $"{client.Id}_pub.asc",
+                            $"pub.asc",
                             Encoding.ASCII.GetBytes(
                                 Encoding.ASCII.GetString(outputStream.ToArray())
                             )

@@ -93,6 +93,9 @@ namespace Streetwriters.Common.Models
         [JsonPropertyName("trialsAvailed")]
         public SubscriptionPlan[]? TrialsAvailed { get; set; }
 
+        [JsonPropertyName("extensionsAvailed")]
+        public SubscriptionExtension[]? ExtensionsAvailed { get; set; }
+
         [JsonPropertyName("updatedAt")]
         public long UpdatedAt { get; set; }
 
@@ -103,5 +106,17 @@ namespace Streetwriters.Common.Models
         [BsonRepresentation(BsonType.Int32)]
         [JsonPropertyName("status")]
         public SubscriptionStatus Status { get; set; }
+    }
+
+    public class SubscriptionExtension
+    {
+        [JsonPropertyName("timestamp")]
+        public required long Timestamp { get; set; }
+
+        [JsonPropertyName("expiry")]
+        public required long ExpiryDate { get; set; }
+
+        [JsonPropertyName("type")]
+        public required string Type { get; set; }
     }
 }

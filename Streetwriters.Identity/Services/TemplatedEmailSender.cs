@@ -104,7 +104,7 @@ namespace Streetwriters.Identity.Services
                 Subject = Email2FATemplate.Subject,
                 Data = new { app_name = client.Name, code },
             };
-            await EmailSender.SendEmailAsync(email, template, client, NNGnuPGContext);
+            await EmailSender.SendEmailAsync(email, template, new System.Net.Mail.MailAddress(client.SenderEmail, client.SenderName), NNGnuPGContext);
         }
 
         public async Task SendConfirmationEmailAsync(
@@ -120,7 +120,7 @@ namespace Streetwriters.Identity.Services
                 Subject = ConfirmEmailTemplate.Subject,
                 Data = new { app_name = client.Name, confirm_link = callbackUrl },
             };
-            await EmailSender.SendEmailAsync(email, template, client, NNGnuPGContext);
+            await EmailSender.SendEmailAsync(email, template, new System.Net.Mail.MailAddress(client.SenderEmail, client.SenderName), NNGnuPGContext);
         }
 
         public async Task SendChangeEmailConfirmationAsync(
@@ -136,7 +136,7 @@ namespace Streetwriters.Identity.Services
                 Subject = ConfirmChangeEmailTemplate.Subject,
                 Data = new { app_name = client.Name, code },
             };
-            await EmailSender.SendEmailAsync(email, template, client, NNGnuPGContext);
+            await EmailSender.SendEmailAsync(email, template, new System.Net.Mail.MailAddress(client.SenderEmail, client.SenderName), NNGnuPGContext);
         }
 
         public async Task SendPasswordResetEmailAsync(
@@ -152,7 +152,7 @@ namespace Streetwriters.Identity.Services
                 Subject = PasswordResetEmailTemplate.Subject,
                 Data = new { app_name = client.Name, reset_link = callbackUrl },
             };
-            await EmailSender.SendEmailAsync(email, template, client, NNGnuPGContext);
+            await EmailSender.SendEmailAsync(email, template, new System.Net.Mail.MailAddress(client.SenderEmail, client.SenderName), NNGnuPGContext);
         }
 
         public async Task SendFailedLoginAlertAsync(string email, string deviceInfo, IClient client)
@@ -168,7 +168,7 @@ namespace Streetwriters.Identity.Services
                     device_info = deviceInfo.Replace("\n", "<br>"),
                 },
             };
-            await EmailSender.SendEmailAsync(email, template, client, NNGnuPGContext);
+            await EmailSender.SendEmailAsync(email, template, new System.Net.Mail.MailAddress(client.SenderEmail, client.SenderName), NNGnuPGContext);
         }
     }
 
