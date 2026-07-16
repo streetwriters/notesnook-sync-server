@@ -93,38 +93,39 @@ namespace Notesnook.API.Controllers
         [HttpPatch("password/{type}")]
         public async Task<IActionResult> ChangePassword([FromRoute] string type, [FromBody] ChangePasswordForm form)
         {
-            var userId = User.GetUserId();
-            var clientId = User.FindFirstValue("client_id");
-            var jti = User.FindFirstValue("jti");
-            var isPasswordReset = type == "reset";
-            try
-            {
-                var result = isPasswordReset ? await serviceAccessor.UserAccountService.ResetPasswordAsync(userId, form.NewPassword) : await serviceAccessor.UserAccountService.ChangePasswordAsync(userId, form.OldPassword, form.NewPassword);
-                if (!result)
-                    return BadRequest("Failed to change password.");
+            return BadRequest(new { error = "Password change is currently disabled." });
+            // var userId = User.GetUserId();
+            // var clientId = User.FindFirstValue("client_id");
+            // var jti = User.FindFirstValue("jti");
+            // var isPasswordReset = type == "reset";
+            // try
+            // {
+            //     var result = isPasswordReset ? await serviceAccessor.UserAccountService.ResetPasswordAsync(userId, form.NewPassword) : await serviceAccessor.UserAccountService.ChangePasswordAsync(userId, form.OldPassword, form.NewPassword);
+            //     if (!result)
+            //         return BadRequest("Failed to change password.");
 
-                await UserService.SetUserKeysAsync(userId, form.UserKeys);
+            //     await UserService.SetUserKeysAsync(userId, form.UserKeys);
 
-                await serviceAccessor.UserAccountService.ClearSessionsAsync(userId, clientId, all: false, jti, null);
+            //     await serviceAccessor.UserAccountService.ClearSessionsAsync(userId, clientId, all: false, jti, null);
 
-                await WampServers.MessengerServer.PublishMessageAsync(MessengerServerTopics.SendSSETopic, new SendSSEMessage
-                {
-                    UserId = userId,
-                    OriginTokenId = jti,
-                    Message = new Message
-                    {
-                        Type = "logout",
-                        Data = JsonSerializer.Serialize(new { reason = "Password changed." })
-                    }
-                });
+            //     await WampServers.MessengerServer.PublishMessageAsync(MessengerServerTopics.SendSSETopic, new SendSSEMessage
+            //     {
+            //         UserId = userId,
+            //         OriginTokenId = jti,
+            //         Message = new Message
+            //         {
+            //             Type = "logout",
+            //             Data = JsonSerializer.Serialize(new { reason = "Password changed." })
+            //         }
+            //     });
 
-                return Ok();
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Failed to change password");
-                return BadRequest(new { error = ex.Message });
-            }
+            //     return Ok();
+            // }
+            // catch (Exception ex)
+            // {
+            //     logger.LogError(ex, "Failed to change password");
+            //     return BadRequest(new { error = ex.Message });
+            // }
         }
 
         [HttpPost("reset")]
