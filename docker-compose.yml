@@ -47,9 +47,11 @@ services:
     # Ensure the validate service runs first
     restart: "no"
 
+
   notesnook-db:
     image: mongo:7.0.12
     hostname: notesnook-db
+    restart: unless-stopped
     volumes:
       - dbdata:/data/db
     networks:
@@ -67,14 +69,17 @@ services:
 
   notesnook-s3:
     image: minio/minio:RELEASE.2024-07-29T22-14-52Z
+    restart: unless-stopped
     ports:
-      - 9000:9000
+      - ${MINIO_HOST_PORT:-9000}:9000
+      - ${MINIO_CONSOLE_HOST_PORT:-9090}:9090
     networks:
       - notesnook
     volumes:
       - s3data:/data/s3
     environment:
       MINIO_BROWSER: "on"
+      MINIO_BROWSER_REDIRECT: "off"
     depends_on:
       validate:
         condition: service_completed_successfully
@@ -91,6 +96,7 @@ services:
   # set it up ourselves.
   setup-s3:
     image: minio/mc:RELEASE.2024-07-26T13-08-44Z
+    restart: unless-stopped
     depends_on:
       - notesnook-s3
     networks:
@@ -107,8 +113,9 @@ services:
 
   identity-server:
     image: streetwriters/identity:latest
+    restart: unless-stopped
     ports:
-      - 8264:8264
+      - ${IDENTITY_HOST_PORT:-8264}:8264
     networks:
       - notesnook
     env_file: *env-files
@@ -127,8 +134,9 @@ services:
 
   notesnook-server:
     image: streetwriters/notesnook-sync:latest
+    restart: unless-stopped
     ports:
-      - 5264:5264
+      - ${SERVER_HOST_PORT:-5264}:5264
     networks:
       - notesnook
     env_file: *env-files
@@ -156,8 +164,9 @@ services:
 
   sse-server:
     image: streetwriters/sse:latest
+    restart: unless-stopped
     ports:
-      - 7264:7264
+      - ${SSE_HOST_PORT:-7264}:7264
     env_file: *env-files
     depends_on:
       - identity-server
@@ -175,8 +184,9 @@ services:
 
   monograph-server:
     image: streetwriters/monograph:latest
+    restart: unless-stopped
     ports:
-      - 6264:3000
+      - ${MONOGRAPH_HOST_PORT:-6264}:3000
     env_file: *env-files
     depends_on:
       - notesnook-server
@@ -190,13 +200,14 @@ services:
       start_period: 60s
     environment:
       <<: *server-discovery
+      HOST: 0.0.0.0
       API_HOST: http://notesnook-server:5264
       PUBLIC_URL: ${MONOGRAPH_PUBLIC_URL}
 
   autoheal:
     image: willfarrell/autoheal:latest
     tty: true
-    restart: always
+    restart: unless-stopped
     environment:
       - AUTOHEAL_INTERVAL=60
       - AUTOHEAL_START_PERIOD=300
@@ -212,4 +223,3 @@ networks:
 volumes:
   dbdata:
   s3data:
-
