@@ -1,0 +1,47 @@
+name: notesnook-external-minio-infra
+
+services:
+  notesnook-minio:
+    image: minio/minio:RELEASE.2024-07-29T22-14-52Z
+    hostname: notesnook-minio
+    ports:
+      - 9000:9000
+    networks:
+      - notesnook-shared
+    volumes:
+      - s3data:/data/s3
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_BROWSER: "on"
+    command: server /data/s3 --console-address :9090
+    healthcheck:
+      test: timeout 5s bash -c ':> /dev/tcp/127.0.0.1/9000' || exit 1
+      interval: 40s
+      timeout: 30s
+      retries: 3
+      start_period: 60s
+
+  notesnook-minio-setup:
+    image: minio/mc:RELEASE.2024-07-26T13-08-44Z
+    depends_on:
+      notesnook-minio:
+        condition: service_healthy
+    networks:
+      - notesnook-shared
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    command:
+      - /bin/bash
+      - -c
+      - |
+        mc alias set minio http://notesnook-minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin}
+        mc mb minio/attachments -p
+
+networks:
+  notesnook-shared:
+    name: notesnook-shared
+
+volumes:
+  s3data:
