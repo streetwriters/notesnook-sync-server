@@ -25,20 +25,22 @@ using System.Threading.Tasks;
 using IdentityModel;
 using IdentityServer4.Models;
 using IdentityServer4.Services;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
-using Streetwriters.Common.Enums;
+using Ng.Services;
 using Streetwriters.Common.Models;
-using Streetwriters.Data.Repositories;
 
 namespace Streetwriters.Identity.Services
 {
     public class ProfileService : IProfileService
     {
         protected UserManager<User> UserManager { get; set; }
+        private IHttpContextAccessor HttpContextAccessor { get; set; }
 
-        public ProfileService(UserManager<User> userManager)
+        public ProfileService(UserManager<User> userManager, IHttpContextAccessor httpContextAccessor)
         {
             UserManager = userManager;
+            HttpContextAccessor = httpContextAccessor;
         }
 
         public async Task GetProfileDataAsync(ProfileDataRequestContext context)
@@ -51,6 +53,40 @@ namespace Streetwriters.Identity.Services
 
             context.IssuedClaims.AddRange(roles.Select((r) => new Claim(JwtClaimTypes.Role, r)));
             context.IssuedClaims.AddRange(claims);
+
+            var httpContext = HttpContextAccessor.HttpContext;
+            if (httpContext == null) return;
+
+            var userAgentHeader = httpContext.Request.Headers.UserAgent.ToString();
+            if (string.IsNullOrEmpty(userAgentHeader)) return;
+
+            var userAgentService = new UserAgentService();
+            var ua = userAgentService.Parse(userAgentHeader);
+            string? browser = null;
+            if (userAgentHeader.Contains("Electron/", StringComparison.OrdinalIgnoreCase))
+            {
+                var electronMatch = System.Text.RegularExpressions.Regex.Match(
+                    userAgentHeader,
+                    @"Electron/([\d.]+)",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase
+                );
+                browser = electronMatch.Success
+                    ? $"Electron {electronMatch.Groups[1].Value}"
+                    : "Electron";
+            }
+            else if (!string.IsNullOrEmpty(ua.Browser))
+            {
+                browser = $"{ua.Browser} {ua.BrowserVersion}";
+            }
+
+            if (!string.IsNullOrEmpty(browser))
+            {
+                context.IssuedClaims.Add(new Claim("device_browser", browser));
+            }
+            if (!string.IsNullOrEmpty(ua.Platform))
+            {
+                context.IssuedClaims.Add(new Claim("device_platform", ua.Platform));
+            }
         }
 
         public Task IsActiveAsync(IsActiveContext context)
