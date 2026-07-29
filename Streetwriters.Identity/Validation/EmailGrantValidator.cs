@@ -59,7 +59,6 @@ namespace Streetwriters.Identity.Validation
 
         public string GrantType => Config.EMAIL_GRANT_TYPE;
 
-
         public async Task ValidateAsync(ExtensionGrantValidationContext context)
         {
             var email = context.Request.Raw["email"];
@@ -76,8 +75,14 @@ namespace Streetwriters.Identity.Validation
             };
 
             var isMultiFactor = await UserManager.GetTwoFactorEnabledAsync(user);
+            if (!isMultiFactor)
+            {
+                context.Result.IsError = false;
+                context.Result.Subject = await TokenGenerationService.TransformTokenRequestAsync(context.Request, user, GrantType, [Config.MFA_PASSWORD_GRANT_TYPE_SCOPE]);
+                return;
+            }
 
-            var primaryMethod = isMultiFactor ? MFAService.GetPrimaryMethod(user) : MFAMethods.Email;
+            var primaryMethod = MFAService.GetPrimaryMethod(user);
             var secondaryMethod = MFAService.GetSecondaryMethod(user);
             var sendPhoneNumber = primaryMethod == MFAMethods.SMS || secondaryMethod == MFAMethods.SMS;
 
