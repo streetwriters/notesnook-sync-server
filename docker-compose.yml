@@ -167,7 +167,6 @@ services:
       S3_SERVICE_URL: "${ATTACHMENTS_SERVER_PUBLIC_URL}"
       S3_REGION: "us-east-1"
       S3_BUCKET_NAME: "attachments"
-      NOTESNOOK_CORS: ${NOTESNOOK_CORS_ORIGINS:-}
 
   sse-server:
     image: streetwriters/sse:latest
