@@ -55,24 +55,6 @@ namespace Notesnook.API.Repositories
             return ALGORITHMS.Contains(algorithm);
         }
 
-        public Task<long> CountItemsSyncedAfterAsync(string userId, long timestamp)
-        {
-            var filter = Builders<SyncItem>.Filter.And(Builders<SyncItem>.Filter.Gt("DateSynced", timestamp), Builders<SyncItem>.Filter.Eq("UserId", userId));
-            return Collection.CountDocumentsAsync(filter);
-        }
-        public Task<IAsyncCursor<SyncItem>> FindItemsSyncedAfter(string userId, long timestamp, int batchSize)
-        {
-            var filter = Builders<SyncItem>.Filter.And(Builders<SyncItem>.Filter.Gt("DateSynced", timestamp), Builders<SyncItem>.Filter.Eq("UserId", userId));
-            return Collection.FindAsync(filter, new FindOptions<SyncItem>
-            {
-                BatchSize = batchSize,
-                AllowDiskUse = true,
-                AllowPartialResults = false,
-                NoCursorTimeout = true,
-                Sort = new SortDefinitionBuilder<SyncItem>().Ascending("_id")
-            });
-        }
-
         public Task<IAsyncCursor<SyncItem>> FindItemsById(string userId, IEnumerable<string> ids, bool all, int batchSize)
         {
             var filters = new List<FilterDefinition<SyncItem>>(new[] { Builders<SyncItem>.Filter.Eq("UserId", userId) });
@@ -94,41 +76,7 @@ namespace Notesnook.API.Repositories
             dbContext.AddCommand((handle, ct) => Collection.DeleteManyAsync(handle, filter, null, ct));
         }
 
-        public void Upsert(SyncItem item, string userId, long dateSynced)
-        {
-            if (item.Length > 15 * 1024 * 1024)
-            {
-                throw new Exception($"Size of item \"{item.ItemId}\" is too large. Maximum allowed size is 15 MB.");
-            }
-
-            if (!IsValidAlgorithm(item.Algorithm))
-            {
-                throw new Exception($"Invalid alg identifier {item.Algorithm}");
-            }
-
-            // Handle case where the cipher is corrupted.
-            if (!IsBase64String(item.Cipher))
-            {
-                logger.LogError("Corrupted item {ItemId} in collection {CollectionName}. Length: {Length}, Cipher: {Cipher}",
-                    item.ItemId, this.collectionName, item.Length, item.Cipher);
-                throw new Exception($"Corrupted item \"{item.ItemId}\" in collection \"{this.collectionName}\". Please report this error to support@streetwriters.co.");
-            }
-
-            if (item.ItemId == null)
-                throw new Exception($"Item does not have an ItemId.");
-
-            item.DateSynced = dateSynced;
-            item.UserId = userId;
-
-            var filter = Builders<SyncItem>.Filter.And(
-                Builders<SyncItem>.Filter.Eq("UserId", userId),
-                Builders<SyncItem>.Filter.Eq("ItemId", item.ItemId)
-            );
-
-            dbContext.AddCommand((handle, ct) => Collection.ReplaceOneAsync(handle, filter, item, new ReplaceOptions { IsUpsert = true }, ct));
-        }
-
-        public void UpsertMany(IEnumerable<SyncItem> items, string userId, long dateSynced)
+        public void UpsertMany(IEnumerable<SyncItem> items, string userId)
         {
             var userIdFilter = Builders<SyncItem>.Filter.Eq("UserId", userId);
             var writes = new List<WriteModel<SyncItem>>();
@@ -160,7 +108,7 @@ namespace Notesnook.API.Repositories
                     Builders<SyncItem>.Filter.Eq("ItemId", item.ItemId)
                 );
 
-                item.DateSynced = dateSynced;
+                item.DateSynced = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
                 item.UserId = userId;
 
                 writes.Add(new ReplaceOneModel<SyncItem>(filter, item)

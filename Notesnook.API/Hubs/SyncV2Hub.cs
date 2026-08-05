@@ -57,7 +57,7 @@ namespace Notesnook.API.Hubs
         private ISyncItemsRepositoryAccessor Repositories { get; }
         private SyncDeviceService SyncDeviceService { get; }
         private readonly IUnitOfWork unit;
-        private readonly FrozenDictionary<string, Action<IEnumerable<SyncItem>, string, long>> UpsertActionsMap;
+        private readonly FrozenDictionary<string, Action<IEnumerable<SyncItem>, string>> UpsertActionsMap;
         private readonly CollectionDef[] BaseCollectionDefs;
         private readonly CollectionDef[] V4CollectionDefs;
         ILogger<SyncV2Hub> Logger { get; }
@@ -96,7 +96,7 @@ namespace Notesnook.API.Hubs
                 new("inboxitemhistory", Repositories.InboxItemsHistory.FindItemsById),
                 new("relation", Repositories.Relations.FindItemsById), // relations must sync at the end to prevent invalid state
             ];
-            UpsertActionsMap = new Dictionary<string, Action<IEnumerable<SyncItem>, string, long>> {
+            UpsertActionsMap = new Dictionary<string, Action<IEnumerable<SyncItem>, string>> {
                 { "settingitem", Repositories.Settings.UpsertMany },
                 { "attachment", Repositories.Attachments.UpsertMany },
                 { "note", Repositories.Notes.UpsertMany },
@@ -149,7 +149,7 @@ namespace Notesnook.API.Hubs
             try
             {
                 var UpsertItems = UpsertActionsMap[pushItem.Type] ?? throw new Exception($"Invalid item type: {pushItem.Type}.");
-                UpsertItems(pushItem.Items, userId, 1);
+                UpsertItems(pushItem.Items, userId);
 
                 if (!await unit.Commit()) return 0;
 
