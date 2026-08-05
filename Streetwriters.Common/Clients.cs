@@ -42,6 +42,20 @@ namespace Streetwriters.Common
             PackageName = "com.streetwriters.notesnook",
             OnEmailConfirmed = async (userId) =>
             {
+                if (!Constants.IS_SELF_HOSTED)
+                {
+                    await WampServers.SubscriptionServer.PublishMessageAsync(
+                        SubscriptionServerTopics.EmailConfirmedTopic,
+                        new EmailConfirmedMessage
+                        {
+                            UserId = userId,
+                            ClientId = "notesnook",
+                            AppId = ApplicationType.NOTESNOOK,
+                            ConfirmedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+                        }
+                    );
+                }
+
                 await WampServers.MessengerServer.PublishMessageAsync(MessengerServerTopics.SendSSETopic, new SendSSEMessage
                 {
                     UserId = userId,

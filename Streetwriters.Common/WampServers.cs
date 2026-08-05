@@ -110,6 +110,7 @@ namespace Streetwriters.Common
         public const string CreateSubscriptionTopic = "co.streetwriters.subscriptions.create";
         public const string CreateSubscriptionV2Topic = "co.streetwriters.subscriptions.v2.create";
         public const string DeleteSubscriptionTopic = "co.streetwriters.subscriptions.delete";
+        public const string EmailConfirmedTopic = "co.streetwriters.subscriptions.email_confirmed";
     }
 
     public struct IdentityServerTopics
