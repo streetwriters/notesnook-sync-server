@@ -14,9 +14,8 @@ using Streetwriters.Common.Models;
 
 namespace Streetwriters.Common.Services
 {
-    public class EmailSender : IEmailSender, IAsyncDisposable
+    public class EmailSender : IEmailSender
     {
-        private readonly SmtpClient mailClient = new();
         private readonly ILogger<EmailSender> logger;
 
         public EmailSender(ILogger<EmailSender> logger)
@@ -32,27 +31,25 @@ namespace Streetwriters.Common.Services
             Dictionary<string, byte[]>? attachments = null
         )
         {
-            if (!mailClient.IsConnected)
+            using var mailClient = new SmtpClient();
+
+            if (int.TryParse(Common.Constants.SMTP_PORT, out int port))
             {
-                if (int.TryParse(Common.Constants.SMTP_PORT, out int port))
-                {
-                    await mailClient.ConnectAsync(
-                        Common.Constants.SMTP_HOST,
-                        port,
-                        MailKit.Security.SecureSocketOptions.Auto
-                    );
-                }
-                else
-                {
-                    throw new InvalidDataException("SMTP_PORT is not a valid integer value.");
-                }
+                await mailClient.ConnectAsync(
+                    Common.Constants.SMTP_HOST,
+                    port,
+                    MailKit.Security.SecureSocketOptions.Auto
+                );
+            }
+            else
+            {
+                throw new InvalidDataException("SMTP_PORT is not a valid integer value.");
             }
 
-            if (!mailClient.IsAuthenticated)
-                await mailClient.AuthenticateAsync(
-                    Common.Constants.SMTP_USERNAME,
-                    Common.Constants.SMTP_PASSWORD
-                );
+            await mailClient.AuthenticateAsync(
+                Common.Constants.SMTP_USERNAME,
+                Common.Constants.SMTP_PASSWORD
+            );
 
             var message = new MimeMessage();
             message.From.Add(new MailboxAddress(from.DisplayName, from.Address));
@@ -70,6 +67,11 @@ namespace Streetwriters.Common.Services
             );
 
             await mailClient.SendAsync(message);
+
+            if (mailClient.IsConnected)
+            {
+                await mailClient.DisconnectAsync(true);
+            }
         }
 
         private async Task<MimeEntity> GetEmailBodyAsync(
@@ -129,10 +131,5 @@ namespace Streetwriters.Common.Services
             }
         }
 
-        async ValueTask IAsyncDisposable.DisposeAsync()
-        {
-            await mailClient.DisconnectAsync(true);
-            mailClient.Dispose();
-        }
     }
 }
