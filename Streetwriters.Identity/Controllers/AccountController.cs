@@ -116,6 +116,7 @@ namespace Streetwriters.Identity.Controllers
 
                         if (await UserManager.IsInRoleAsync(user, client.Id) && client.OnEmailConfirmed != null)
                         {
+                            logger.LogInformation("Email confirmed for user {UserId} on client {ClientId}. Triggering OnEmailConfirmed callback.", userId, client.Id);
                             await client.OnEmailConfirmed(userId);
                         }
 
