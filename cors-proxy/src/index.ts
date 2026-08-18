@@ -279,8 +279,8 @@ function serveYouTubeEmbed(url: string) {
     </style>
 </head>
 <body>
-    <iframe src="${transformYouTubeUrl(
-      url,
+    <iframe src="${escapeHtmlAttr(
+      transformYouTubeUrl(url),
     )}" allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture;web-share" allowfullscreen referrerpolicy="strict-origin-when-cross-origin" title="Video player"></iframe>
 </body>
 </html>`;
@@ -299,6 +299,14 @@ function isYouTubeEmbed(urlString: string) {
   );
 }
 
+function escapeHtmlAttr(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 // Transform YouTube URLs to use youtube-nocookie.com for enhanced privacy
 function transformYouTubeUrl(urlString: string): string {
   try {
@@ -315,7 +323,7 @@ function transformYouTubeUrl(urlString: string): string {
       return url.toString();
     }
 
-    return urlString;
+    return url.toString();
   } catch {
     return urlString;
   }
