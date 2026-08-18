@@ -30,6 +30,7 @@ using Notesnook.API.Helpers;
 using Notesnook.API.Interfaces;
 using Notesnook.API.Models;
 using Notesnook.API.Models.Responses;
+using Notesnook.API.Repositories;
 using Streetwriters.Common;
 using Streetwriters.Common.Accessors;
 using Streetwriters.Common.Enums;
@@ -190,6 +191,26 @@ namespace Notesnook.API.Services
             }
 
             await Repositories.UsersSettings.UpdateAsync(userSettings.Id, userSettings);
+        }
+
+        public async Task<EncryptedData?> GetEncryptionVerifier(string userId)
+        {
+            SyncItemsRepository[] repositories = [Repositories.Notes, Repositories.Notebooks, Repositories.Shortcuts, Repositories.Contents, Repositories.Settings, Repositories.LegacySettings, Repositories.Attachments, Repositories.Reminders, Repositories.Relations, Repositories.Colors, Repositories.Tags, Repositories.Vaults, Repositories.InboxItemsHistory];
+            foreach (var repo in repositories)
+            {
+                var item = await repo.FindOneAsync((s) => s.UserId == userId && (s.KeyVersion == null || s.KeyVersion == 0));
+                if (item != null)
+                {
+                    return new EncryptedData
+                    {
+                        Cipher = item.Cipher,
+                        IV = item.IV,
+                        Salt = "",
+                        Length = item.Length
+                    };
+                }
+            }
+            return null;
         }
 
         public async Task DeleteUserAsync(string userId)

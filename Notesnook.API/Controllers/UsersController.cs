@@ -127,6 +127,24 @@ namespace Notesnook.API.Controllers
             }
         }
 
+
+        [HttpGet("verifier")]
+        public async Task<IActionResult> GetEncryptionVerifier()
+        {
+            var userId = User.GetUserId();
+            try
+            {
+                var response = await UserService.GetEncryptionVerifier(userId);
+                if (response == null) return NotFound();
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to get encryption verifier for user id: {UserId}", userId);
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
         [HttpPost("reset")]
         public async Task<IActionResult> Reset([FromForm] bool removeAttachments)
         {

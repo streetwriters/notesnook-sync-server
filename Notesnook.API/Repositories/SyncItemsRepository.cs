@@ -36,6 +36,7 @@ using Streetwriters.Common;
 using Streetwriters.Data.DbContexts;
 using Streetwriters.Data.Interfaces;
 using Streetwriters.Data.Repositories;
+using AspNetCore.Identity.Mongo.Mongo;
 
 namespace Notesnook.API.Repositories
 {
