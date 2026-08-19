@@ -1,0 +1,201 @@
+version: "3.8"
+
+x-server-discovery: &server-discovery
+  NOTESNOOK_SERVER_PORT: 5264
+  NOTESNOOK_SERVER_HOST: notesnook-server
+  IDENTITY_SERVER_PORT: 8264
+  IDENTITY_SERVER_HOST: identity-server
+  SSE_SERVER_PORT: 7264
+  SSE_SERVER_HOST: sse-server
+  SELF_HOSTED: 1
+  IDENTITY_SERVER_URL: ${AUTH_SERVER_PUBLIC_URL}
+  NOTESNOOK_APP_HOST: ${NOTESNOOK_APP_PUBLIC_URL}
+
+x-env-files: &env-files
+  - .env
+
+services:
+  validate:
+    image: vandot/alpine-bash
+    entrypoint: /bin/bash
+    env_file: *env-files
+    command:
+      - -c
+      - |
+        # List of required environment variables
+        required_vars=(
+          "INSTANCE_NAME"
+          "NOTESNOOK_API_SECRET"
+          "DISABLE_SIGNUPS"
+          "SMTP_USERNAME"
+          "SMTP_PASSWORD"
+          "SMTP_HOST"
+          "SMTP_PORT"
+          "AUTH_SERVER_PUBLIC_URL"
+          "NOTESNOOK_APP_PUBLIC_URL"
+          "MONOGRAPH_PUBLIC_URL"
+          "ATTACHMENTS_SERVER_PUBLIC_URL"
+          "GARAGE_RPC_SECRET" # Added for Garage
+        )
+
+        # Check each required environment variable
+        for var in "$${required_vars[@]}"; do
+          if [ -z "$${!var}" ]; then
+            echo "Error: Required environment variable $$var is not set."
+            exit 1
+          fi
+        done
+
+        echo "All required environment variables are set."
+    # Ensure the validate service runs first
+    restart: "no"
+
+  notesnook-db:
+    image: mongo:8.0
+    hostname: notesnook-db
+    volumes:
+      - dbdata:/data/db
+    networks:
+      - notesnook
+    command: --replSet rs0 --bind_ip_all
+    depends_on:
+      validate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: echo 'try { rs.status() } catch (err) { rs.initiate() }; db.runCommand("ping").ok' | mongosh mongodb://localhost:27017 --quiet
+      interval: 40s
+      timeout: 30s
+      retries: 3
+      start_period: 60s
+
+  garage:
+    image: dxflrs/garage:v2.1.0
+    restart: unless-stopped
+    ports:
+      - 3900:3900 # S3 API
+      - 3901:3901 # RPC
+      - 3902:3902 # S3 Web (Optional)
+    networks:
+      - notesnook
+    volumes:
+      - s3data:/var/lib/garage
+      - ./garage.toml:/etc/garage.toml:ro
+    env_file: *env-files
+    environment:
+      GARAGE_RPC_SECRET: ${GARAGE_RPC_SECRET}
+    depends_on:
+      validate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "/garage", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  identity-server:
+    image: streetwriters/identity:latest
+    ports:
+      - 8264:8264
+    networks:
+      - notesnook
+    env_file: *env-files
+    depends_on:
+      - notesnook-db
+    healthcheck:
+      test: wget --tries=1 -nv -q  http://localhost:8264/health -O- || exit 1
+      interval: 40s
+      timeout: 30s
+      retries: 3
+      start_period: 60s
+    environment:
+      <<: *server-discovery
+      MONGODB_CONNECTION_STRING: mongodb://notesnook-db:27017/identity?replSet=rs0
+      MONGODB_DATABASE_NAME: identity
+
+  notesnook-server:
+    image: streetwriters/notesnook-sync:latest
+    ports:
+      - 5264:5264
+    networks:
+      - notesnook
+    env_file: *env-files
+    depends_on:
+      - garage
+      - identity-server
+    healthcheck:
+      test: wget --tries=1 -nv -q  http://localhost:5264/health -O- || exit 1
+      interval: 40s
+      timeout: 30s
+      retries: 3
+      start_period: 60s
+    environment:
+      <<: *server-discovery
+      MONGODB_CONNECTION_STRING: mongodb://notesnook-db:27017/?replSet=rs0
+      MONGODB_DATABASE_NAME: notesnook
+      S3_INTERNAL_SERVICE_URL: "http://garage:3900"
+      S3_INTERNAL_BUCKET_NAME: "attachments"
+      S3_ACCESS_KEY_ID: "${GARAGE_ACCESS_KEY_ID}" # Update these after generating keys
+      S3_ACCESS_KEY: "${GARAGE_ACCESS_KEY_SECRET}" # Update these after generating keys
+      S3_SERVICE_URL: "${ATTACHMENTS_SERVER_PUBLIC_URL}"
+      S3_REGION: "us-east-1"
+      S3_BUCKET_NAME: "attachments"
+
+  sse-server:
+    image: streetwriters/sse:latest
+    ports:
+      - 7264:7264
+    env_file: *env-files
+    depends_on:
+      - identity-server
+      - notesnook-server
+    networks:
+      - notesnook
+    healthcheck:
+      test: wget --tries=1 -nv -q  http://localhost:7264/health -O- || exit 1
+      interval: 40s
+      timeout: 30s
+      retries: 3
+      start_period: 60s
+    environment:
+      <<: *server-discovery
+
+  monograph-server:
+    image: streetwriters/monograph:latest
+    ports:
+      - 6264:3000
+    env_file: *env-files
+    depends_on:
+      - notesnook-server
+    networks:
+      - notesnook
+    healthcheck:
+      test: wget --tries=1 -nv -q  http://localhost:3000/api/health -O- || exit 1
+      interval: 40s
+      timeout: 30s
+      retries: 3
+      start_period: 60s
+    environment:
+      <<: *server-discovery
+      API_HOST: http://notesnook-server:5264
+      PUBLIC_URL: ${MONOGRAPH_PUBLIC_URL}
+
+  autoheal:
+    image: willfarrell/autoheal:latest
+    tty: true
+    restart: always
+    environment:
+      - AUTOHEAL_INTERVAL=60
+      - AUTOHEAL_START_PERIOD=300
+      - AUTOHEAL_DEFAULT_STOP_TIMEOUT=10
+    depends_on:
+      validate:
+        condition: service_completed_successfully
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+networks:
+  notesnook:
+
+volumes:
+  dbdata:
+  s3data:
