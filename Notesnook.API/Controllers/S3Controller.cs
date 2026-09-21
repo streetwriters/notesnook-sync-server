@@ -20,10 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 using System;
 using System.Net.Http;
 using System.Security.Claims;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
 using Notesnook.API.Helpers;
@@ -32,7 +34,6 @@ using Notesnook.API.Models;
 using Streetwriters.Common;
 using Streetwriters.Common.Accessors;
 using Streetwriters.Common.Extensions;
-using Streetwriters.Common.Models;
 
 namespace Notesnook.API.Controllers
 {
@@ -40,39 +41,45 @@ namespace Notesnook.API.Controllers
     [Route("s3")]
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     [Authorize("Sync")]
-    public class S3Controller(IS3Service s3Service, ISyncItemsRepositoryAccessor repositories, WampServiceAccessor serviceAccessor, ILogger<S3Controller> logger) : ControllerBase
+    public class S3Controller(IS3Service s3Service, ISyncItemsRepositoryAccessor repositories, WampServiceAccessor serviceAccessor, IHttpClientFactory httpClientFactory, ILogger<S3Controller> logger) : ControllerBase
     {
         [HttpPut]
+        [EnableRateLimiting("s3-direct")]
         public async Task<IActionResult> Upload([FromQuery] string name)
         {
-            return BadRequest(new { error = "Attachment storage is temporarily unavailable. Please try again later." });
-            // try
-            // {
-            //     var userId = this.User.GetUserId();
+            try
+            {
+                var userId = this.User.GetUserId();
 
-            //     var fileSize = HttpContext.Request.ContentLength ?? 0;
-            //     bool hasBody = fileSize > 0;
+                var fileSize = HttpContext.Request.ContentLength ?? 0;
+                bool hasBody = fileSize > 0;
 
-            //     if (!hasBody)
-            //     {
-            //         return Ok(Request.GetEncodedUrl() + "&access_token=" + Request.Headers.Authorization.ToString().Replace("Bearer ", ""));
-            //     }
+                if (!hasBody)
+                {
+                    return Ok(Request.GetEncodedUrl() + "&access_token=" + Request.Headers.Authorization.ToString().Replace("Bearer ", ""));
+                }
 
-            //     if (Constants.IS_SELF_HOSTED) await UploadFileAsync(userId, name, fileSize);
-            //     else await UploadFileWithChecksAsync(userId, name, fileSize);
+                if (Constants.IS_SELF_HOSTED) await UploadFileAsync(userId, name, fileSize);
+                else await UploadFileWithChecksAsync(userId, name, fileSize);
 
-            //     return Ok();
-            // }
-            // catch (Exception ex)
-            // {
-            //     logger.LogError(ex, "Error uploading attachment for user.");
-            //     return BadRequest(new { error = "Failed to upload attachment." });
-            // }
+                return Ok();
+            }
+            catch (Exception ex) when (S3TransientErrorClassifier.IsTransient(ex))
+            {
+                return StorageUnavailable(ex);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error uploading attachment for user.");
+                return BadRequest(new { error = "Failed to upload attachment." });
+            }
         }
 
         private async Task UploadFileWithChecksAsync(string userId, string name, long fileSize)
         {
-            var userSettings = await repositories.UsersSettings.FindOneAsync((u) => u.UserId == userId);
+            var userSettings = await repositories.UsersSettings.FindOneAsync((u) => u.UserId == userId)
+                ?? throw new Exception("User settings not found.");
+            var observedStorageLimit = userSettings.StorageLimit;
 
             var subscription = await serviceAccessor.UserSubscriptionService.GetUserSubscriptionAsync(Clients.Notesnook.Id, userId) ?? throw new Exception("User subscription not found.");
 
@@ -85,49 +92,68 @@ namespace Notesnook.API.Controllers
 
             var uploadedFileSize = await UploadFileAsync(userId, name, fileSize);
 
-            userSettings.StorageLimit.Value += uploadedFileSize;
-            await repositories.UsersSettings.Collection.UpdateOneAsync(
-                Builders<UserSettings>.Filter.Eq(u => u.UserId, userId),
-                Builders<UserSettings>.Update.Set(u => u.StorageLimit, userSettings.StorageLimit)
-            );
-
-            // extra check in case user sets wrong ContentLength in the HTTP header
-            if (uploadedFileSize != fileSize && StorageHelper.IsStorageLimitReached(subscription, userSettings.StorageLimit.Value))
+            try
             {
-                await s3Service.DeleteObjectAsync(userId, name);
-                throw new Exception("Storage limit exceeded.");
+                await s3Service.IncrementStorageUsageAsync(userId, uploadedFileSize, observedStorageLimit);
             }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to account for attachment usage for user {UserId}.", userId);
+            }
+
         }
 
         private async Task<long> UploadFileAsync(string userId, string name, long fileSize)
         {
             var url = await s3Service.GetInternalUploadObjectUrlAsync(userId, name) ?? throw new Exception("Could not create signed url.");
 
-            var httpClient = new HttpClient();
+            var httpClient = httpClientFactory.CreateClient("S3Upload");
             var content = new StreamContent(HttpContext.Request.BodyReader.AsStream());
             content.Headers.ContentLength = fileSize;
-            var response = await httpClient.SendRequestAsync<Response>(url, null, HttpMethod.Put, content);
-            if (!response.Success) throw new Exception(response.Content != null ? await response.Content.ReadAsStringAsync() : "Could not upload file.");
+            using var request = new HttpRequestMessage(HttpMethod.Put, url)
+            {
+                Content = content
+            };
+            using var uploadTimeout = CancellationTokenSource.CreateLinkedTokenSource(HttpContext.RequestAborted);
+            uploadTimeout.CancelAfter(TimeSpan.FromMinutes(15 + (15 * fileSize / (1024d * 1024d * 1024d))));
+            using var response = await httpClient.SendAsync(
+                request,
+                HttpCompletionOption.ResponseHeadersRead,
+                uploadTimeout.Token);
+            if (!response.IsSuccessStatusCode)
+            {
+                var statusCode = (int)response.StatusCode;
+                if (S3TransientErrorClassifier.IsTransient(statusCode))
+                    throw new S3StorageUnavailableException("Attachment storage is temporarily unavailable.");
 
-            return await s3Service.GetObjectSizeAsync(userId, name);
+                throw new Exception(await response.Content.ReadAsStringAsync(uploadTimeout.Token));
+            }
+
+            // The PUT response confirms this request. A follow-up HEAD can lag or
+            // be throttled, so direct accounting uses the accepted request bytes.
+            return fileSize;
         }
 
 
         [HttpGet("multipart")]
+        [EnableRateLimiting("s3-multipart-control")]
         public async Task<IActionResult> MultipartUpload([FromQuery] string name, [FromQuery] int parts, [FromQuery] string? uploadId)
         {
-            return BadRequest(new { error = "Attachment storage is temporarily unavailable. Please try again later." });
-            // var userId = this.User.GetUserId();
-            // try
-            // {
-            //     var meta = await s3Service.StartMultipartUploadAsync(userId, name, parts, uploadId);
-            //     return Ok(meta);
-            // }
-            // catch (Exception ex)
-            // {
-            //     logger.LogError(ex, "Error starting multipart upload for user.");
-            //     return BadRequest(new { error = "Failed to start multipart upload." });
-            // }
+            var userId = this.User.GetUserId();
+            try
+            {
+                var meta = await s3Service.StartMultipartUploadAsync(userId, name, parts, uploadId);
+                return Ok(meta);
+            }
+            catch (Exception ex) when (S3TransientErrorClassifier.IsTransient(ex))
+            {
+                return StorageUnavailable(ex);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error starting multipart upload for user.");
+                return BadRequest(new { error = "Failed to start multipart upload." });
+            }
         }
 
         [HttpDelete("multipart")]
@@ -139,6 +165,10 @@ namespace Notesnook.API.Controllers
                 await s3Service.AbortMultipartUploadAsync(userId, name, uploadId);
                 return Ok();
             }
+            catch (Exception ex) when (S3TransientErrorClassifier.IsTransient(ex))
+            {
+                return StorageUnavailable(ex);
+            }
             catch (Exception ex)
             {
                 logger.LogError(ex, "Error aborting multipart upload for user.");
@@ -147,6 +177,7 @@ namespace Notesnook.API.Controllers
         }
 
         [HttpPost("multipart")]
+        [EnableRateLimiting("s3-multipart-control")]
         public async Task<IActionResult> CompleteMultipartUpload([FromBody] CompleteMultipartUploadRequestWrapper uploadRequestWrapper)
         {
             var userId = this.User.GetUserId();
@@ -155,11 +186,21 @@ namespace Notesnook.API.Controllers
                 await s3Service.CompleteMultipartUploadAsync(userId, uploadRequestWrapper.ToRequest());
                 return Ok();
             }
+            catch (Exception ex) when (S3TransientErrorClassifier.IsTransient(ex))
+            {
+                return StorageUnavailable(ex);
+            }
             catch (Exception ex)
             {
                 logger.LogError(ex, "Error completing multipart upload for user.");
                 return BadRequest(new { error = "Failed to complete multipart upload." });
             }
+        }
+
+        private IActionResult StorageUnavailable(Exception exception)
+        {
+            logger.LogWarning(exception, "Attachment storage is temporarily unavailable.");
+            return StatusCode(503, new { error = "Attachment storage is temporarily unavailable. Please try again later." });
         }
 
         [HttpGet]

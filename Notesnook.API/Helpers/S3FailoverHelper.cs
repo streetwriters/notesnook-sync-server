@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
+using System.Net.Sockets;
 using System.Threading.Tasks;
 using Amazon.S3;
 using Amazon.S3.Model;
@@ -48,12 +50,6 @@ namespace Notesnook.API.Helpers
         public bool UseExponentialBackoff { get; set; } = true;
 
         /// <summary>
-        /// Whether to allow failover for write operations (PUT, POST, DELETE).
-        /// Default is false to prevent data consistency issues.
-        /// </summary>
-        public bool AllowWriteFailover { get; set; } = false;
-
-        /// <summary>
         /// List of exception types that should trigger failover
         /// </summary>
         public HashSet<Type> FailoverExceptions { get; set; } = new()
@@ -75,6 +71,39 @@ namespace Notesnook.API.Helpers
             "InternalError",
             "RequestTimeout"
         };
+    }
+
+    public sealed class S3StorageUnavailableException : Exception
+    {
+        public S3StorageUnavailableException(string message, Exception? innerException = null)
+            : base(message, innerException)
+        {
+        }
+    }
+
+    public static class S3TransientErrorClassifier
+    {
+        public static bool IsTransient(int statusCode)
+        {
+            return statusCode == 408 || statusCode == 429 || statusCode >= 500;
+        }
+
+        public static bool IsTransient(Exception exception)
+        {
+            if (exception is S3StorageUnavailableException)
+                return true;
+
+            if (exception is AmazonS3Exception s3Exception)
+            {
+                return IsTransient((int)s3Exception.StatusCode)
+                    || s3Exception.ErrorCode is "SlowDown" or "ServiceUnavailable" or "InternalError" or "RequestTimeout";
+            }
+
+            if (exception is HttpRequestException or SocketException or TimeoutException or TaskCanceledException)
+                return true;
+
+            return exception.InnerException != null && IsTransient(exception.InnerException);
+        }
     }
 
     /// <summary>
@@ -161,10 +190,11 @@ namespace Notesnook.API.Helpers
             var result = new S3FailoverResult<T>();
             Exception? lastException = null;
 
-            // Determine max clients to try based on write operation flag
-            var maxClientsToTry = (isWriteOperation && !config.AllowWriteFailover) ? 1 : clients.Count;
+            // Writes stay on the provider that owns the object or multipart upload.
+            // They get one application attempt and never fail over.
+            var maxClientsToTry = isWriteOperation ? 1 : clients.Count;
 
-            if (isWriteOperation && !config.AllowWriteFailover && clients.Count > 1)
+            if (isWriteOperation && clients.Count > 1)
             {
                 logger?.LogDebug(
                     "Write operation {Operation} will only use primary endpoint. Failover is disabled for write operations.",
@@ -185,7 +215,12 @@ namespace Notesnook.API.Helpers
                         operationName, clientName, i + 1, maxClientsToTry);
                 }
 
-                var (success, value, exception, attempts) = await TryExecuteAsync(client, operation, operationName, clientName);
+                var (success, value, exception, attempts) = await TryExecuteAsync(
+                    client,
+                    operation,
+                    operationName,
+                    clientName,
+                    isWriteOperation ? 0 : config.MaxRetries);
                 result.AttemptsUsed += attempts;
 
                 if (success && value != null)
@@ -222,19 +257,22 @@ namespace Notesnook.API.Helpers
                 operationName, maxClientsToTry, result.AttemptsUsed);
 
             return result;
-        }        /// <summary>
-                 /// Try to execute an operation with retries
-                 /// </summary>
+        }
+
+        /// <summary>
+        /// Try to execute an operation with retries
+        /// </summary>
         private async Task<(bool success, T? value, Exception? exception, int attempts)> TryExecuteAsync<T>(
             AmazonS3Client client,
             Func<AmazonS3Client, Task<T>> operation,
             string operationName,
-            string endpointName)
+            string endpointName,
+            int maxRetries)
         {
             Exception? lastException = null;
             int attempts = 0;
 
-            for (int retry = 0; retry <= config.MaxRetries; retry++)
+            for (int retry = 0; retry <= maxRetries; retry++)
             {
                 attempts++;
                 try
@@ -246,12 +284,12 @@ namespace Notesnook.API.Helpers
                 {
                     lastException = ex;
 
-                    if (retry < config.MaxRetries && ShouldRetry(ex))
+                    if (retry < maxRetries && ShouldRetry(ex))
                     {
                         var delay = CalculateRetryDelay(retry);
                         logger?.LogWarning(ex,
                             "Attempt {Attempt}/{MaxAttempts} failed for {Operation} on {Endpoint}. Retrying in {Delay}ms",
-                            retry + 1, config.MaxRetries + 1, operationName, endpointName, delay);
+                            retry + 1, maxRetries + 1, operationName, endpointName, delay);
 
                         await Task.Delay(delay);
                     }
@@ -322,10 +360,10 @@ namespace Notesnook.API.Helpers
             string operationName = "S3Operation",
             bool isWriteOperation = false)
         {
-            await ExecuteWithFailoverAsync<object?>(async (client) =>
+            await ExecuteWithFailoverAsync(async (client) =>
             {
                 await operation(client);
-                return null;
+                return true;
             }, operationName, isWriteOperation);
         }
     }
@@ -384,6 +422,7 @@ namespace Notesnook.API.Helpers
                         ServiceURL = url,
                         AuthenticationRegion = region,
                         ForcePathStyle = forcePathStyle,
+                        MaxErrorRetry = 0,
                         SignatureMethod = Amazon.Runtime.SigningAlgorithm.HmacSHA256,
                         SignatureVersion = "4"
                     };

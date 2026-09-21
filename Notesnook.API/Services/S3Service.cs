@@ -60,9 +60,11 @@ namespace Notesnook.API.Services
         // That is why we create 2 separate S3 clients. One for internal traffic and one for external.
         private readonly S3FailoverHelper S3InternalClient;
         private readonly HttpClient httpClient = new();
+        private readonly ILogger<S3Service> logger;
 
         public S3Service(ISyncItemsRepositoryAccessor syncItemsRepositoryAccessor, WampServiceAccessor wampServiceAccessor, ILogger<S3Service> logger)
         {
+            this.logger = logger;
             Repositories = syncItemsRepositoryAccessor;
             ServiceAccessor = wampServiceAccessor;
             S3Client = new S3FailoverHelper(
@@ -277,12 +279,32 @@ namespace Notesnook.API.Services
 
         private async Task<long> GetMultipartUploadSizeAsync(string userId, string key, string uploadId)
         {
-            var objectName = GetFullObjectName(userId, key);
-            var parts = await S3InternalClient.ExecuteWithFailoverAsync((client) => client.ListPartsAsync(INTERNAL_BUCKET_NAME, objectName, uploadId), operationName: "ListParts");
+            var objectName = GetFullObjectName(userId, key) ?? throw new Exception("Invalid object name.");
             long totalSize = 0;
-            foreach (var part in parts.Parts)
+            var marker = 0;
+            while (true)
             {
-                totalSize += part.Size;
+                var request = new ListPartsRequest
+                {
+                    BucketName = INTERNAL_BUCKET_NAME,
+                    Key = objectName,
+                    UploadId = uploadId,
+                    PartNumberMarker = marker.ToString()
+                };
+                var parts = await S3InternalClient.ExecuteWithFailoverAsync(
+                    (client) => client.ListPartsAsync(request),
+                    operationName: "ListParts",
+                    isWriteOperation: true);
+                foreach (var part in parts.Parts)
+                {
+                    totalSize = checked(totalSize + part.Size);
+                }
+
+                if (!parts.IsTruncated)
+                    break;
+                if (parts.NextPartNumberMarker <= marker)
+                    throw new Exception("S3 returned an invalid parts page.");
+                marker = parts.NextPartNumberMarker;
             }
             return totalSize;
         }
@@ -298,21 +320,22 @@ namespace Notesnook.API.Services
                 await this.AbortMultipartUploadAsync(userId, uploadRequest.Key, uploadRequest.UploadId);
                 throw new Exception("User settings not found.");
             }
-            userSettings.StorageLimit ??= StorageHelper.RolloverStorageLimit(userSettings.StorageLimit);
+            var observedStorageLimit = userSettings.StorageLimit;
+            userSettings.StorageLimit = StorageHelper.RolloverStorageLimit(userSettings.StorageLimit);
+            long fileSize = 0;
 
             if (!Constants.IS_SELF_HOSTED)
             {
                 var subscription = await ServiceAccessor.UserSubscriptionService.GetUserSubscriptionAsync(Clients.Notesnook.Id, userId) ?? throw new Exception("User subscription not found.");
 
-                long fileSize = await GetMultipartUploadSizeAsync(userId, uploadRequest.Key, uploadRequest.UploadId);
+                fileSize = await GetMultipartUploadSizeAsync(userId, uploadRequest.Key, uploadRequest.UploadId);
                 if (StorageHelper.IsFileSizeExceeded(subscription, fileSize))
                 {
                     await this.AbortMultipartUploadAsync(userId, uploadRequest.Key, uploadRequest.UploadId);
                     throw new Exception("Max file size exceeded.");
                 }
 
-                userSettings.StorageLimit.Value += fileSize;
-                if (StorageHelper.IsStorageLimitReached(subscription, userSettings.StorageLimit.Value))
+                if (StorageHelper.IsStorageLimitReached(subscription, userSettings.StorageLimit.Value + fileSize))
                 {
                     await this.AbortMultipartUploadAsync(userId, uploadRequest.Key, uploadRequest.UploadId);
                     throw new Exception("Storage limit reached.");
@@ -326,12 +349,73 @@ namespace Notesnook.API.Services
 
             if (!Constants.IS_SELF_HOSTED)
             {
-                await Repositories.UsersSettings.UpsertAsync(userSettings, (u) => u.UserId == userId);
-                await Repositories.UsersSettings.Collection.UpdateOneAsync(
-                    Builders<UserSettings>.Filter.Eq(u => u.UserId, userId),
-                    Builders<UserSettings>.Update.Set(u => u.StorageLimit, userSettings.StorageLimit)
-                );
+                try
+                {
+                    await IncrementStorageUsageAsync(userId, fileSize, observedStorageLimit);
+                }
+                catch (Exception ex)
+                {
+                    // The object is already committed. Accounting is best effort so
+                    // a Mongo failure cannot turn a successful upload into a retry.
+                    logger.LogError(ex, "Failed to account for multipart attachment usage for user {UserId}.", userId);
+                }
             }
+        }
+
+        public async Task IncrementStorageUsageAsync(string userId, long fileSize, Limit? observedStorageLimit)
+        {
+            var collection = Repositories.UsersSettings.Collection;
+            var userFilter = Builders<UserSettings>.Filter.Eq(u => u.UserId, userId);
+
+            for (var attempt = 0; attempt < 3; attempt++)
+            {
+                var now = DateTimeOffset.UtcNow;
+                var monthStart = new DateTimeOffset(now.Year, now.Month, 1, 0, 0, 0, TimeSpan.Zero);
+                var nextMonthStart = monthStart.AddMonths(1);
+                var nowMilliseconds = now.ToUnixTimeMilliseconds();
+                var monthStartMilliseconds = monthStart.ToUnixTimeMilliseconds();
+                var nextMonthStartMilliseconds = nextMonthStart.ToUnixTimeMilliseconds();
+                var currentStorageLimit = observedStorageLimit;
+
+                if (attempt > 0)
+                {
+                    currentStorageLimit = (await collection.Find(userFilter).FirstOrDefaultAsync())?.StorageLimit;
+                }
+
+                var isCurrentMonth = currentStorageLimit != null
+                    && currentStorageLimit.UpdatedAt >= monthStartMilliseconds
+                    && currentStorageLimit.UpdatedAt < nextMonthStartMilliseconds;
+
+                if (!isCurrentMonth)
+                {
+                    var observedFilter = currentStorageLimit == null
+                        ? Builders<UserSettings>.Filter.Eq(u => u.StorageLimit, null)
+                        : Builders<UserSettings>.Filter.Eq("StorageLimit.UpdatedAt", currentStorageLimit.UpdatedAt);
+
+                    var resetResult = await collection.UpdateOneAsync(
+                        Builders<UserSettings>.Filter.And(userFilter, observedFilter),
+                        Builders<UserSettings>.Update.Set(
+                            "StorageLimit",
+                            new Limit { Value = 0, UpdatedAt = nowMilliseconds }));
+
+                    if (resetResult.MatchedCount == 0)
+                        continue;
+                }
+
+                var result = await collection.UpdateOneAsync(
+                    Builders<UserSettings>.Filter.And(
+                        userFilter,
+                        Builders<UserSettings>.Filter.Gte("StorageLimit.UpdatedAt", monthStartMilliseconds),
+                        Builders<UserSettings>.Filter.Lt("StorageLimit.UpdatedAt", nextMonthStartMilliseconds)),
+                    Builders<UserSettings>.Update.Combine(
+                        Builders<UserSettings>.Update.Inc("StorageLimit.Value", fileSize),
+                        Builders<UserSettings>.Update.Set("StorageLimit.UpdatedAt", nowMilliseconds)));
+
+                if (result.MatchedCount > 0)
+                    return;
+            }
+
+            throw new Exception("Storage usage counter was not available after rollover retries.");
         }
 
         private async Task<string?> GetPresignedURLAsync(string userId, string name, HttpVerb httpVerb, S3ClientMode mode = S3ClientMode.EXTERNAL)

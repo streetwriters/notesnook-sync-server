@@ -23,6 +23,7 @@ using System.IO.Compression;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Encodings.Web;
+using System.Threading;
 using System.Threading.Tasks;
 using Amazon.Runtime;
 using StackExchange.Redis;
@@ -35,6 +36,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Memory;
@@ -68,6 +70,7 @@ using Streetwriters.Data;
 using Streetwriters.Data.DbContexts;
 using Streetwriters.Data.Interfaces;
 using Streetwriters.Data.Repositories;
+using System.Threading.RateLimiting;
 
 namespace Notesnook.API
 {
@@ -124,6 +127,27 @@ namespace Notesnook.API
 
                 options.DefaultPolicy = options.GetPolicy("Notesnook") ?? throw new Exception("Notesnook policy not found");
             }).AddSingleton<IAuthorizationMiddlewareResultHandler, AuthorizationResultTransformer>();
+
+            services.AddRateLimiter(options =>
+            {
+                options.RejectionStatusCode = StatusCodes.Status503ServiceUnavailable;
+                options.AddPolicy("s3-direct", _ => RateLimitPartition.GetConcurrencyLimiter(
+                    "s3-direct",
+                    _ => new ConcurrencyLimiterOptions
+                    {
+                        PermitLimit = ReadRateLimit("S3_DIRECT_UPLOAD_CONCURRENCY", 128),
+                        QueueLimit = 0,
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+                    }));
+                options.AddPolicy("s3-multipart-control", _ => RateLimitPartition.GetConcurrencyLimiter(
+                    "s3-multipart-control",
+                    _ => new ConcurrencyLimiterOptions
+                    {
+                        PermitLimit = ReadRateLimit("S3_MULTIPART_CONTROL_CONCURRENCY", 32),
+                        QueueLimit = 0,
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+                    }));
+            });
 
             services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddOAuth2Introspection("introspection", options =>
@@ -204,6 +228,10 @@ namespace Notesnook.API
             services.AddScoped<SyncDeviceService>();
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<IS3Service, S3Service>();
+            services.AddHttpClient("S3Upload", client =>
+            {
+                client.Timeout = Timeout.InfiniteTimeSpan;
+            });
             services.AddScoped<IURLAnalyzer, URLAnalyzer>();
 
             services.AddWampServiceAccessor(Servers.NotesnookAPI);
@@ -314,6 +342,7 @@ namespace Notesnook.API
 
             app.UseAuthentication();
             app.UseAuthorization();
+            app.UseRateLimiter();
 
             app.UseEndpoints(endpoints =>
             {
@@ -325,6 +354,13 @@ namespace Notesnook.API
                     options.Transports = HttpTransportType.WebSockets;
                 });
             });
+        }
+
+        private int ReadRateLimit(string name, int defaultValue)
+        {
+            return int.TryParse(Configuration[name], out var value) && value > 0
+                ? value
+                : defaultValue;
         }
     }
 
