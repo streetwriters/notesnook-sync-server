@@ -434,11 +434,7 @@ namespace Notesnook.API.Services
                     Expires = System.DateTime.Now.AddHours(1),
                     Verb = httpVerb,
                     Key = objectName,
-#if (DEBUG || STAGING)
-                    Protocol = Protocol.HTTP,
-#else
                     Protocol = client.Config.ServiceURL.StartsWith("http://") ? Protocol.HTTP : Protocol.HTTPS,
-#endif
                 };
                 return client.GetPreSignedURLAsync(request);
             }, operationName: "GetPreSignedURL");
@@ -458,11 +454,7 @@ namespace Notesnook.API.Services
                 Key = objectName,
                 PartNumber = partNumber,
                 UploadId = uploadId,
-#if (DEBUG || STAGING)
-                Protocol = Protocol.HTTP,
-#else
                 Protocol = c.Config.ServiceURL.StartsWith("http://") ? Protocol.HTTP : Protocol.HTTPS,
-#endif
             }), operationName: "GetPreSignedURL");
         }
 
