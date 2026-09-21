@@ -45,28 +45,29 @@ namespace Notesnook.API.Controllers
         [HttpPut]
         public async Task<IActionResult> Upload([FromQuery] string name)
         {
-            try
-            {
-                var userId = this.User.GetUserId();
+            return BadRequest(new { error = "Attachment storage is temporarily unavailable. Please try again later." });
+            // try
+            // {
+            //     var userId = this.User.GetUserId();
 
-                var fileSize = HttpContext.Request.ContentLength ?? 0;
-                bool hasBody = fileSize > 0;
+            //     var fileSize = HttpContext.Request.ContentLength ?? 0;
+            //     bool hasBody = fileSize > 0;
 
-                if (!hasBody)
-                {
-                    return Ok(Request.GetEncodedUrl() + "&access_token=" + Request.Headers.Authorization.ToString().Replace("Bearer ", ""));
-                }
+            //     if (!hasBody)
+            //     {
+            //         return Ok(Request.GetEncodedUrl() + "&access_token=" + Request.Headers.Authorization.ToString().Replace("Bearer ", ""));
+            //     }
 
-                if (Constants.IS_SELF_HOSTED) await UploadFileAsync(userId, name, fileSize);
-                else await UploadFileWithChecksAsync(userId, name, fileSize);
+            //     if (Constants.IS_SELF_HOSTED) await UploadFileAsync(userId, name, fileSize);
+            //     else await UploadFileWithChecksAsync(userId, name, fileSize);
 
-                return Ok();
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Error uploading attachment for user.");
-                return BadRequest(new { error = "Failed to upload attachment." });
-            }
+            //     return Ok();
+            // }
+            // catch (Exception ex)
+            // {
+            //     logger.LogError(ex, "Error uploading attachment for user.");
+            //     return BadRequest(new { error = "Failed to upload attachment." });
+            // }
         }
 
         private async Task UploadFileWithChecksAsync(string userId, string name, long fileSize)
@@ -115,17 +116,18 @@ namespace Notesnook.API.Controllers
         [HttpGet("multipart")]
         public async Task<IActionResult> MultipartUpload([FromQuery] string name, [FromQuery] int parts, [FromQuery] string? uploadId)
         {
-            var userId = this.User.GetUserId();
-            try
-            {
-                var meta = await s3Service.StartMultipartUploadAsync(userId, name, parts, uploadId);
-                return Ok(meta);
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Error starting multipart upload for user.");
-                return BadRequest(new { error = "Failed to start multipart upload." });
-            }
+            return BadRequest(new { error = "Attachment storage is temporarily unavailable. Please try again later." });
+            // var userId = this.User.GetUserId();
+            // try
+            // {
+            //     var meta = await s3Service.StartMultipartUploadAsync(userId, name, parts, uploadId);
+            //     return Ok(meta);
+            // }
+            // catch (Exception ex)
+            // {
+            //     logger.LogError(ex, "Error starting multipart upload for user.");
+            //     return BadRequest(new { error = "Failed to start multipart upload." });
+            // }
         }
 
         [HttpDelete("multipart")]
