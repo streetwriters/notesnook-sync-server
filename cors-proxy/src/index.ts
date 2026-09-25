@@ -3,9 +3,14 @@
  * Built with Bun runtime
  */
 
+import { createHash, timingSafeEqual } from "node:crypto";
+
 const PORT = Bun.env.PORT || 3000;
 const HOST = Bun.env.HOST || "localhost";
 const ALLOWED_ORIGINS = Bun.env.ALLOWED_ORIGINS?.split(",") || ["*"];
+// Optional shared secret. When set, proxy requests must carry it as
+// "Authorization: Bearer <token>". Empty or unset keeps the proxy open.
+const AUTH_TOKEN = Bun.env.AUTH_TOKEN || "";
 const MAX_REDIRECTS = 5;
 
 // CORS headers configuration
@@ -24,6 +29,22 @@ const corsHeaders = {
 function logRequest(method: string, url: string, status: number) {
   const timestamp = new Date().toISOString();
   console.log(`[${timestamp}] ${method} ${url} - ${status}`);
+}
+
+// Compare in constant time. Hashing first keeps both inputs the same
+// length, which timingSafeEqual requires.
+function safeEqual(a: string, b: string): boolean {
+  const hashA = createHash("sha256").update(a).digest();
+  const hashB = createHash("sha256").update(b).digest();
+  return timingSafeEqual(hashA, hashB);
+}
+
+// Check the Authorization header against AUTH_TOKEN
+function isAuthorized(req: Request): boolean {
+  const header = req.headers.get("authorization");
+  const match = header?.match(/^Bearer\s+(\S+)\s*$/i);
+  if (!match) return false;
+  return safeEqual(match[1] ?? "", AUTH_TOKEN);
 }
 
 // Validate URL
@@ -224,6 +245,19 @@ const server = Bun.serve({
       });
     }
 
+    // The shared secret, when set, guards the relay below. /health, the
+    // preflight, the usage page and the YouTube route are handled above.
+    if (AUTH_TOKEN && !isAuthorized(req)) {
+      logRequest(req.method, targetUrl, 401);
+      return new Response("Unauthorized", {
+        status: 401,
+        headers: {
+          ...corsHeaders,
+          "WWW-Authenticate": "Bearer",
+        },
+      });
+    }
+
     // Proxy the request for non-YouTube URLs
     const response = await proxyRequest(targetUrl);
     logRequest(req.method, targetUrl, response.status);
@@ -243,6 +277,12 @@ console.log(
 );
 console.log(`📋 Health check: http://${server.hostname}:${server.port}/health`);
 console.log(`🌍 Environment: ${Bun.env.NODE_ENV || "development"}`);
+console.log(
+  `🔒 Access: ${AUTH_TOKEN ? "restricted (auth token required)" : "open (no auth token set)"}`,
+);
+if (/\s/.test(AUTH_TOKEN)) {
+  console.warn("⚠️ AUTH_TOKEN contains whitespace and can never be matched.");
+}
 
 /**
  * This is required to bypass YouTube's Referrer Policy restrictions when
