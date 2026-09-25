@@ -79,9 +79,12 @@ namespace Streetwriters.Identity.Controllers
         }
 
         [HttpDelete]
-        public IActionResult Disable2FA()
+        public async Task<IActionResult> Disable2FA()
         {
-            return BadRequest("2FA is mandatory and cannot be disabled.");
+            var user = await UserManager.GetUserAsync(User) ?? throw new Exception("User not found.");
+            if (!await UserManager.GetTwoFactorEnabledAsync(user)) return Ok();
+            await MFAService.DisableMFAAsync(user);
+            return Ok();
         }
 
         [HttpGet("codes")]
