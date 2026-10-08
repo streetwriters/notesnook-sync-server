@@ -98,7 +98,7 @@ Merge these into the repository root .env (see examples/garage/.env.example):
 Notes:
   - Notesnook uses presigned URLs for attachments; public bucket policies are not required.
   - Use the S3 API URL (port 3900) for ATTACHMENTS_SERVER_PUBLIC_URL unless you proxy it.
-  - Do not use aws s3api put-bucket-policy for public read; Garage does not support this like MinIO.
+  - Do not use aws s3api put-bucket-policy for public read; Garage does not support this like Silo/MinIO.
 
 Then restart the sync server (from repo root):
 

@@ -13,7 +13,7 @@ services:
       identity-server:
         condition: service_started
     environment:
-      S3_INTERNAL_SERVICE_URL: "http://notesnook-minio:9000"
+      S3_INTERNAL_SERVICE_URL: "http://notesnook-silo:9000"
 
 networks:
   notesnook-shared:

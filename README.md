@@ -70,11 +70,11 @@ Then start the stack:
 docker compose up
 ```
 
-This sets up MongoDB, MinIO, and the Notesnook services.
+This sets up MongoDB, Silo (S3-compatible storage), and the Notesnook services.
 
 Optional services (`themes-server`, `cors-proxy`, `inbox-api`): `docker compose --profile extras up`
 
-For external MongoDB, MinIO, or Garage deployments, see [`examples/`](examples/).
+For external MongoDB, Silo, or Garage deployments, see [`examples/`](examples/).
 
 ## TODO Self-hosting
 
@@ -84,7 +84,7 @@ For external MongoDB, MinIO, or Garage deployments, see [`examples/`](examples/)
 - [x] Open source the Identity server
 - [x] Open source the SSE Messaging infrastructure
 - [x] Fully Dockerize all services
-- [x] Use self-hosted Minio for S3 storage
+- [x] Use self-hosted Silo for S3 storage
 - [x] Publish on DockerHub
 - [x] Add settings to change server URLs in Notesnook client apps (starting from v3.0.18)
 - [ ] Write self hosting docs

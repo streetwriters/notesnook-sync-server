@@ -1,9 +1,9 @@
-name: notesnook-external-minio-infra
+name: notesnook-external-silo-infra
 
 services:
-  notesnook-minio:
-    image: minio/minio:RELEASE.2024-07-29T22-14-52Z
-    hostname: notesnook-minio
+  notesnook-silo:
+    image: pgsty/silo:RELEASE.2026-09-16T00-00-00Z
+    hostname: notesnook-silo
     ports:
       - 9000:9000
     networks:
@@ -16,16 +16,16 @@ services:
       MINIO_BROWSER: "on"
     command: server /data/s3 --console-address :9090
     healthcheck:
-      test: timeout 5s bash -c ':> /dev/tcp/127.0.0.1/9000' || exit 1
+      test: ["CMD", "silo", "healthcheck", "ready"]
       interval: 40s
       timeout: 30s
       retries: 3
       start_period: 60s
 
-  notesnook-minio-setup:
-    image: minio/mc:RELEASE.2024-07-26T13-08-44Z
+  notesnook-silo-setup:
+    image: pgsty/mc:RELEASE.2026-09-13T00-00-00Z
     depends_on:
-      notesnook-minio:
+      notesnook-silo:
         condition: service_healthy
     networks:
       - notesnook-shared
@@ -36,8 +36,8 @@ services:
       - /bin/bash
       - -c
       - |
-        mc alias set minio http://notesnook-minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin}
-        mc mb minio/attachments -p
+        mc alias set silo http://notesnook-silo:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin}
+        mc mb silo/attachments -p
 
 networks:
   notesnook-shared:

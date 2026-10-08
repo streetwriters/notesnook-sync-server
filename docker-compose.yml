@@ -80,7 +80,7 @@ services:
       start_period: 60s
 
   notesnook-s3:
-    image: minio/minio:RELEASE.2024-07-29T22-14-52Z
+    image: pgsty/silo:RELEASE.2026-09-16T00-00-00Z
     ports:
       - 9000:9000
     networks:
@@ -95,16 +95,16 @@ services:
     env_file: *env-files
     command: server /data/s3 --console-address :9090
     healthcheck:
-      test: timeout 5s bash -c ':> /dev/tcp/127.0.0.1/9000' || exit 1
+      test: ["CMD", "silo", "healthcheck", "ready"]
       interval: 40s
       timeout: 30s
       retries: 3
       start_period: 60s
 
-  # There's no way to specify a default bucket in Minio so we have to
+  # There's no way to specify a default bucket in Silo so we have to
   # set it up ourselves.
   setup-s3:
-    image: minio/mc:RELEASE.2024-07-26T13-08-44Z
+    image: pgsty/mc:RELEASE.2026-09-13T00-00-00Z
     depends_on:
       - notesnook-s3
     networks:
@@ -114,10 +114,10 @@ services:
     command:
       - -c
       - |
-        until mc alias set minio http://notesnook-s3:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin}; do
+        until mc alias set silo http://notesnook-s3:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin}; do
           sleep 1;
         done;
-        mc mb minio/attachments -p
+        mc mb silo/attachments -p
 
   identity-server:
     image: streetwriters/identity:latest

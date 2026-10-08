@@ -1,6 +1,6 @@
 # External MongoDB
 
-MongoDB runs in a separate compose project. The Notesnook stack uses the root [`docker-compose.yml`](../../docker-compose.yml) with [`notesnook.override.yml`](notesnook.override.yml), which disables the embedded `notesnook-db` service and points at external Mongo. Embedded MinIO is unchanged.
+MongoDB runs in a separate compose project. The Notesnook stack uses the root [`docker-compose.yml`](../../docker-compose.yml) with [`notesnook.override.yml`](notesnook.override.yml), which disables the embedded `notesnook-db` service and points at external Mongo. Embedded Silo is unchanged.
 
 ## Setup
 
