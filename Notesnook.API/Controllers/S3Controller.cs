@@ -71,7 +71,7 @@ namespace Notesnook.API.Controllers
             catch (Exception ex)
             {
                 logger.LogError(ex, "Error uploading attachment for user.");
-                return BadRequest(new { error = "Failed to upload attachment." });
+                return BadRequest(new { error = $"Failed to upload attachment: ${ex.Message}." });
             }
         }
 
