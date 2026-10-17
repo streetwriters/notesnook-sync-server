@@ -125,6 +125,9 @@ namespace Streetwriters.Identity.Controllers
         {
             var user = await UserManager.GetUserAsync(User) ?? throw new Exception("User not found.");
 
+            if (form.IsFallback && !await UserManager.GetTwoFactorEnabledAsync(user))
+                return BadRequest("Please enable 2FA.");
+
             if (!await MFAService.VerifyOTPAsync(user, form.VerificationCode, form.Type))
                 return BadRequest("Invalid verification code.");
 
