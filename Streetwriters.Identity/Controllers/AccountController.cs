@@ -120,9 +120,6 @@ namespace Streetwriters.Identity.Controllers
                             await client.OnEmailConfirmed(userId);
                         }
 
-                        if (!await UserManager.GetTwoFactorEnabledAsync(user))
-                            await MFAService.EnableMFAAsync(user, MFAMethods.Email);
-
                         return Content(
                             emailConfirmedPageHtml.Replace("{{subheading}}", "Your email has been confirmed."),
                             "text/html"

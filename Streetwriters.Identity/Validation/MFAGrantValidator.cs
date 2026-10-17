@@ -133,8 +133,10 @@ namespace Streetwriters.Identity.Validation
 
             // This must be done after the MFA code is verified
             // otherwise the security stamp will be updated
-            // making all the 2FA code invalid
-            if (!await UserManager.GetTwoFactorEnabledAsync(user))
+            // making all the 2FA code invalid.
+            // Old clients don't support optional 2FA so we keep enforcing it for them.
+            var supportsOptionalMFA = context.Request.Raw["mfa:optional"] == "true";
+            if (!supportsOptionalMFA && !await UserManager.GetTwoFactorEnabledAsync(user))
                 await MFAService.EnableMFAAsync(user, MFAMethods.Email);
 
             await UserManager.ResetAccessFailedCountAsync(user);

@@ -75,7 +75,9 @@ namespace Streetwriters.Identity.Validation
             };
 
             var isMultiFactor = await UserManager.GetTwoFactorEnabledAsync(user);
-            if (!isMultiFactor)
+            // Old clients always expect the MFA step so only skip it for clients that support optional 2FA
+            var supportsOptionalMFA = context.Request.Raw["mfa:optional"] == "true";
+            if (!isMultiFactor && supportsOptionalMFA)
             {
                 context.Result.IsError = false;
                 context.Result.Subject = await TokenGenerationService.TransformTokenRequestAsync(context.Request, user, GrantType, [Config.MFA_PASSWORD_GRANT_TYPE_SCOPE]);

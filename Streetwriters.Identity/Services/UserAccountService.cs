@@ -77,7 +77,8 @@ namespace Streetwriters.Identity.Services
             var result = await userManager.RemovePasswordAsync(user);
             if (!result.Succeeded) return false;
 
-            await mfaService.ResetMFAAsync(user);
+            if (await userManager.GetTwoFactorEnabledAsync(user))
+                await mfaService.ResetMFAAsync(user);
             result = await userManager.AddPasswordAsync(user, newPassword);
 
             // force change email to lowercase if it is not already
