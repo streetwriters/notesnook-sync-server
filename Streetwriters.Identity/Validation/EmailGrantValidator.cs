@@ -63,7 +63,8 @@ namespace Streetwriters.Identity.Validation
         {
             var email = context.Request.Raw["email"];
             var clientId = context.Request.ClientId;
-            var user = await UserManager.FindRegisteredUserAsync(email, clientId) ?? new User
+            var registeredUser = await UserManager.FindRegisteredUserAsync(email, clientId);
+            var user = registeredUser ?? new User
             {
                 Id = MongoDB.Bson.ObjectId.GenerateNewId(),
                 Email = email,
@@ -75,9 +76,10 @@ namespace Streetwriters.Identity.Validation
             };
 
             var isMultiFactor = await UserManager.GetTwoFactorEnabledAsync(user);
-            // Old clients always expect the MFA step so only skip it for clients that support optional 2FA
+            // Old clients always expect the MFA step so only skip it for clients that support optional 2FA.
+            // Unregistered users must always go through the MFA step so we don't expose whether an account exists.
             var supportsOptionalMFA = context.Request.Raw["mfa:optional"] == "true";
-            if (!isMultiFactor && supportsOptionalMFA)
+            if (registeredUser != null && !isMultiFactor && supportsOptionalMFA)
             {
                 context.Result.IsError = false;
                 context.Result.Subject = await TokenGenerationService.TransformTokenRequestAsync(context.Request, user, GrantType, [Config.MFA_PASSWORD_GRANT_TYPE_SCOPE]);

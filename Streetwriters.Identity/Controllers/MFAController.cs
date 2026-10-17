@@ -79,9 +79,14 @@ namespace Streetwriters.Identity.Controllers
         }
 
         [HttpDelete]
-        public async Task<IActionResult> Disable2FA()
+        public async Task<IActionResult> Disable2FA([FromForm] string password)
         {
             var user = await UserManager.GetUserAsync(User) ?? throw new Exception("User not found.");
+
+            var result = await SignInManager.CheckPasswordSignInAsync(user, password, true);
+            if (result.IsLockedOut) return BadRequest("Too many failed attempts. Please try again later.");
+            if (!result.Succeeded) return BadRequest("Wrong password.");
+
             if (!await UserManager.GetTwoFactorEnabledAsync(user)) return Ok();
             await MFAService.DisableMFAAsync(user);
             return Ok();
