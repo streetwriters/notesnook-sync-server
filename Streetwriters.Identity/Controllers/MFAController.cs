@@ -78,7 +78,7 @@ namespace Streetwriters.Identity.Controllers
             }
         }
 
-        [HttpDelete]
+        [HttpPost("disable")]
         public async Task<IActionResult> Disable2FA([FromForm] string password)
         {
             var user = await UserManager.GetUserAsync(User) ?? throw new Exception("User not found.");
@@ -88,7 +88,7 @@ namespace Streetwriters.Identity.Controllers
             if (!result.Succeeded) return BadRequest("Wrong password.");
 
             if (!await UserManager.GetTwoFactorEnabledAsync(user)) return Ok();
-            await MFAService.DisableMFAAsync(user);
+            if (!await MFAService.DisableMFAAsync(user)) return BadRequest("Failed to disable 2FA.");
             return Ok();
         }
 

@@ -100,7 +100,7 @@ namespace Streetwriters.Identity.Validation
                 }
             };
             context.Result.IsError = false;
-            context.Result.Subject = await TokenGenerationService.TransformTokenRequestAsync(context.Request, user, GrantType, new string[] { Config.MFA_GRANT_TYPE_SCOPE });
+            context.Result.Subject = await TokenGenerationService.TransformTokenRequestAsync(context.Request, user, GrantType, [Config.MFA_GRANT_TYPE_SCOPE]);
         }
     }
 }
