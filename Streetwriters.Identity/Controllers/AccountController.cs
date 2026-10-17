@@ -120,9 +120,6 @@ namespace Streetwriters.Identity.Controllers
                             await client.OnEmailConfirmed(userId);
                         }
 
-                        if (!await UserManager.GetTwoFactorEnabledAsync(user))
-                            await MFAService.EnableMFAAsync(user, MFAMethods.Email);
-
                         return Content(
                             emailConfirmedPageHtml.Replace("{{subheading}}", "Your email has been confirmed."),
                             "text/html"
@@ -145,7 +142,7 @@ namespace Streetwriters.Identity.Controllers
 
         [HttpPost("verify")]
         [EnableRateLimiting("strict")]
-        public async Task<IActionResult> SendVerificationEmail([FromForm] string newEmail)
+        public async Task<IActionResult> SendVerificationEmail([FromForm] string? newEmail)
         {
             var client = Clients.FindClientById(User.FindFirstValue("client_id"));
             if (client == null) return BadRequest("Invalid client_id.");

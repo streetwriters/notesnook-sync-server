@@ -70,6 +70,7 @@ namespace Streetwriters.Identity.Services
             await this.RemoveSecondaryMethodAsync(user);
 
             await UserManager.ResetAuthenticatorKeyAsync(user);
+            await UserManager.GenerateNewTwoFactorRecoveryCodesAsync(user, 0);
             return true;
         }
 

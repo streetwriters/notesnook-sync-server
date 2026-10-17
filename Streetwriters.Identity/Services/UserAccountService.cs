@@ -34,12 +34,6 @@ namespace Streetwriters.Identity.Services
             var claims = await userManager.GetClaimsAsync(user);
             var marketingConsentClaim = claims.FirstOrDefault((claim) => claim.Type == $"{clientId}:marketing_consent");
 
-            if (await userManager.IsEmailConfirmedAsync(user) && !await userManager.GetTwoFactorEnabledAsync(user))
-            {
-                await mfaService.EnableMFAAsync(user, MFAMethods.Email);
-                user = await userManager.FindByIdAsync(userId);
-                ArgumentNullException.ThrowIfNull(user);
-            }
             ArgumentNullException.ThrowIfNull(user.Email);
 
             return new UserModel
@@ -83,7 +77,8 @@ namespace Streetwriters.Identity.Services
             var result = await userManager.RemovePasswordAsync(user);
             if (!result.Succeeded) return false;
 
-            await mfaService.ResetMFAAsync(user);
+            if (await userManager.GetTwoFactorEnabledAsync(user))
+                await mfaService.ResetMFAAsync(user);
             result = await userManager.AddPasswordAsync(user, newPassword);
 
             // force change email to lowercase if it is not already
@@ -170,6 +165,7 @@ namespace Streetwriters.Identity.Services
                     }
                     else
                     {
+                        await mfaService.EnableMFAAsync(user, MFAMethods.Email);
                         if (userAgent != null) await userManager.AddClaimAsync(user, new Claim("platform", PlatformFromUserAgent(userAgent)));
                         var code = await userManager.GenerateEmailConfirmationTokenAsync(user);
                         var callbackUrl = UrlExtensions.TokenLink(user.Id.ToString(), code, client.Id, TokenType.CONFRIM_EMAIL);

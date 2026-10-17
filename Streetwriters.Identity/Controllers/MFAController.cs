@@ -78,10 +78,18 @@ namespace Streetwriters.Identity.Controllers
             }
         }
 
-        [HttpDelete]
-        public IActionResult Disable2FA()
+        [HttpPost("disable")]
+        public async Task<IActionResult> Disable2FA([FromForm] string password)
         {
-            return BadRequest("2FA is mandatory and cannot be disabled.");
+            var user = await UserManager.GetUserAsync(User) ?? throw new Exception("User not found.");
+
+            var result = await SignInManager.CheckPasswordSignInAsync(user, password, true);
+            if (result.IsLockedOut) return BadRequest("Too many failed attempts. Please try again later.");
+            if (!result.Succeeded) return BadRequest("Wrong password.");
+
+            if (!await UserManager.GetTwoFactorEnabledAsync(user)) return Ok();
+            if (!await MFAService.DisableMFAAsync(user)) return BadRequest("Failed to disable 2FA.");
+            return Ok();
         }
 
         [HttpGet("codes")]
@@ -116,6 +124,9 @@ namespace Streetwriters.Identity.Controllers
         public async Task<IActionResult> EnableAuthenticator([FromForm] MultiFactorEnableForm form)
         {
             var user = await UserManager.GetUserAsync(User) ?? throw new Exception("User not found.");
+
+            if (form.IsFallback && !await UserManager.GetTwoFactorEnabledAsync(user))
+                return BadRequest("Please enable 2FA.");
 
             if (!await MFAService.VerifyOTPAsync(user, form.VerificationCode, form.Type))
                 return BadRequest("Invalid verification code.");
