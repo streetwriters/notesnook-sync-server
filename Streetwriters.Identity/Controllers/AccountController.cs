@@ -308,7 +308,7 @@ namespace Streetwriters.Identity.Controllers
             var jti = User.FindFirstValue("jti");
             var userId = User.GetSubjectId();
             var clientId = User.FindFirstValue("client_id");
-            if (await UserAccountService.ClearSessionsAsync(userId, clientId, all, refresh_token, jti))
+            if (await UserAccountService.ClearSessionsAsync(userId, clientId, all, jti, refresh_token))
                 await SendLogoutMessageAsync(userId, "Session revoked.");
             return Ok();
         }
