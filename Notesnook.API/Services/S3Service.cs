@@ -460,7 +460,9 @@ namespace Notesnook.API.Services
 
         private static string? GetFullObjectName(string userId, string name)
         {
-            if (userId == null || !Regex.IsMatch(name, "[0-9a-zA-Z!" + Regex.Escape("-") + "_.*'()]")) return null;
+            // the whole name must be made of S3's safe characters (no "/") so it
+            // can't escape the user's directory
+            if (userId == null || name == null || !Regex.IsMatch(name, @"^[0-9a-zA-Z!\-_.*'()]+$") || name == "." || name == "..") return null;
             return $"{userId}/{name}";
         }
 
