@@ -25,10 +25,12 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.Extensions.Logging;
 using Notesnook.API.Interfaces;
 using Notesnook.API.Models;
 using Notesnook.API.Models.Responses;
+using Notesnook.API.Services;
 using Streetwriters.Common;
 using Streetwriters.Common.Accessors;
 using Streetwriters.Common.Extensions;
@@ -40,7 +42,7 @@ namespace Notesnook.API.Controllers
     [ApiController]
     [Authorize]
     [Route("users")]
-    public class UsersController(IUserService UserService, WampServiceAccessor serviceAccessor, ILogger<UsersController> logger) : ControllerBase
+    public class UsersController(IUserService UserService, IUserKeysService UserKeysService, WampServiceAccessor serviceAccessor, ILogger<UsersController> logger) : ControllerBase
     {
         [HttpPost]
         [AllowAnonymous]
@@ -74,14 +76,16 @@ namespace Notesnook.API.Controllers
             }
         }
 
+        [Obsolete("Only for old clients. Use POST /users/keys and PUT/DELETE /users/keys/inbox instead.")]
         [HttpPatch]
         public async Task<IActionResult> UpdateUser([FromBody] UserKeys keys)
         {
             var userId = User.GetUserId();
             try
             {
-                await UserService.SetUserKeysAsync(userId, keys);
-                return Ok();
+                if (!await UserKeysService.AddUserKeysAsync(userId, keys))
+                    return Conflict(new { error = "Your encryption keys were changed on another device. Please try again." });
+                return Ok(await UserService.GetUserAsync(userId));
             }
             catch (Exception ex)
             {
@@ -90,23 +94,164 @@ namespace Notesnook.API.Controllers
             }
         }
 
+        [HttpPost("keys")]
+        public async Task<IActionResult> GetOrCreateKeys([FromBody] UserKeys keys, [FromQuery] long? revision)
+        {
+            var userId = User.GetUserId();
+            try
+            {
+                var result = await UserKeysService.GetOrCreateUserKeysAsync(userId, keys, revision);
+                if (result != KeyWriteResult.Success) return KeyWriteRejected(result);
+                return Ok(await UserService.GetUserAsync(userId));
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to create keys for user with id: {UserId}", userId);
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Commits the pending keys of a password change that failed after the
+        /// password was changed. Clients call this when logging in with a
+        /// password that unwraps the pending keys, which proves it's the new one.
+        /// </summary>
+        /// <param name="revision">revision of the user whose pending keys the client checked</param>
+        [HttpPost("keys/pending/commit")]
+        public async Task<IActionResult> CommitPendingKeys([FromQuery, BindRequired] long revision)
+        {
+            var userId = User.GetUserId();
+            try
+            {
+                var result = await UserKeysService.CommitPendingKeysAsync(userId, revision);
+                if (result != KeyWriteResult.Success) return KeyWriteRejected(result);
+                await EndOtherSessionsAsync(userId);
+                return Ok(await UserService.GetUserAsync(userId));
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to commit pending keys for user with id: {UserId}", userId);
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Discards the pending keys of a password change that failed before
+        /// the password was changed. Clients call this when logging in with a
+        /// password that doesn't unwrap the pending keys.
+        /// </summary>
+        /// <param name="revision">revision of the user whose pending keys the client checked</param>
+        [HttpPost("keys/pending/discard")]
+        public async Task<IActionResult> DiscardPendingKeys([FromQuery, BindRequired] long revision)
+        {
+            var userId = User.GetUserId();
+            try
+            {
+                var result = await UserKeysService.DiscardPendingKeysAsync(userId, revision);
+                if (result != KeyWriteResult.Success) return KeyWriteRejected(result);
+                return Ok(await UserService.GetUserAsync(userId));
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to discard pending keys for user with id: {UserId}", userId);
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
+        [HttpPut("keys/inbox")]
+        public async Task<IActionResult> SetInboxKeys([FromBody] InboxKeys keys, [FromQuery] long? revision)
+        {
+            var userId = User.GetUserId();
+            if (keys.Public == null || keys.Private == null)
+                return BadRequest(new { error = "Both public and private inbox keys are required." });
+            try
+            {
+                var result = await UserKeysService.SetInboxKeysAsync(userId, keys, revision);
+                if (result != KeyWriteResult.Success) return KeyWriteRejected(result);
+                return Ok(await UserService.GetUserAsync(userId));
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to set inbox keys for user with id: {UserId}", userId);
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
+        [HttpDelete("keys/inbox")]
+        public async Task<IActionResult> RemoveInboxKeys()
+        {
+            var userId = User.GetUserId();
+            try
+            {
+                if (!await UserKeysService.RemoveInboxKeysAsync(userId))
+                    return KeyWriteRejected(KeyWriteResult.PasswordChangeInProgress);
+                return Ok(await UserService.GetUserAsync(userId));
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to remove inbox keys for user with id: {UserId}", userId);
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
         [HttpPatch("password/{type}")]
         public async Task<IActionResult> ChangePassword([FromRoute] string type, [FromBody] ChangePasswordForm form)
         {
             var userId = User.GetUserId();
-            var clientId = User.FindFirstValue("client_id");
-            var jti = User.FindFirstValue("jti");
             var isPasswordReset = type == "reset";
             try
             {
-                var result = isPasswordReset ? await serviceAccessor.UserAccountService.ResetPasswordAsync(userId, form.NewPassword) : await serviceAccessor.UserAccountService.ChangePasswordAsync(userId, form.OldPassword, form.NewPassword);
-                if (!result)
+                // keys are staged first and replace the current keys only once
+                // the password has changed
+                var stagedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                var staged = await UserKeysService.StageKeysAsync(userId, form.UserKeys, form.Revision, stagedAt);
+                if (staged != KeyWriteResult.Success) return KeyWriteRejected(staged);
+
+                var changed = await TryChangePasswordAsync(userId, form, isPasswordReset);
+                // an interrupted change might still have set the password, so
+                // we ask Identity instead of assuming
+                if (changed == null) changed = await IsPasswordSetAsync(userId, form.NewPassword);
+                // if even that is unknown, the pending keys are kept: logging
+                // in commits or discards them
+                if (changed == null) return BadRequest(new { error = "Your password might have been changed. Please log in again." });
+                if (changed == false)
+                {
+                    await UserKeysService.DiscardStagedKeysAsync(userId, stagedAt);
                     return BadRequest("Failed to change password.");
+                }
 
-                await UserService.SetUserKeysAsync(userId, form.UserKeys);
+                // only fails if the pending keys were resolved by a login
+                // while the password was being changed
+                var committed = await UserKeysService.CommitStagedKeysAsync(userId, stagedAt);
+                if (committed != KeyWriteResult.Success)
+                {
+                    logger.LogError("Password of user with id {UserId} was changed but its pending keys were gone", userId);
+                    return BadRequest(new { error = "Your password was changed but your encryption keys could not be updated. Please contact support." });
+                }
 
+                await EndOtherSessionsAsync(userId);
+                return Ok(await UserService.GetUserAsync(userId));
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to change password");
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
+
+        /// <summary>
+        /// Logs out the user's other sessions after their keys were rewrapped.
+        /// The keys are already committed, so a failure here mustn't fail the
+        /// request: the client has to switch to the new password regardless.
+        /// </summary>
+        private async Task EndOtherSessionsAsync(string userId)
+        {
+            var clientId = User.FindFirstValue("client_id");
+            var jti = User.FindFirstValue("jti");
+            try
+            {
                 await serviceAccessor.UserAccountService.ClearSessionsAsync(userId, clientId, all: false, jti, null);
-
                 await WampServers.MessengerServer.PublishMessageAsync(MessengerServerTopics.SendSSETopic, new SendSSEMessage
                 {
                     UserId = userId,
@@ -117,16 +262,52 @@ namespace Notesnook.API.Controllers
                         Data = JsonSerializer.Serialize(new { reason = "Password changed." })
                     }
                 });
-
-                return Ok();
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Failed to change password");
-                return BadRequest(new { error = ex.Message });
+                logger.LogError(ex, "Failed to end other sessions of user with id: {UserId}", userId);
             }
         }
 
+        /// <returns>null if it's unknown whether the password was changed</returns>
+        private async Task<bool?> TryChangePasswordAsync(string userId, ChangePasswordForm form, bool isPasswordReset)
+        {
+            try
+            {
+                return isPasswordReset
+                    ? await serviceAccessor.UserAccountService.ResetPasswordAsync(userId, form.NewPassword)
+                    : await serviceAccessor.UserAccountService.ChangePasswordAsync(userId, form.OldPassword, form.NewPassword);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to change password of user with id: {UserId}", userId);
+                return null;
+            }
+        }
+
+        /// <returns>null if the password couldn't be verified</returns>
+        private async Task<bool?> IsPasswordSetAsync(string userId, string password)
+        {
+            try
+            {
+                return await serviceAccessor.UserAccountService.VerifyPasswordAsync(userId, password);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to verify password of user with id: {UserId}", userId);
+                return null;
+            }
+        }
+
+        private ConflictObjectResult KeyWriteRejected(KeyWriteResult result)
+        {
+            return result switch
+            {
+                KeyWriteResult.WrappedWithOldPassword => Conflict(new { error = "password_changed", error_description = "Your password was changed on another device. Please log in again." }),
+                KeyWriteResult.KeysChanged => Conflict(new { error = "keys_changed", error_description = "Your account was updated on another device. Please try again." }),
+                _ => Conflict(new { error = "password_change_in_progress", error_description = "Your password is being changed. If this doesn't go away, please log in again." })
+            };
+        }
 
         [HttpGet("verifier")]
         public async Task<IActionResult> GetEncryptionVerifier()

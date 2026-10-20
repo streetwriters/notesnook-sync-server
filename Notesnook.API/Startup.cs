@@ -227,6 +227,7 @@ namespace Notesnook.API
             services.AddScoped<ISyncItemsRepositoryAccessor, SyncItemsRepositoryAccessor>();
             services.AddScoped<SyncDeviceService>();
             services.AddScoped<IUserService, UserService>();
+            services.AddScoped<IUserKeysService, UserKeysService>();
             services.AddScoped<IS3Service, S3Service>();
             services.AddHttpClient("S3Upload", client =>
             {

@@ -24,6 +24,15 @@ namespace Notesnook.API.Models.Responses
         [JsonPropertyName("inboxKeys")]
         public InboxKeys? InboxKeys { get; set; }
 
+        [JsonPropertyName("revision")]
+        public long Revision { get; set; }
+
+        /// <summary>
+        /// Keys of a password change that is in progress or failed midway.
+        /// </summary>
+        [JsonPropertyName("pendingKeys")]
+        public UserKeys? PendingKeys { get; set; }
+
         [JsonPropertyName("subscription")]
         public Subscription? Subscription { get; set; }
 

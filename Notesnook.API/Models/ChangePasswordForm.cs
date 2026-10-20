@@ -20,5 +20,13 @@ namespace Notesnook.API.Models
         {
             get; set;
         }
+
+        /// <summary>
+        /// Revision of the user the keys were rewrapped from.
+        /// </summary>
+        public long? Revision
+        {
+            get; set;
+        }
     }
 }

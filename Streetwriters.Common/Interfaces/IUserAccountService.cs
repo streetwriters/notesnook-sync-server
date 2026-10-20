@@ -14,6 +14,8 @@ namespace Streetwriters.Common.Interfaces
         Task<bool> ChangePasswordAsync(string userId, string oldPassword, string newPassword);
         [WampProcedure("co.streetwriters.identity.users.reset_password")]
         Task<bool> ResetPasswordAsync(string userId, string newPassword);
+        [WampProcedure("co.streetwriters.identity.users.verify_password")]
+        Task<bool> VerifyPasswordAsync(string userId, string password);
         [WampProcedure("co.streetwriters.identity.users.clear_sessions")]
         Task<bool> ClearSessionsAsync(string userId, string clientId, bool all, string jti, string? refreshToken);
         [WampProcedure("co.streetwriters.identity.users.create_user")]

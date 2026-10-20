@@ -139,6 +139,8 @@ namespace Notesnook.API.Services
                 DataEncryptionKey = userSettings.DataEncryptionKey,
                 LegacyDataEncryptionKey = userSettings.LegacyDataEncryptionKey,
                 InboxKeys = userSettings.InboxKeys,
+                Revision = userSettings.Revision,
+                PendingKeys = userSettings.PendingKeys,
                 Salt = userSettings.Salt,
                 Subscription = subscription,
                 StorageUsed = userSettings.StorageLimit.Value,
@@ -146,51 +148,6 @@ namespace Notesnook.API.Services
                 Success = true,
                 StatusCode = 200
             };
-        }
-
-        public async Task SetUserKeysAsync(string userId, UserKeys keys)
-        {
-            var userSettings = await Repositories.UsersSettings.FindOneAsync((u) => u.UserId == userId) ?? throw new Exception("User not found.");
-
-            if (keys.AttachmentsKey != null)
-            {
-                userSettings.AttachmentsKey = keys.AttachmentsKey;
-            }
-            if (keys.MonographPasswordsKey != null)
-            {
-                userSettings.MonographPasswordsKey = keys.MonographPasswordsKey;
-            }
-            if (keys.DataEncryptionKey != null)
-                userSettings.DataEncryptionKey = keys.DataEncryptionKey;
-            if (keys.LegacyDataEncryptionKey != null)
-                userSettings.LegacyDataEncryptionKey = keys.LegacyDataEncryptionKey;
-
-            if (keys.InboxKeys != null)
-            {
-                if (keys.InboxKeys.Public == null || keys.InboxKeys.Private == null)
-                {
-                    userSettings.InboxKeys = null;
-                    await Repositories.InboxApiKey.DeleteManyAsync(t => t.UserId == userId);
-                }
-                else
-                {
-                    userSettings.InboxKeys = keys.InboxKeys;
-                }
-
-                await Repositories.InboxItems.DeleteManyAsync(t => t.UserId == userId);
-                await WampServers.MessengerServer.PublishMessageAsync(MessengerServerTopics.SendSSETopic, new SendSSEMessage
-                {
-                    OriginTokenId = null,
-                    UserId = userId,
-                    Message = new Message
-                    {
-                        Type = "inboxUpdated",
-                        Data = JsonSerializer.Serialize(new { reason = "Inbox PGP keys added, updated, or removed." })
-                    }
-                });
-            }
-
-            await Repositories.UsersSettings.UpdateAsync(userSettings.Id, userSettings);
         }
 
         public async Task<EncryptedData?> GetEncryptionVerifier(string userId)
@@ -299,17 +256,17 @@ namespace Notesnook.API.Services
 
             await syncDeviceService.ResetDevicesAsync(userId);
 
-            var userSettings = await Repositories.UsersSettings.FindOneAsync((s) => s.UserId == userId);
-
-            userSettings.AttachmentsKey = null;
-            userSettings.MonographPasswordsKey = null;
-            userSettings.DataEncryptionKey = null;
-            userSettings.LegacyDataEncryptionKey = null;
-            userSettings.VaultKey = null;
-            userSettings.InboxKeys = null;
-            userSettings.LastSynced = 0;
-
-            await Repositories.UsersSettings.UpsertAsync(userSettings, (s) => s.UserId == userId);
+            await Repositories.UsersSettings.Collection.UpdateOneAsync(Builders<UserSettings>.Filter.Eq((s) => s.UserId, userId), Builders<UserSettings>.Update
+                .Set((s) => s.AttachmentsKey, null)
+                .Set((s) => s.MonographPasswordsKey, null)
+                .Set((s) => s.DataEncryptionKey, null)
+                .Set((s) => s.LegacyDataEncryptionKey, null)
+                .Set((s) => s.VaultKey, null)
+                .Set((s) => s.InboxKeys, null)
+                .Set((s) => s.PendingKeys, null)
+                .Set((s) => s.PendingKeysSince, null)
+                .Set((s) => s.LastSynced, 0)
+                .Inc((s) => s.Revision, 1));
 
             if (removeAttachments)
                 await S3Service.DeleteDirectoryAsync(userId);

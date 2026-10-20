@@ -59,6 +59,20 @@ namespace Notesnook.API.Models
         public EncryptedData? LegacyDataEncryptionKey { get; set; }
         public InboxKeys? InboxKeys { get; set; }
         public Limit? StorageLimit { get; set; }
+        /// <summary>
+        /// Incremented on every change to the user's keys.
+        /// </summary>
+        public long Revision { get; set; }
+        /// <summary>
+        /// Revision at which the password (and so the master key) last changed.
+        /// Keys wrapped from an older revision are wrapped with an old master key.
+        /// </summary>
+        public long MasterKeyRevision { get; set; }
+        /// <summary>
+        /// Keys rewrapped for a password change that hasn't completed yet.
+        /// </summary>
+        public UserKeys? PendingKeys { get; set; }
+        public long? PendingKeysSince { get; set; }
 
         [BsonId]
         [BsonRepresentation(BsonType.ObjectId)]

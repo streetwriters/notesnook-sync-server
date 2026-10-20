@@ -32,6 +32,5 @@ namespace Notesnook.API.Interfaces
         Task<bool> ResetUserAsync(string userId, bool removeAttachments);
         Task<UserResponse> GetUserAsync(string userId);
         Task<EncryptedData?> GetEncryptionVerifier(string userId);
-        Task SetUserKeysAsync(string userId, UserKeys keys);
     }
 }

@@ -74,20 +74,30 @@ namespace Streetwriters.Identity.Services
         {
             var user = await userManager.FindByIdAsync(userId) ?? throw new Exception("User not found.");
 
-            var result = await userManager.RemovePasswordAsync(user);
+            // a single write, so a failed reset leaves the old password set
+            var resetToken = await userManager.GeneratePasswordResetTokenAsync(user);
+            var result = await userManager.ResetPasswordAsync(user, resetToken, newPassword);
             if (!result.Succeeded) return false;
 
             if (await userManager.GetTwoFactorEnabledAsync(user))
                 await mfaService.ResetMFAAsync(user);
-            result = await userManager.AddPasswordAsync(user, newPassword);
 
             // force change email to lowercase if it is not already
             if (user.Email != null && user.Email != user.Email.ToLower())
             {
                 var token = await userManager.GenerateChangeEmailTokenAsync(user, user.Email.ToLower());
-                result = await userManager.ChangeEmailAsync(user, user.Email.ToLower(), token);
+                // the password is already reset so this mustn't fail the reset
+                var emailResult = await userManager.ChangeEmailAsync(user, user.Email.ToLower(), token);
+                if (!emailResult.Succeeded)
+                    logger.LogWarning("Failed to lowercase email of user {UserId}: {Errors}", userId, string.Join(", ", emailResult.Errors.Select((e) => e.Description)));
             }
-            return result.Succeeded;
+            return true;
+        }
+
+        public async Task<bool> VerifyPasswordAsync(string userId, string password)
+        {
+            var user = await userManager.FindByIdAsync(userId) ?? throw new Exception("User not found.");
+            return await userManager.CheckPasswordAsync(user, password);
         }
 
         public async Task<bool> ClearSessionsAsync(string userId, string clientId, bool all, string jti, string? refreshToken)
@@ -113,7 +123,10 @@ namespace Streetwriters.Identity.Services
 
             await WampServers.NotesnookServer.PublishMessageAsync(IdentityServerTopics.ClearCacheTopic, new ClearCacheMessage(removedKeys));
             await WampServers.MessengerServer.PublishMessageAsync(IdentityServerTopics.ClearCacheTopic, new ClearCacheMessage(removedKeys));
-            await WampServers.SubscriptionServer.PublishMessageAsync(IdentityServerTopics.ClearCacheTopic, new ClearCacheMessage(removedKeys));
+            if (!Constants.IS_SELF_HOSTED)
+            {
+                await WampServers.SubscriptionServer.PublishMessageAsync(IdentityServerTopics.ClearCacheTopic, new ClearCacheMessage(removedKeys));
+            }
             // await SendLogoutMessageAsync(user.Id.ToString(), "Session revoked.");
             return true;
         }
