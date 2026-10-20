@@ -109,6 +109,7 @@ namespace Streetwriters.Identity.Validation
                         var recoveryCodeResult = await UserManager.RedeemTwoFactorRecoveryCodeAsync(user, mfaCode);
                         if (!recoveryCodeResult.Succeeded)
                         {
+                            await UserManager.AccessFailedAsync(user);
                             context.Result.IsError = true;
                             context.Result.Error = "invalid_2fa_recovery_code";
                             context.Result.ErrorDescription = recoveryCodeResult.Errors.ToErrors().First();
@@ -120,19 +121,19 @@ namespace Streetwriters.Identity.Validation
                         var isMFACodeValid = await MFAService.VerifyOTPAsync(user, mfaCode, mfaMethod);
                         if (!isMFACodeValid)
                         {
+                            await UserManager.AccessFailedAsync(user);
                             context.Result.IsError = true;
                             context.Result.Error = "invalid_2fa_code";
                             context.Result.ErrorDescription = "Please provide a valid multi factor authentication code.";
                             return;
                         }
                     }
-
-                    // if we are here, it means we succeeded.
-                    success = true;
                 }
 
                 if (success)
                 {
+                    // CheckPasswordSignInAsync doesn't reset lockout when 2FA is enabled
+                    await UserManager.ResetAccessFailedCountAsync(user);
                     var sub = await UserManager.GetUserIdAsync(user);
                     context.Result = new GrantValidationResult(sub, AuthenticationMethods.Password);
                     return;
