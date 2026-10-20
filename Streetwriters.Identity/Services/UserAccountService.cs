@@ -60,6 +60,7 @@ namespace Streetwriters.Identity.Services
             if (!await userManager.CheckPasswordAsync(user, password)) throw new Exception("Wrong password.");
 
             await userManager.DeleteAsync(user);
+            await persistedGrantStore.RemoveAllAsync(new PersistedGrantFilter { SubjectId = userId });
         }
 
         public async Task<bool> ChangePasswordAsync(string userId, string oldPassword, string newPassword)

@@ -53,9 +53,10 @@ namespace Streetwriters.Identity.Services
             context.IssuedClaims.AddRange(claims);
         }
 
-        public Task IsActiveAsync(IsActiveContext context)
+        public async Task IsActiveAsync(IsActiveContext context)
         {
-            return Task.CompletedTask;
+            // deleted users must not be able to refresh or introspect their tokens
+            context.IsActive = await UserManager.GetUserAsync(context.Subject) != null;
         }
     }
 }
