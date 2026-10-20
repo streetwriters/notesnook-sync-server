@@ -241,7 +241,7 @@ namespace Streetwriters.Identity.Controllers
 
             if (!await UserManager.VerifyUserTokenAsync(user, TokenOptions.DefaultProvider, "PasswordResetAuthorizationCode", form.Code))
                 return BadRequest("Invalid authorization_code.");
-            var token = await TokenGenerationService.CreateAccessTokenAsync(user, form.ClientId);
+            var token = await TokenGenerationService.CreateAccessTokenAsync(user, form.ClientId, authenticationMethods: [Constants.PASSWORD_RESET_AUTHENTICATION_METHOD]);
             return Ok(new
             {
                 access_token = token,

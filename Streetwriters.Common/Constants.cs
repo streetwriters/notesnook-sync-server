@@ -24,6 +24,8 @@ namespace Streetwriters.Common
     public class Constants
     {
         public static int COMPATIBILITY_VERSION = 1;
+        // amr claim of access tokens issued by the password reset flow
+        public const string PASSWORD_RESET_AUTHENTICATION_METHOD = "password_reset";
         public static bool IS_SELF_HOSTED => ReadSecret("SELF_HOSTED") == "1";
         public static bool DISABLE_SIGNUPS => ReadSecret("DISABLE_SIGNUPS") == "true";
         public static string INSTANCE_NAME => ReadSecret("INSTANCE_NAME") ?? "default";

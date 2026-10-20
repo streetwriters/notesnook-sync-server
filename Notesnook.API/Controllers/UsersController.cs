@@ -22,7 +22,9 @@ using System.Net.Http;
 using System.Security.Claims;
 using System.Text.Json;
 using System.Threading.Tasks;
+using IdentityModel;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
@@ -199,6 +201,10 @@ namespace Notesnook.API.Controllers
         {
             var userId = User.GetUserId();
             var isPasswordReset = type == "reset";
+            // only tokens from the password reset flow can reset the password
+            // without the old one
+            if (isPasswordReset && !User.HasClaim(JwtClaimTypes.AuthenticationMethod, Constants.PASSWORD_RESET_AUTHENTICATION_METHOD))
+                return StatusCode(StatusCodes.Status403Forbidden, new { error = "Please use the password reset link sent to your email to reset your password." });
             try
             {
                 // keys are staged first and replace the current keys only once

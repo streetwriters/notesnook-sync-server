@@ -60,7 +60,7 @@ namespace Streetwriters.Identity.Helpers
             refreshTokenService = _refreshTokenService;
         }
 
-        public async Task<string> CreateAccessTokenAsync(User user, string clientId, int lifetime = 1800)
+        public async Task<string> CreateAccessTokenAsync(User user, string clientId, int lifetime = 1800, string[]? authenticationMethods = null)
         {
             var client = Config.Clients.FirstOrDefault((c) => c.ClientId == clientId);
             if (client == null)
@@ -74,6 +74,7 @@ namespace Streetwriters.Identity.Helpers
                 AdditionalClaims = [.. IdentityPricipal.Claims],
                 DisplayName = user.UserName,
                 AuthenticationTime = System.DateTime.UtcNow,
+                AuthenticationMethods = authenticationMethods ?? [],
                 IdentityProvider = IdentityServerConstants.LocalIdentityProvider
             };
             var Request = new TokenCreationRequest

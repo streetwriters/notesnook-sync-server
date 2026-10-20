@@ -27,7 +27,7 @@ namespace Streetwriters.Identity.Interfaces
 {
     public interface ITokenGenerationService
     {
-        Task<string> CreateAccessTokenAsync(User user, string clientId, int lifetime = 1800);
+        Task<string> CreateAccessTokenAsync(User user, string clientId, int lifetime = 1800, string[]? authenticationMethods = null);
         Task<string> CreateAccessTokenFromValidatedRequestAsync(ValidatedTokenRequest validatedRequest, User user, string[] scopes, int lifetime = 1200);
         Task<ClaimsPrincipal> TransformTokenRequestAsync(ValidatedTokenRequest request, User user, string grantType, string[] scopes, int lifetime = 1200);
         Task<TokenResponse?> CreateUserTokensAsync(User user, string clientId, int lifetime = 1800);
