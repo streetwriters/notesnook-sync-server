@@ -73,7 +73,7 @@ namespace Streetwriters.Identity
                     AccessTokenType = AccessTokenType.Reference,
                     AllowOfflineAccess = true,
                     UpdateAccessTokenClaimsOnRefresh = true,
-                    RefreshTokenUsage = TokenUsage.ReUse,
+                    RefreshTokenUsage = TokenUsage.OneTimeOnly,
                     RefreshTokenExpiration = TokenExpiration.Sliding,
 
                     AccessTokenLifetime = 6 * 3600, // 6 hours

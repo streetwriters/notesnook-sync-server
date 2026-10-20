@@ -271,7 +271,8 @@ namespace Streetwriters.Identity
                 cm.SetIgnoreExtraElements(true);
             });
 
-            services.AddSingleton<IPersistedGrantDbContext, CustomPersistedGrantDbContext>();
+            services.AddSingleton<CustomPersistedGrantDbContext>();
+            services.AddSingleton<IPersistedGrantDbContext>((sp) => sp.GetRequiredService<CustomPersistedGrantDbContext>());
             services.AddTransient<IPersistedGrantStore, PersistedGrantStore>();
             services.AddTransient<TokenCleanup>();
 
@@ -286,7 +287,9 @@ namespace Streetwriters.Identity
                     q.AddTrigger(opts => opts
                         .ForJob(jobKey)
                         .WithIdentity("TokenCleanup-trigger")
-                        .WithSimpleSchedule((s) => s.RepeatForever().WithIntervalInSeconds(tokenCleanUpOptions.Interval)));
+                        // the scheduler starts after a delay, so the first run always
+                        // misfires and must not be skipped until the next interval
+                        .WithSimpleSchedule((s) => s.RepeatForever().WithIntervalInSeconds(tokenCleanUpOptions.Interval).WithMisfireHandlingInstructionFireNow()));
                 }
             });
         }
