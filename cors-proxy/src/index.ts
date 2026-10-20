@@ -3,6 +3,9 @@
  * Built with Bun runtime
  */
 
+import { lookup } from "node:dns/promises";
+import { isIP } from "node:net";
+
 const PORT = Bun.env.PORT || 3000;
 const HOST = Bun.env.HOST || "localhost";
 const ALLOWED_ORIGINS = Bun.env.ALLOWED_ORIGINS?.split(",") || ["*"];
@@ -36,6 +39,100 @@ function isValidUrl(urlString: string): boolean {
   }
 }
 
+function isAllowedOrigin(origin: string): boolean {
+  return ALLOWED_ORIGINS.includes("*") || ALLOWED_ORIGINS.includes(origin);
+}
+
+// Only allow hosts that resolve exclusively to public addresses so the proxy
+// can't be used to reach internal services or cloud metadata endpoints
+async function isPublicHost(hostname: string): Promise<boolean> {
+  const host = hostname.replace(/^\[|\]$/g, "");
+  try {
+    const addresses = isIP(host)
+      ? [{ address: host }]
+      : await lookup(host, { all: true, verbatim: true });
+    return (
+      addresses.length > 0 &&
+      addresses.every(({ address }) => isPublicAddress(address))
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isPublicAddress(address: string): boolean {
+  if (isIP(address) === 4)
+    return isPublicIPv4(...(address.split(".").map(Number) as IPv4Octets));
+
+  const groups = parseIPv6(address);
+  if (!groups) return false;
+  const [g0, g1, g2, g3, g4, g5, g6, g7] = groups;
+  const embeddedIPv4: IPv4Octets = [g6 >> 8, g6 & 0xff, g7 >> 8, g7 & 0xff];
+
+  // ::/96 (includes :: and ::1), ::ffff:0:0/96 (IPv4-mapped)
+  if (!g0 && !g1 && !g2 && !g3 && !g4 && (!g5 || g5 === 0xffff))
+    return isPublicIPv4(...embeddedIPv4);
+  // 64:ff9b::/96 (NAT64)
+  if (g0 === 0x64 && g1 === 0xff9b && !g2 && !g3 && !g4 && !g5)
+    return isPublicIPv4(...embeddedIPv4);
+  // 2002::/16 (6to4)
+  if (g0 === 0x2002)
+    return isPublicIPv4(g1 >> 8, g1 & 0xff, g2 >> 8, g2 & 0xff);
+
+  return !(
+    (g0 & 0xfe00) === 0xfc00 || // fc00::/7 unique local
+    (g0 & 0xffc0) === 0xfe80 || // fe80::/10 link local
+    (g0 & 0xff00) === 0xff00 // ff00::/8 multicast
+  );
+}
+
+function isPublicIPv4(a: number, b: number, c: number, _d: number): boolean {
+  return !(
+    a === 0 ||
+    a === 10 ||
+    a === 127 ||
+    a >= 224 ||
+    (a === 100 && b >= 64 && b <= 127) ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168) ||
+    (a === 192 && b === 0 && c === 0) ||
+    (a === 198 && (b === 18 || b === 19))
+  );
+}
+
+type IPv4Octets = [number, number, number, number];
+type IPv6Groups = [number, number, number, number, number, number, number, number];
+
+function parseIPv6(address: string): IPv6Groups | null {
+  let ip = address.toLowerCase().replace(/%.*$/, "");
+  const ipv4Tail = ip.match(/(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+  if (ipv4Tail) {
+    const [a, b, c, d] = ipv4Tail.slice(1).map(Number) as IPv4Octets;
+    ip =
+      ip.slice(0, ipv4Tail.index) +
+      ((a << 8) | b).toString(16) +
+      ":" +
+      ((c << 8) | d).toString(16);
+  }
+
+  const [head, tail, ...rest] = ip.split("::");
+  if (rest.length) return null;
+  const headGroups = head ? head.split(":") : [];
+  const tailGroups = tail ? tail.split(":") : [];
+  const groups =
+    tail === undefined
+      ? headGroups
+      : [
+          ...headGroups,
+          ...Array(8 - headGroups.length - tailGroups.length).fill("0"),
+          ...tailGroups,
+        ];
+  if (groups.length !== 8 || groups.some((g) => !/^[0-9a-f]{1,4}$/.test(g)))
+    return null;
+  return groups.map((g) => parseInt(g, 16)) as IPv6Groups;
+}
+
 // Handle proxied request with redirect support
 async function proxyRequest(
   targetUrl: string,
@@ -44,6 +141,14 @@ async function proxyRequest(
   if (redirectCount >= MAX_REDIRECTS) {
     return new Response("Too many redirects", {
       status: 508,
+      headers: corsHeaders,
+    });
+  }
+
+  // checked on every hop so redirects can't lead to internal hosts
+  if (!isValidUrl(targetUrl) || !(await isPublicHost(new URL(targetUrl).hostname))) {
+    return new Response("Forbidden target URL", {
+      status: 403,
       headers: corsHeaders,
     });
   }
@@ -96,6 +201,11 @@ async function proxyRequest(
     responseHeaders.delete("x-proxy");
     responseHeaders.delete("x-cache");
 
+    // upstream content is served from the proxy's origin so it must never be
+    // able to run scripts (e.g. HTML or SVG opened directly)
+    responseHeaders.set("Content-Security-Policy", "sandbox");
+    responseHeaders.set("X-Content-Type-Options", "nosniff");
+
     return new Response(response.body, {
       status: response.status,
       statusText: response.statusText,
@@ -118,6 +228,12 @@ const server = Bun.serve({
   hostname: HOST,
   async fetch(req) {
     const url = new URL(req.url);
+
+    const origin = req.headers.get("Origin");
+    if (origin && !isAllowedOrigin(origin)) {
+      logRequest(req.method, url.pathname, 403);
+      return new Response("Origin not allowed", { status: 403 });
+    }
 
     // Health check endpoint
     if (url.pathname === "/health") {

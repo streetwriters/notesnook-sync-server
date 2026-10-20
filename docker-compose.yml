@@ -256,8 +256,11 @@ services:
     image: streetwriters/cors-proxy:latest
     ports:
       - 3001:3000
+    # The proxy fetches arbitrary URLs so it must not share a network with the
+    # other services. To also keep it off your host & LAN, block private ranges
+    # for its subnet in the host firewall (iptables DOCKER-USER chain).
     networks:
-      - notesnook
+      - cors-proxy
     healthcheck:
       test: >
         bun -e "fetch('http://127.0.0.1:3000/health')
@@ -310,6 +313,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
 networks:
   notesnook:
+  cors-proxy:
 
 volumes:
   dbdata:
