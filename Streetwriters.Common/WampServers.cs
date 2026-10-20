@@ -32,15 +32,24 @@ namespace Streetwriters.Common
     public class WampServer
     {
         public required string Endpoint { get; set; }
+        public required int Port { get; set; }
         public required string Address { get; set; }
         public required string Realm { get; set; }
+
+        /// <summary>
+        /// Shared secret that WAMP clients must send to connect. Derived from
+        /// NOTESNOOK_API_SECRET so it doesn't need separate configuration and
+        /// doesn't leak the secret itself if a URL gets logged.
+        /// </summary>
+        internal static string AuthToken => ("wamp:" + Constants.NOTESNOOK_API_SECRET).Sha256();
+        internal const string AuthTokenQueryKey = "token";
 
         private IWampChannel? channel = null;
         private async Task<IWampChannel> GetChannelAsync()
         {
             if (channel != null && channel.RealmProxy.Monitor.IsConnected)
                 return channel;
-            channel = await WampHelper.OpenWampChannelAsync(Address, Realm);
+            channel = await WampHelper.OpenWampChannelAsync($"{Address}?{AuthTokenQueryKey}={Uri.EscapeDataString(AuthToken)}", Realm);
             return channel;
         }
 
@@ -73,28 +82,32 @@ namespace Streetwriters.Common
         public static WampServer MessengerServer { get; } = new WampServer
         {
             Endpoint = "/wamp",
-            Address = $"{Servers.MessengerServer.WS()}/wamp",
+            Port = Constants.SSE_WAMP_PORT,
+            Address = $"ws://{Servers.MessengerServer.Hostname}:{Constants.SSE_WAMP_PORT}/wamp",
             Realm = "messages",
         };
 
         public static WampServer SubscriptionServer { get; } = new WampServer
         {
             Endpoint = "/wamp",
-            Address = $"{Servers.SubscriptionServer.WS()}/wamp",
+            Port = Constants.SUBSCRIPTIONS_WAMP_PORT,
+            Address = $"ws://{Servers.SubscriptionServer.Hostname}:{Constants.SUBSCRIPTIONS_WAMP_PORT}/wamp",
             Realm = "messages",
         };
 
         public static WampServer IdentityServer { get; } = new WampServer
         {
             Endpoint = "/wamp",
-            Address = $"{Servers.IdentityServer.WS()}/wamp",
+            Port = Constants.IDENTITY_WAMP_PORT,
+            Address = $"ws://{Servers.IdentityServer.Hostname}:{Constants.IDENTITY_WAMP_PORT}/wamp",
             Realm = "messages",
         };
 
         public static WampServer NotesnookServer { get; } = new WampServer
         {
             Endpoint = "/wamp",
-            Address = $"{Servers.NotesnookAPI.WS()}/wamp",
+            Port = Constants.NOTESNOOK_WAMP_PORT,
+            Address = $"ws://{Servers.NotesnookAPI.Hostname}:{Constants.NOTESNOOK_WAMP_PORT}/wamp",
             Realm = "messages",
         };
     }

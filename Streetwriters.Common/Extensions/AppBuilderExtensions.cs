@@ -20,7 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 using System;
 using System.Collections.Generic;
 using System.Net;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -59,12 +62,32 @@ namespace Streetwriters.Common.Extensions
         {
             WampHost host = new();
 
-            app.Map(server.Endpoint, builder =>
+            // WAMP is only served on its internal port, and that port serves nothing else.
+            var expectedToken = Encoding.UTF8.GetBytes(WampServer.AuthToken);
+            app.MapWhen(context => context.Connection.LocalPort == server.Port, wampApp =>
             {
-                builder.UseWebSockets();
-                host.RegisterTransport(new AspNetCoreWebSocketTransport(builder),
-                                       new JTokenJsonBinding(),
-                                       new JTokenMsgpackBinding());
+                wampApp.Map(server.Endpoint, builder =>
+                {
+                    builder.Use(async (context, next) =>
+                    {
+                        var token = Encoding.UTF8.GetBytes(context.Request.Query[WampServer.AuthTokenQueryKey].ToString());
+                        if (!CryptographicOperations.FixedTimeEquals(token, expectedToken))
+                        {
+                            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                            return;
+                        }
+                        await next();
+                    });
+                    builder.UseWebSockets();
+                    host.RegisterTransport(new AspNetCoreWebSocketTransport(builder),
+                                           new JTokenJsonBinding(),
+                                           new JTokenMsgpackBinding());
+                });
+                wampApp.Run(context =>
+                {
+                    context.Response.StatusCode = StatusCodes.Status404NotFound;
+                    return Task.CompletedTask;
+                });
             });
 
             host.Open();

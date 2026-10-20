@@ -54,18 +54,21 @@ namespace Streetwriters.Common
         public static string? TWILIO_SERVICE_SID => ReadSecret("TWILIO_SERVICE_SID");
         // Server discovery
         public static int NOTESNOOK_SERVER_PORT => int.Parse(ReadSecret("NOTESNOOK_SERVER_PORT") ?? "80");
+        public static int NOTESNOOK_WAMP_PORT => int.Parse(ReadSecret("NOTESNOOK_WAMP_PORT") ?? (NOTESNOOK_SERVER_PORT + 1).ToString());
         public static string? NOTESNOOK_SERVER_HOST => ReadSecret("NOTESNOOK_SERVER_HOST");
         public static string? NOTESNOOK_CERT_PATH => ReadSecret("NOTESNOOK_CERT_PATH");
         public static string? NOTESNOOK_CERT_KEY_PATH => ReadSecret("NOTESNOOK_CERT_KEY_PATH");
         public static string[] KNOWN_PROXIES => (ReadSecret("KNOWN_PROXIES") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
         public static int IDENTITY_SERVER_PORT => int.Parse(ReadSecret("IDENTITY_SERVER_PORT") ?? "80");
+        public static int IDENTITY_WAMP_PORT => int.Parse(ReadSecret("IDENTITY_WAMP_PORT") ?? (IDENTITY_SERVER_PORT + 1).ToString());
         public static string? IDENTITY_SERVER_HOST => ReadSecret("IDENTITY_SERVER_HOST");
         public static Uri? IDENTITY_SERVER_URL => ReadSecret("IDENTITY_SERVER_URL") is string url ? new Uri(url) : null;
         public static string? IDENTITY_CERT_PATH => ReadSecret("IDENTITY_CERT_PATH");
         public static string? IDENTITY_CERT_KEY_PATH => ReadSecret("IDENTITY_CERT_KEY_PATH");
 
         public static int SSE_SERVER_PORT => int.Parse(ReadSecret("SSE_SERVER_PORT") ?? "80");
+        public static int SSE_WAMP_PORT => int.Parse(ReadSecret("SSE_WAMP_PORT") ?? (SSE_SERVER_PORT + 1).ToString());
         public static string? SSE_SERVER_HOST => ReadSecret("SSE_SERVER_HOST");
         public static string? SSE_CERT_PATH => ReadSecret("SSE_CERT_PATH");
         public static string? SSE_CERT_KEY_PATH => ReadSecret("SSE_CERT_KEY_PATH");
@@ -75,6 +78,7 @@ namespace Streetwriters.Common
         public static string MONGODB_CONNECTION_STRING => ReadSecret("MONGODB_CONNECTION_STRING") ?? throw new ArgumentNullException("MONGODB_CONNECTION_STRING environment variable is not set");
         public static string MONGODB_DATABASE_NAME => ReadSecret("MONGODB_DATABASE_NAME") ?? throw new ArgumentNullException("MONGODB_DATABASE_NAME environment variable is not set");
         public static int SUBSCRIPTIONS_SERVER_PORT => int.Parse(ReadSecret("SUBSCRIPTIONS_SERVER_PORT") ?? "80");
+        public static int SUBSCRIPTIONS_WAMP_PORT => int.Parse(ReadSecret("SUBSCRIPTIONS_WAMP_PORT") ?? (SUBSCRIPTIONS_SERVER_PORT + 1).ToString());
         public static string? SUBSCRIPTIONS_SERVER_HOST => ReadSecret("SUBSCRIPTIONS_SERVER_HOST");
         public static string? SUBSCRIPTIONS_CERT_PATH => ReadSecret("SUBSCRIPTIONS_CERT_PATH");
         public static string? SUBSCRIPTIONS_CERT_KEY_PATH => ReadSecret("SUBSCRIPTIONS_CERT_KEY_PATH");
