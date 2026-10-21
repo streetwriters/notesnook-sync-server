@@ -102,12 +102,6 @@ namespace Streetwriters.Common.Extensions
             return app.ApplicationServices.GetRequiredService<T>();
         }
 
-        public static T GetScopedService<T>(this IApplicationBuilder app) where T : notnull
-        {
-            using var scope = app.ApplicationServices.CreateScope();
-            return scope.ServiceProvider.GetRequiredService<T>();
-        }
-
         public static IApplicationBuilder UseForwardedHeadersWithKnownProxies(this IApplicationBuilder app, IWebHostEnvironment env, string forwardedForHeaderName = null)
         {
             if (!env.IsDevelopment())

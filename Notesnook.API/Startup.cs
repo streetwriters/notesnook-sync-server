@@ -329,13 +329,13 @@ namespace Notesnook.API
             {
                 realm.Subscribe<DeleteUserMessage>(IdentityServerTopics.DeleteUserTopic, async (ev) =>
                 {
-                    IUserService service = app.GetScopedService<IUserService>();
-                    await service.DeleteUserAsync(ev.UserId);
+                    await using var scope = app.ApplicationServices.CreateAsyncScope();
+                    await scope.ServiceProvider.GetRequiredService<IUserService>().DeleteUserAsync(ev.UserId);
                 });
 
                 realm.Subscribe<ClearCacheMessage>(IdentityServerTopics.ClearCacheTopic, (ev) =>
                 {
-                    IDistributedCache cache = app.GetScopedService<IDistributedCache>();
+                    IDistributedCache cache = app.GetService<IDistributedCache>();
                     ev.Keys.ForEach((key) => cache.Remove(key));
                 });
             });

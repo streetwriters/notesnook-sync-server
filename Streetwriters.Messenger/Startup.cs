@@ -130,7 +130,7 @@ namespace Streetwriters.Messenger
                     }
                 });
 
-                IDistributedCache cache = app.GetScopedService<IDistributedCache>();
+                IDistributedCache cache = app.GetService<IDistributedCache>();
                 realm.Subscribe<ClearCacheMessage>(IdentityServerTopics.ClearCacheTopic, (ev) => ev.Keys.ForEach((key) => cache.Remove(key)));
             });
 

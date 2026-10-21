@@ -233,7 +233,7 @@ namespace Streetwriters.Identity
 
             app.UseWamp(WampServers.IdentityServer, (realm, server) =>
             {
-                realm.Services.RegisterCallee(() => app.ApplicationServices.CreateScope().ServiceProvider.GetRequiredService<IUserAccountService>());
+                realm.Services.RegisterCallee(new ScopedUserAccountService(app.ApplicationServices));
 
                 realm.Subscribe(SubscriptionServerTopics.CreateSubscriptionTopic, async (Subscription subscription) =>
                 {
