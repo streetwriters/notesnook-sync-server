@@ -12,10 +12,12 @@ namespace Streetwriters.Identity.Services
     {
         private static DateTimeOffset LAST_FETCH_TIME = DateTimeOffset.MinValue;
         private static HashSet<string> BLACKLISTED_DOMAINS = new();
+        private readonly HttpClient httpClient;
         private readonly ILogger<EmailAddressValidator> logger;
 
-        public EmailAddressValidator(ILogger<EmailAddressValidator> logger)
+        public EmailAddressValidator(HttpClient httpClient, ILogger<EmailAddressValidator> logger)
         {
+            this.httpClient = httpClient;
             this.logger = logger;
         }
 
@@ -26,7 +28,6 @@ namespace Streetwriters.Identity.Services
             {
                 if (LAST_FETCH_TIME.AddDays(1) < DateTimeOffset.UtcNow)
                 {
-                    var httpClient = new HttpClient();
                     var domainsList = await httpClient.GetStringAsync("https://raw.githubusercontent.com/disposable-email-domains/disposable-email-domains/master/disposable_email_blocklist.conf");
                     var domains = domainsList.Split('\n').Where(line => !string.IsNullOrWhiteSpace(line) && !line.TrimStart().StartsWith("//"));
                     BLACKLISTED_DOMAINS = new HashSet<string>(domains, StringComparer.OrdinalIgnoreCase);

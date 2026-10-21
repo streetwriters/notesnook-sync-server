@@ -46,7 +46,6 @@ namespace Notesnook.API.Services
         IUnitOfWork unitOfWork, IS3Service s3Service, SyncDeviceService syncDeviceService, WampServiceAccessor serviceAccessor, ILogger<UserService> logger) : IUserService
     {
         private static readonly System.Security.Cryptography.RandomNumberGenerator Rng = System.Security.Cryptography.RandomNumberGenerator.Create();
-        private readonly HttpClient httpClient = new();
         private IHttpContextAccessor HttpContextAccessor { get; } = accessor;
         private ISyncItemsRepositoryAccessor Repositories { get; } = syncItemsRepositoryAccessor;
         private IS3Service S3Service { get; set; } = s3Service;

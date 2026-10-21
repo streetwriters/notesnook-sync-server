@@ -201,7 +201,7 @@ namespace Streetwriters.Identity
 
             AddOperationalStore(services, new TokenCleanupOptions { Enable = true, Interval = 3600 * 12 });
 
-            services.AddScoped<EmailAddressValidator>();
+            services.AddHttpClient<EmailAddressValidator>();
             services.AddScoped<IUserAccountService, UserAccountService>();
             services.AddTransient<IMFAService, MFAService>();
             services.AddControllers();

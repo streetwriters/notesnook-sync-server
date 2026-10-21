@@ -228,12 +228,13 @@ namespace Notesnook.API
             services.AddScoped<SyncDeviceService>();
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<IUserKeysService, UserKeysService>();
+            services.AddSingleton<S3Clients>();
             services.AddScoped<IS3Service, S3Service>();
             services.AddHttpClient("S3Upload", client =>
             {
                 client.Timeout = Timeout.InfiniteTimeSpan;
             });
-            services.AddScoped<IURLAnalyzer, URLAnalyzer>();
+            services.AddHttpClient<IURLAnalyzer, URLAnalyzer>();
 
             services.AddWampServiceAccessor(Servers.NotesnookAPI);
 
