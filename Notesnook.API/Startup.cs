@@ -76,12 +76,14 @@ namespace Notesnook.API
 {
     public class Startup
     {
-        public Startup(IConfiguration configuration)
+        public Startup(IConfiguration configuration, IWebHostEnvironment environment)
         {
             Configuration = configuration;
+            Environment = environment;
         }
 
         public IConfiguration Configuration { get; }
+        public IWebHostEnvironment Environment { get; }
 
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
@@ -247,7 +249,8 @@ namespace Notesnook.API
                 hub.MaximumReceiveMessageSize = 100 * 1024 * 1024;
                 hub.KeepAliveInterval = TimeSpan.FromSeconds(15);
                 hub.ClientTimeoutInterval = TimeSpan.FromMinutes(10);
-                hub.EnableDetailedErrors = true;
+                // detailed errors expose internal (e.g. Mongo) exception messages to clients
+                hub.EnableDetailedErrors = Environment.IsDevelopment();
             }).AddMessagePackProtocol().AddJsonProtocol();
 
             if (!string.IsNullOrEmpty(Constants.SIGNALR_REDIS_CONNECTION_STRING))

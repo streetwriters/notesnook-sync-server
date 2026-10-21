@@ -148,7 +148,8 @@ namespace Notesnook.API.Hubs
             var stopwatch = Stopwatch.StartNew();
             try
             {
-                var UpsertItems = UpsertActionsMap[pushItem.Type] ?? throw new Exception($"Invalid item type: {pushItem.Type}.");
+                if (!UpsertActionsMap.TryGetValue(pushItem.Type, out var UpsertItems))
+                    throw new HubException($"Invalid item type: {pushItem.Type}.");
                 UpsertItems(pushItem.Items, userId);
                 if (pushItem.Items.Any())
                 {
