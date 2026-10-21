@@ -228,8 +228,8 @@ namespace Streetwriters.Identity
             app.UseIdentityServer();
             app.UseRateLimiter();
 
-            app.UseAuthorization();
             app.UseAuthentication();
+            app.UseAuthorization();
 
             app.UseWamp(WampServers.IdentityServer, (realm, server) =>
             {

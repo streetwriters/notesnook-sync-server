@@ -104,8 +104,8 @@ namespace Streetwriters.Messenger
 
             app.UseRouting();
 
-            app.UseAuthorization();
             app.UseAuthentication();
+            app.UseAuthorization();
 
             var options = new ServerSentEventsOptions();
             options.Authorization = new ServerSentEventsAuthorization()
