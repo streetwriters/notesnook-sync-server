@@ -176,7 +176,7 @@ namespace Streetwriters.Identity.Controllers
             var client = Clients.FindClientById(User.FindFirstValue("client_id"));
             if (client == null) return BadRequest("Invalid client_id.");
             var user = await UserManager.GetUserAsync(User) ?? throw new Exception("User not found.");
-            return Ok(UserAccountService.GetUserAsync(client.Id, user.Id.ToString()));
+            return Ok(await UserAccountService.GetUserAsync(client.Id, user.Id.ToString()));
         }
 
         [HttpPost("recover")]
@@ -246,7 +246,7 @@ namespace Streetwriters.Identity.Controllers
             {
                 access_token = token,
                 scope = string.Join(' ', Config.ApiScopes.Select(s => s.Name)),
-                expires_in = 18000
+                expires_in = 1800
             });
         }
 
@@ -267,22 +267,22 @@ namespace Streetwriters.Identity.Controllers
                         ArgumentNullException.ThrowIfNull(form.NewEmail);
                         ArgumentNullException.ThrowIfNull(form.Password);
                         ArgumentNullException.ThrowIfNull(form.VerificationCode);
-                        var result = await UserManager.ChangeEmailAsync(user, form.NewEmail, form.VerificationCode);
-                        if (result.Succeeded)
+                        foreach (var validator in UserManager.PasswordValidators)
                         {
-                            result = await UserManager.RemovePasswordAsync(user);
-                            if (result.Succeeded)
-                            {
-                                result = await UserManager.AddPasswordAsync(user, form.Password);
-                                if (result.Succeeded)
-                                {
-                                    await UserManager.SetUserNameAsync(user, form.NewEmail);
-                                    await SendLogoutMessageAsync(user.Id.ToString(), "Email changed.");
-                                    return Ok();
-                                }
-                            }
+                            var validation = await validator.ValidateAsync(UserManager, user, form.Password);
+                            if (!validation.Succeeded) return BadRequest(validation.Errors.ToErrors());
                         }
-                        return BadRequest(result.Errors.ToErrors());
+
+                        // the password is derived from the email, so the new email, username and
+                        // password must be saved together. ChangeEmailAsync persists all of them.
+                        user.PasswordHash = UserManager.PasswordHasher.HashPassword(user, form.Password);
+                        user.UserName = form.NewEmail;
+                        await UserManager.UpdateNormalizedUserNameAsync(user);
+                        var result = await UserManager.ChangeEmailAsync(user, form.NewEmail, form.VerificationCode);
+                        if (!result.Succeeded) return BadRequest(result.Errors.ToErrors());
+
+                        await SendLogoutMessageAsync(user.Id.ToString(), "Email changed.");
+                        return Ok();
                     }
                 case "change_marketing_consent":
                     {
