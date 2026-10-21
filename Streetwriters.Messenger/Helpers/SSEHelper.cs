@@ -29,10 +29,17 @@ namespace Streetwriters.Messenger.Helpers
 {
     public class SSEHelper
     {
+        private static readonly TimeSpan SendTimeout = TimeSpan.FromSeconds(10);
+
+        public static void AddToUserGroup(IServerSentEventsService sseService, IServerSentEventsClient client)
+        {
+            var userId = client.User?.FindFirstValue("sub");
+            if (userId != null) sseService.AddToGroup(userId, client);
+        }
+
         public static async Task SendEventToUserAsync(string data, IServerSentEventsService sseService, string userId, string? originTokenId = null, CancellationToken cancellationToken = default)
         {
-            var clients = sseService.GetClients()
-                .Where(c => c.User?.FindFirstValue("sub") == userId)
+            var clients = sseService.GetClients(userId)
                 .Where(c => originTokenId == null || c.User?.FindFirstValue("jti") != originTokenId);
 
             await SendEventToClientsAsync(clients, data, cancellationToken);
@@ -43,23 +50,25 @@ namespace Streetwriters.Messenger.Helpers
             await SendEventToClientsAsync(sseService.GetClients(), data, cancellationToken);
         }
 
-        private static async Task SendEventToClientsAsync(IEnumerable<IServerSentEventsClient> clients, string data, CancellationToken cancellationToken)
+        private static Task SendEventToClientsAsync(IEnumerable<IServerSentEventsClient> clients, string data, CancellationToken cancellationToken)
         {
-            foreach (var client in clients)
-            {
-                if (!client.IsConnected) continue;
+            return Task.WhenAll(clients.Where(c => c.IsConnected).Select(c => SendEventToClientAsync(c, data, cancellationToken)));
+        }
 
-                try
-                {
-                    await client.SendEventAsync(data, cancellationToken);
-                }
-                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-                {
-                    break;
-                }
-                catch
-                {
-                }
+        private static async Task SendEventToClientAsync(IServerSentEventsClient client, string data, CancellationToken cancellationToken)
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(SendTimeout);
+            try
+            {
+                await client.SendEventAsync(data, cts.Token);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch
+            {
             }
         }
     }

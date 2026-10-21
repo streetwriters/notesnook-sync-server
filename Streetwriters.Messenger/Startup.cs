@@ -82,7 +82,10 @@ namespace Streetwriters.Messenger
                 options.CacheDuration = TimeSpan.FromMinutes(30);
             });
 
-            services.AddServerSentEvents();
+            services.AddServerSentEvents(options =>
+            {
+                options.OnClientConnected = (service, args) => SSEHelper.AddToUserGroup(service, args.Client);
+            });
             services.AddSingleton<IHostedService, HeartbeatService>();
             services.AddResponseCompression(options =>
             {

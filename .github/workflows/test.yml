@@ -22,3 +22,6 @@ jobs:
       # MongoDB is started by the tests themselves (EphemeralMongo)
       - name: Run tests
         run: dotnet test tests/Notesnook.API.Tests -c Release
+
+      - name: Run Messenger tests
+        run: dotnet test tests/Streetwriters.Messenger.Tests -c Release
