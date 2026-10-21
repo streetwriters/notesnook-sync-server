@@ -156,9 +156,12 @@ namespace Notesnook.API.Hubs
 
                     // we need to delete the inbox items from the inbox collection
                     // after syncing to prevent them from being sent again in the 
-                    // next fetch.
-                    var itemIds = pushItem.Items.Select(i => i.ItemId).ToList();
-                    Repositories.InboxItems.DeleteMany(i => i.UserId == userId && itemIds.Contains(i.ItemId));
+                    // next fetch. inbox items are always notes.
+                    if (pushItem.Type == "note")
+                    {
+                        var itemIds = pushItem.Items.Select(i => i.ItemId).ToList();
+                        Repositories.InboxItems.DeleteMany(i => i.UserId == userId && itemIds.Contains(i.ItemId));
+                    }
                 }
 
                 if (!await unit.Commit()) return 0;

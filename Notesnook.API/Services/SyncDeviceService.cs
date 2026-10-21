@@ -75,45 +75,13 @@ namespace Notesnook.API.Services
         }
 
         const int MaxIdsPerChunk = 25_000;
-        public async Task AppendIdsAsync(IClientSessionHandle session, string userId, string deviceId, string key, IEnumerable<ItemKey> ids, CancellationToken ct = default)
+        private static UpdateOneModel<DeviceIdsChunk> AppendIdsModel(string userId, string deviceId, string key, IEnumerable<string> ids)
         {
-            // write concern can't be set on operations inside a transaction
-            var collection = session.IsInTransaction
-                ? repositories.DeviceIdsChunks.Collection
-                : repositories.DeviceIdsChunks.Collection.WithWriteConcern(WriteConcern.W1);
-
+            // adds the ids to a chunk that still has room, or creates a new chunk if none matches.
+            // a chunk moved to "pending" (or deleted) concurrently no longer matches, so the ids are never lost.
             var filter = DeviceIdsChunkFilter(userId, deviceId, key) & Builders<DeviceIdsChunk>.Filter.Where(x => x.Ids.Length < MaxIdsPerChunk);
-            var chunk = await collection.Find(session, filter).FirstOrDefaultAsync(ct);
-
-            // the chunk may have been moved to "pending" (or deleted) after we found it,
-            // so only update it if it is still "unsynced" and fall back to a new chunk otherwise
-            var updated = false;
-            if (chunk != null)
-            {
-                var update = Builders<DeviceIdsChunk>.Update.AddToSetEach(x => x.Ids, ids.Select(i => i.ToString()));
-                var result = await collection.UpdateOneAsync(
-                    session,
-                    Builders<DeviceIdsChunk>.Filter.Eq(x => x.Id, chunk.Id) & Builders<DeviceIdsChunk>.Filter.Eq(x => x.Key, key),
-                    update,
-                    cancellationToken: ct
-                );
-                updated = result.MatchedCount > 0;
-            }
-
-            if (!updated)
-            {
-                var newChunk = new DeviceIdsChunk
-                {
-                    UserId = userId,
-                    DeviceId = deviceId,
-                    Key = key,
-                    Ids = [.. ids.Select(i => i.ToString())]
-                };
-                await collection.InsertOneAsync(session, newChunk, cancellationToken: ct);
-            }
-
-            var emptyChunksFilter = DeviceIdsChunkFilter(userId, deviceId, key) & Builders<DeviceIdsChunk>.Filter.Size(x => x.Ids, 0);
-            await collection.DeleteManyAsync(session, emptyChunksFilter, cancellationToken: ct);
+            var update = Builders<DeviceIdsChunk>.Update.AddToSetEach(x => x.Ids, ids);
+            return new UpdateOneModel<DeviceIdsChunk>(filter, update) { IsUpsert = true };
         }
 
         public async Task WriteIdsAsync(string userId, string deviceId, string key, IEnumerable<ItemKey> ids)
@@ -218,12 +186,21 @@ namespace Notesnook.API.Services
 
         private async Task AddIdsToDevicesAsync(IClientSessionHandle session, string userId, string? excludedDeviceId, IEnumerable<ItemKey> ids, CancellationToken ct = default)
         {
+            var idStrings = ids.Select(i => i.ToString()).ToArray();
+            if (idStrings.Length == 0) return;
+
             var devices = await repositories.SyncDevices.Collection.Find(session, UserFilter(userId)).ToListAsync(ct);
-            foreach (var device in devices)
-            {
-                if (device.DeviceId == excludedDeviceId) continue;
-                await AppendIdsAsync(session, userId, device.DeviceId, "unsynced", ids, ct);
-            }
+            var writes = devices
+                .Where(d => d.DeviceId != excludedDeviceId)
+                .Select(d => AppendIdsModel(userId, d.DeviceId, "unsynced", idStrings))
+                .ToList();
+            if (writes.Count == 0) return;
+
+            // write concern can't be set on operations inside a transaction
+            var collection = session.IsInTransaction
+                ? repositories.DeviceIdsChunks.Collection
+                : repositories.DeviceIdsChunks.Collection.WithWriteConcern(WriteConcern.W1);
+            await collection.BulkWriteAsync(session, writes, cancellationToken: ct);
         }
 
         public async Task<SyncDevice> RegisterDeviceAsync(string userId, string deviceId)

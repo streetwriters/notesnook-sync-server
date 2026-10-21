@@ -67,6 +67,27 @@ public class SyncDeviceServiceTests(TestDatabase db) : IClassFixture<TestDatabas
         Assert.Equal([Note("1")], await devices.GetIdsAsync(userId, "B", "unsynced"));
     }
 
+    // #24: ids are appended to the existing "unsynced" chunk of every other device in one write
+    [Fact]
+    public async Task Appended_ids_reuse_the_unsynced_chunk()
+    {
+        var userId = NewUserId();
+        var scope = db.CreateScope();
+        await RegisterSyncedDeviceAsync(userId, "A");
+        await RegisterSyncedDeviceAsync(userId, "B");
+        var devices = await RegisterSyncedDeviceAsync(userId, "C");
+
+        await devices.AddIdsToOtherDevicesAsync(userId, "A", [Note("1")]);
+        await devices.AddIdsToOtherDevicesAsync(userId, "A", [Note("2"), Note("1")]);
+
+        foreach (var deviceId in new[] { "B", "C" })
+        {
+            Assert.Equal([Note("1"), Note("2")], (await devices.GetIdsAsync(userId, deviceId, "unsynced")).OrderBy(i => i.ItemId));
+            Assert.Equal(1, await scope.Repositories.DeviceIdsChunks.Collection.CountDocumentsAsync(c => c.UserId == userId && c.DeviceId == deviceId));
+        }
+        Assert.Empty(await devices.GetIdsAsync(userId, "A", "unsynced"));
+    }
+
     // #7: ids appended while a fetch moves "unsynced" to "pending" must not be lost
     [Fact]
     public async Task Ids_appended_during_fetches_are_never_lost()
