@@ -300,8 +300,9 @@ namespace Notesnook.API.Hubs
 
                     if (!device.IsSyncReset)
                     {
-                        ids.ExceptWith(chunk.Items.Select(i => new ItemKey(i.ItemId, chunk.Type)));
-                        await SyncDeviceService.WritePendingIdsAsync(userId, deviceId, ids);
+                        var sentIds = chunk.Items.Select(i => new ItemKey(i.ItemId, chunk.Type)).ToList();
+                        ids.ExceptWith(sentIds);
+                        await SyncDeviceService.RemovePendingIdsAsync(userId, deviceId, sentIds);
                     }
                 }
 

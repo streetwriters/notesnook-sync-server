@@ -159,9 +159,15 @@ namespace Notesnook.API.Services
             return await GetIdsAsync(userId, deviceId, "pending");
         }
 
-        public async Task WritePendingIdsAsync(string userId, string deviceId, HashSet<ItemKey> ids)
+        public async Task RemovePendingIdsAsync(string userId, string deviceId, IEnumerable<ItemKey> ids)
         {
-            await WriteIdsAsync(userId, deviceId, "pending", ids);
+            var filter = DeviceIdsChunkFilter(userId, deviceId, "pending");
+            var collection = repositories.DeviceIdsChunks.Collection.WithWriteConcern(WriteConcern.W1);
+            await collection.BulkWriteAsync(
+            [
+                new UpdateManyModel<DeviceIdsChunk>(filter, Builders<DeviceIdsChunk>.Update.PullAll(x => x.Ids, ids.Select(i => i.ToString()))),
+                new DeleteManyModel<DeviceIdsChunk>(filter & Builders<DeviceIdsChunk>.Filter.Size(x => x.Ids, 0))
+            ]);
         }
 
         public async Task ResetAsync(string userId, string deviceId)

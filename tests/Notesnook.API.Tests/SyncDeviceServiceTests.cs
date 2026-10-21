@@ -24,7 +24,7 @@ public class SyncDeviceServiceTests(TestDatabase db) : IClassFixture<TestDatabas
     {
         var userId = NewUserId();
         var devices = await RegisterSyncedDeviceAsync(userId, "B");
-        await devices.WritePendingIdsAsync(userId, "B", [Note("pending")]);
+        await devices.WriteIdsAsync(userId, "B", "pending", [Note("pending")]);
         await devices.AddIdsToOtherDevicesAsync(userId, "A", [Note("unsynced")]);
 
         var ids = await devices.FetchUnsyncedIdsAsync(userId, "B");
@@ -32,6 +32,39 @@ public class SyncDeviceServiceTests(TestDatabase db) : IClassFixture<TestDatabas
         Assert.Equal([Note("pending"), Note("unsynced")], ids.OrderBy(i => i.ItemId));
         Assert.Empty(await devices.GetIdsAsync(userId, "B", "unsynced"));
         Assert.Equal(ids, await devices.GetIdsAsync(userId, "B", "pending"));
+    }
+
+    // #23: sent ids are pulled from every "pending" chunk and emptied chunks are deleted
+    [Fact]
+    public async Task Removing_pending_ids_pulls_them_from_every_chunk()
+    {
+        var userId = NewUserId();
+        var scope = db.CreateScope();
+        var devices = await RegisterSyncedDeviceAsync(userId, "B");
+        await devices.WriteIdsAsync(userId, "B", "pending", [Note("1"), Note("2")]);
+        await devices.AddIdsToOtherDevicesAsync(userId, "A", [Note("1"), Note("3")]);
+        await devices.FetchUnsyncedIdsAsync(userId, "B");
+
+        await devices.RemovePendingIdsAsync(userId, "B", [Note("1"), Note("3")]);
+
+        Assert.Equal([Note("2")], await devices.GetIdsAsync(userId, "B", "pending"));
+        Assert.Equal(1, await scope.Repositories.DeviceIdsChunks.Collection.CountDocumentsAsync(c => c.UserId == userId && c.DeviceId == "B" && c.Key == "pending"));
+    }
+
+    // #23: removing sent ids must not touch ids recorded in "unsynced" while they were being sent
+    [Fact]
+    public async Task Removing_pending_ids_keeps_unsynced_ids()
+    {
+        var userId = NewUserId();
+        var devices = await RegisterSyncedDeviceAsync(userId, "B");
+        await devices.AddIdsToOtherDevicesAsync(userId, "A", [Note("1")]);
+        await devices.FetchUnsyncedIdsAsync(userId, "B");
+        await devices.AddIdsToOtherDevicesAsync(userId, "A", [Note("1")]);
+
+        await devices.RemovePendingIdsAsync(userId, "B", [Note("1")]);
+
+        Assert.Empty(await devices.GetIdsAsync(userId, "B", "pending"));
+        Assert.Equal([Note("1")], await devices.GetIdsAsync(userId, "B", "unsynced"));
     }
 
     // #7: ids appended while a fetch moves "unsynced" to "pending" must not be lost
