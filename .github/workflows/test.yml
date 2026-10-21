@@ -1,0 +1,24 @@
+name: Test
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  test:
+    name: Run tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      # MongoDB is started by the tests themselves (EphemeralMongo)
+      - name: Run tests
+        run: dotnet test tests/Notesnook.API.Tests -c Release
