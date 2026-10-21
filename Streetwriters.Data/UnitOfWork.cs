@@ -27,7 +27,8 @@ namespace Streetwriters.Data
     {
         public async Task<bool> Commit()
         {
-            return await dbContext.SaveChanges() > 0;
+            await dbContext.SaveChanges();
+            return true;
         }
 
         public void Dispose()
@@ -35,4 +36,4 @@ namespace Streetwriters.Data
             dbContext.Dispose();
         }
     }
-}
+}

@@ -117,6 +117,7 @@ namespace Notesnook.API.Repositories
                     IsUpsert = true
                 });
             }
+            if (writes.Count == 0) return;
             dbContext.AddCommand((handle, ct) => Collection.BulkWriteAsync(handle, writes, options: new BulkWriteOptions { IsOrdered = false }, ct));
         }
 

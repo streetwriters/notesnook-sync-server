@@ -54,32 +54,28 @@ namespace Streetwriters.Data.DbContexts
 
         public async Task<int> SaveChanges()
         {
-            try
-            {
-                var count = _commands.Count;
+            var count = _commands.Count;
+            if (count == 0) return 0;
 
-                using (IClientSessionHandle session = await MongoClient.StartSessionAsync())
-                {
-#if (DEBUG || STAGING)
-                    await Parallel.ForEachAsync(_commands, async (c, ct) => await c(session, ct));
-#else
-                    await session.WithTransactionAsync(
-                        async (handle, token) =>
-                        {
-                            await Task.WhenAll(_commands.Select(c => c(handle, token)));
-                            return true;
-                        }
-                    );
-#endif
-                }
-                return count;
-            }
-            catch (Exception ex)
+            using (IClientSessionHandle session = await MongoClient.StartSessionAsync())
             {
-                // TODO use Slogger here.
-                await Console.Error.WriteLineAsync(ex.ToString());
-                return 0;
+                // a session is not thread-safe, so the commands must run one after another
+#if (DEBUG || STAGING)
+                foreach (var command in _commands)
+                    await command(session, CancellationToken.None);
+#else
+                await session.WithTransactionAsync(
+                    async (handle, token) =>
+                    {
+                        foreach (var command in _commands)
+                            await command(handle, token);
+                        return true;
+                    }
+                );
+#endif
             }
+            _commands.Clear();
+            return count;
         }
 
         public void AddCommand(Func<IClientSessionHandle, CancellationToken, Task> func)
