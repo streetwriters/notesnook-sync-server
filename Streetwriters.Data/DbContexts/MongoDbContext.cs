@@ -57,8 +57,9 @@ namespace Streetwriters.Data.DbContexts
             var count = _commands.Count;
             if (count == 0) return 0;
 
-            using (IClientSessionHandle session = await MongoClient.StartSessionAsync())
+            try
             {
+                using IClientSessionHandle session = await MongoClient.StartSessionAsync();
                 // a session is not thread-safe, so the commands must run one after another
                 await session.WithTransactionAsync(
                     async (handle, token) =>
@@ -69,7 +70,11 @@ namespace Streetwriters.Data.DbContexts
                     }
                 );
             }
-            _commands.Clear();
+            finally
+            {
+                // never replay these commands, whether they were committed or rolled back
+                _commands.Clear();
+            }
             return count;
         }
 
