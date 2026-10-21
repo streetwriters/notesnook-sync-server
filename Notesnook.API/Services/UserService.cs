@@ -176,7 +176,6 @@ namespace Notesnook.API.Services
         public async Task DeleteUserAsync(string userId)
         {
             logger.LogInformation("Deleting user {UserId}", userId);
-            var cc = new CancellationTokenSource();
 
             Repositories.Notes.DeleteByUserId(userId);
             Repositories.Notebooks.DeleteByUserId(userId);
@@ -237,9 +236,6 @@ namespace Notesnook.API.Services
 
         public async Task<bool> ResetUserAsync(string userId, bool removeAttachments)
         {
-
-            var cc = new CancellationTokenSource();
-
             Repositories.Notes.DeleteByUserId(userId);
             Repositories.Notebooks.DeleteByUserId(userId);
             Repositories.Shortcuts.DeleteByUserId(userId);
