@@ -79,15 +79,20 @@ namespace Notesnook.API.Services
             var filter = DeviceIdsChunkFilter(userId, deviceId, key) & Builders<DeviceIdsChunk>.Filter.Where(x => x.Ids.Length < MaxIdsPerChunk);
             var chunk = await repositories.DeviceIdsChunks.Collection.Find(filter).FirstOrDefaultAsync();
 
+            // the chunk may have been moved to "pending" (or deleted) after we found it,
+            // so only update it if it is still "unsynced" and fall back to a new chunk otherwise
+            var updated = false;
             if (chunk != null)
             {
                 var update = Builders<DeviceIdsChunk>.Update.AddToSetEach(x => x.Ids, ids.Select(i => i.ToString()));
-                await repositories.DeviceIdsChunks.Collection.WithWriteConcern(WriteConcern.W1).UpdateOneAsync(
-                    Builders<DeviceIdsChunk>.Filter.Eq(x => x.Id, chunk.Id),
+                var result = await repositories.DeviceIdsChunks.Collection.WithWriteConcern(WriteConcern.W1).UpdateOneAsync(
+                    Builders<DeviceIdsChunk>.Filter.Eq(x => x.Id, chunk.Id) & Builders<DeviceIdsChunk>.Filter.Eq(x => x.Key, key),
                     update
                 );
+                updated = result.MatchedCount > 0;
             }
-            else
+
+            if (!updated)
             {
                 var newChunk = new DeviceIdsChunk
                 {
@@ -129,17 +134,13 @@ namespace Notesnook.API.Services
             var device = await GetDeviceAsync(userId, deviceId);
             if (device == null || device.IsSyncReset) return [];
 
-            var unsyncedIds = await GetIdsAsync(userId, deviceId, "unsynced");
-            var pendingIds = await GetIdsAsync(userId, deviceId, "pending");
+            // atomically move each "unsynced" chunk to "pending" so ids appended concurrently are never lost
+            await repositories.DeviceIdsChunks.Collection.UpdateManyAsync(
+                DeviceIdsChunkFilter(userId, deviceId, "unsynced"),
+                Builders<DeviceIdsChunk>.Update.Set(x => x.Key, "pending")
+            );
 
-            unsyncedIds = [.. unsyncedIds, .. pendingIds];
-
-            if (unsyncedIds.Count == 0) return [];
-
-            await repositories.DeviceIdsChunks.Collection.DeleteManyAsync(DeviceIdsChunkFilter(userId, deviceId, "unsynced"));
-            await WriteIdsAsync(userId, deviceId, "pending", unsyncedIds);
-
-            return unsyncedIds;
+            return await GetIdsAsync(userId, deviceId, "pending");
         }
 
         public async Task WritePendingIdsAsync(string userId, string deviceId, HashSet<ItemKey> ids)
