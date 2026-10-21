@@ -132,7 +132,15 @@ namespace Notesnook.API.Services
         public async Task<HashSet<ItemKey>> FetchUnsyncedIdsAsync(string userId, string deviceId)
         {
             var device = await GetDeviceAsync(userId, deviceId);
-            if (device == null || device.IsSyncReset) return [];
+            if (device == null) return [];
+            if (device.IsSyncReset)
+            {
+                // starting a full sync: it will send every item as it is now, so ids recorded
+                // up to this point are redundant. ids appended after this line survive the sync
+                // (ResetAsync only clears "pending") and are sent on the next fetch.
+                await repositories.DeviceIdsChunks.Collection.DeleteManyAsync(DeviceIdsChunkFilter(userId, deviceId));
+                return [];
+            }
 
             // atomically move each "unsynced" chunk to "pending" so ids appended concurrently are never lost
             await repositories.DeviceIdsChunks.Collection.UpdateManyAsync(
@@ -189,7 +197,7 @@ namespace Notesnook.API.Services
             await UpdateLastAccessTimeAsync(userId, deviceId);
             await foreach (var device in ListDevicesAsync(userId))
             {
-                if (device.DeviceId == deviceId || device.IsSyncReset) continue;
+                if (device.DeviceId == deviceId) continue;
                 await AppendIdsAsync(userId, device.DeviceId, "unsynced", ids);
             }
         }
@@ -198,7 +206,6 @@ namespace Notesnook.API.Services
         {
             await foreach (var device in ListDevicesAsync(userId))
             {
-                if (device.IsSyncReset) continue;
                 await AppendIdsAsync(userId, device.DeviceId, "unsynced", ids);
             }
         }
