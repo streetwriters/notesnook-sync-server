@@ -17,6 +17,7 @@ You should have received a copy of the Affero GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
@@ -49,6 +50,7 @@ namespace Notesnook.API.Accessors
         public Repository<InboxSyncItem> InboxItems { get; }
         public Repository<SyncDevice> SyncDevices { get; }
         public Repository<DeviceIdsChunk> DeviceIdsChunks { get; }
+        public IReadOnlyList<SyncItemCollection> SyncItemCollections { get; }
 
         public SyncItemsRepositoryAccessor(IDbContext dbContext,
 
@@ -106,6 +108,22 @@ namespace Notesnook.API.Accessors
             Vaults = new SyncItemsRepository(dbContext, vaults, logger);
             Tags = new SyncItemsRepository(dbContext, tags, logger);
             InboxItemsHistory = new SyncItemsRepository(dbContext, inboxItemsHistory, logger);
+
+            SyncItemCollections = [
+                new("settingitem", Settings),
+                new("attachment", Attachments),
+                new("note", Notes),
+                new("notebook", Notebooks),
+                new("content", Contents),
+                new("shortcut", Shortcuts),
+                new("reminder", Reminders),
+                new("color", Colors),
+                new("tag", Tags),
+                new("vault", Vaults),
+                new("inboxitemhistory", InboxItemsHistory, RequiresV4: true),
+                new("relation", Relations), // relations must sync at the end to prevent invalid state
+                new(null, LegacySettings),
+            ];
         }
     }
 }

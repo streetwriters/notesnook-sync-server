@@ -155,10 +155,9 @@ namespace Notesnook.API.Services
 
         public async Task<EncryptedData?> GetEncryptionVerifier(string userId)
         {
-            SyncItemsRepository[] repositories = [Repositories.Notes, Repositories.Notebooks, Repositories.Shortcuts, Repositories.Contents, Repositories.Settings, Repositories.LegacySettings, Repositories.Attachments, Repositories.Reminders, Repositories.Relations, Repositories.Colors, Repositories.Tags, Repositories.Vaults, Repositories.InboxItemsHistory];
-            foreach (var repo in repositories)
+            foreach (var collection in Repositories.SyncItemCollections)
             {
-                var item = await repo.FindOneAsync((s) => s.UserId == userId && (s.KeyVersion == null || s.KeyVersion == 0));
+                var item = await collection.Repository.FindOneAsync((s) => s.UserId == userId && (s.KeyVersion == null || s.KeyVersion == 0));
                 if (item != null)
                 {
                     return new EncryptedData
@@ -177,19 +176,8 @@ namespace Notesnook.API.Services
         {
             logger.LogInformation("Deleting user {UserId}", userId);
 
-            Repositories.Notes.DeleteByUserId(userId);
-            Repositories.Notebooks.DeleteByUserId(userId);
-            Repositories.Shortcuts.DeleteByUserId(userId);
-            Repositories.Contents.DeleteByUserId(userId);
-            Repositories.Settings.DeleteByUserId(userId);
-            Repositories.LegacySettings.DeleteByUserId(userId);
-            Repositories.Attachments.DeleteByUserId(userId);
-            Repositories.Reminders.DeleteByUserId(userId);
-            Repositories.Relations.DeleteByUserId(userId);
-            Repositories.Colors.DeleteByUserId(userId);
-            Repositories.Tags.DeleteByUserId(userId);
-            Repositories.Vaults.DeleteByUserId(userId);
-            Repositories.InboxItemsHistory.DeleteByUserId(userId);
+            foreach (var collection in Repositories.SyncItemCollections)
+                collection.Repository.DeleteByUserId(userId);
             Repositories.UsersSettings.Delete((u) => u.UserId == userId);
             Repositories.Monographs.DeleteMany((m) => m.UserId == userId);
             Repositories.InboxApiKey.DeleteMany((t) => t.UserId == userId);
@@ -236,19 +224,8 @@ namespace Notesnook.API.Services
 
         public async Task<bool> ResetUserAsync(string userId, bool removeAttachments)
         {
-            Repositories.Notes.DeleteByUserId(userId);
-            Repositories.Notebooks.DeleteByUserId(userId);
-            Repositories.Shortcuts.DeleteByUserId(userId);
-            Repositories.Contents.DeleteByUserId(userId);
-            Repositories.Settings.DeleteByUserId(userId);
-            Repositories.LegacySettings.DeleteByUserId(userId);
-            Repositories.Attachments.DeleteByUserId(userId);
-            Repositories.Reminders.DeleteByUserId(userId);
-            Repositories.Relations.DeleteByUserId(userId);
-            Repositories.Colors.DeleteByUserId(userId);
-            Repositories.Tags.DeleteByUserId(userId);
-            Repositories.Vaults.DeleteByUserId(userId);
-            Repositories.InboxItemsHistory.DeleteByUserId(userId);
+            foreach (var collection in Repositories.SyncItemCollections)
+                collection.Repository.DeleteByUserId(userId);
             Repositories.Monographs.DeleteMany((m) => m.UserId == userId);
             Repositories.InboxApiKey.DeleteMany((t) => t.UserId == userId);
             if (!await unit.Commit()) return false;

@@ -69,47 +69,10 @@ namespace Notesnook.API.Hubs
             unit = unitOfWork;
             SyncDeviceService = syncDeviceService;
 
-            BaseCollectionDefs = [
-                new("settingitem", Repositories.Settings.FindItemsById),
-                new("attachment", Repositories.Attachments.FindItemsById),
-                new("note", Repositories.Notes.FindItemsById),
-                new("notebook", Repositories.Notebooks.FindItemsById),
-                new("content", Repositories.Contents.FindItemsById),
-                new("shortcut", Repositories.Shortcuts.FindItemsById),
-                new("reminder", Repositories.Reminders.FindItemsById),
-                new("color", Repositories.Colors.FindItemsById),
-                new("tag", Repositories.Tags.FindItemsById),
-                new("vault", Repositories.Vaults.FindItemsById),
-                new("relation", Repositories.Relations.FindItemsById), // relations must sync at the end to prevent invalid state
-            ];
-            V4CollectionDefs = [
-                new("settingitem", Repositories.Settings.FindItemsById),
-                new("attachment", Repositories.Attachments.FindItemsById),
-                new("note", Repositories.Notes.FindItemsById),
-                new("notebook", Repositories.Notebooks.FindItemsById),
-                new("content", Repositories.Contents.FindItemsById),
-                new("shortcut", Repositories.Shortcuts.FindItemsById),
-                new("reminder", Repositories.Reminders.FindItemsById),
-                new("color", Repositories.Colors.FindItemsById),
-                new("tag", Repositories.Tags.FindItemsById),
-                new("vault", Repositories.Vaults.FindItemsById),
-                new("inboxitemhistory", Repositories.InboxItemsHistory.FindItemsById),
-                new("relation", Repositories.Relations.FindItemsById), // relations must sync at the end to prevent invalid state
-            ];
-            UpsertActionsMap = new Dictionary<string, Action<IEnumerable<SyncItem>, string>> {
-                { "settingitem", Repositories.Settings.UpsertMany },
-                { "attachment", Repositories.Attachments.UpsertMany },
-                { "note", Repositories.Notes.UpsertMany },
-                { "notebook", Repositories.Notebooks.UpsertMany },
-                { "content", Repositories.Contents.UpsertMany },
-                { "shortcut", Repositories.Shortcuts.UpsertMany },
-                { "reminder", Repositories.Reminders.UpsertMany },
-                { "relation", Repositories.Relations.UpsertMany },
-                { "color", Repositories.Colors.UpsertMany },
-                { "vault", Repositories.Vaults.UpsertMany },
-                { "tag", Repositories.Tags.UpsertMany },
-                { "inboxitemhistory", Repositories.InboxItemsHistory.UpsertMany },
-            }.ToFrozenDictionary();
+            var synced = Repositories.SyncItemCollections.Where((c) => c.Type != null).ToArray();
+            BaseCollectionDefs = [.. synced.Where((c) => !c.RequiresV4).Select((c) => new CollectionDef(c.Type!, c.Repository.FindItemsById))];
+            V4CollectionDefs = [.. synced.Select((c) => new CollectionDef(c.Type!, c.Repository.FindItemsById))];
+            UpsertActionsMap = synced.ToFrozenDictionary((c) => c.Type!, (c) => (Action<IEnumerable<SyncItem>, string>)c.Repository.UpsertMany);
         }
 
         public override async Task OnConnectedAsync()

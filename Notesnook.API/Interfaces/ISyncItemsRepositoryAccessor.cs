@@ -17,6 +17,7 @@ You should have received a copy of the Affero GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+using System.Collections.Generic;
 using Notesnook.API.Models;
 using Notesnook.API.Repositories;
 using Streetwriters.Common.Models;
@@ -24,6 +25,10 @@ using Streetwriters.Data.Repositories;
 
 namespace Notesnook.API.Interfaces
 {
+    /// <param name="Type">The sync item type, or null for a collection that is no longer synced but still holds user data.</param>
+    /// <param name="RequiresV4">Only synced to clients that use the v4 fetch.</param>
+    public record SyncItemCollection(string? Type, SyncItemsRepository Repository, bool RequiresV4 = false);
+
     public interface ISyncItemsRepositoryAccessor
     {
         SyncItemsRepository Notes { get; }
@@ -45,5 +50,10 @@ namespace Notesnook.API.Interfaces
         Repository<InboxSyncItem> InboxItems { get; }
         Repository<SyncDevice> SyncDevices { get; }
         Repository<DeviceIdsChunk> DeviceIdsChunks { get; }
+
+        /// <summary>
+        /// Every collection of a user's sync items, in the order they are synced.
+        /// </summary>
+        IReadOnlyList<SyncItemCollection> SyncItemCollections { get; }
     }
 }
