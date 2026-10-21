@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using System.Collections.Generic;
 using System.Reactive.Subjects;
+using System.Threading;
 using System.Threading.Tasks;
 using Streetwriters.Common.Messages;
 using WampSharp.V2;
@@ -28,7 +29,7 @@ namespace Streetwriters.Common.Helpers
 {
     public class WampHelper
     {
-        public static async Task<IWampChannel> OpenWampChannelAsync(string server, string realmName)
+        public static async Task<IWampChannel> OpenWampChannelAsync(string server, string realmName, CancellationToken cancellationToken = default)
         {
             DefaultWampChannelFactory channelFactory = new();
 
@@ -39,13 +40,19 @@ namespace Streetwriters.Common.Helpers
             {
                 try
                 {
-                    await channel.Open();
+                    await channel.Open().WaitAsync(cancellationToken);
                     isConnected = true;
+                }
+                catch when (!cancellationToken.IsCancellationRequested)
+                {
+                    await Task.Delay(5000, cancellationToken);
+                    continue;
                 }
                 catch
                 {
-                    await Task.Delay(5000);
-                    continue;
+                    // the abandoned attempt may still connect later
+                    try { channel.Close(); } catch { }
+                    throw;
                 }
             }
 

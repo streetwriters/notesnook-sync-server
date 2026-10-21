@@ -21,6 +21,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Reactive.Subjects;
+using System.Threading;
 using System.Threading.Tasks;
 using Streetwriters.Common.Helpers;
 using Streetwriters.Common.Interfaces;
@@ -44,35 +45,55 @@ namespace Streetwriters.Common
         internal static string AuthToken => ("wamp:" + Constants.NOTESNOOK_API_SECRET).Sha256();
         internal const string AuthTokenQueryKey = "token";
 
+        private static readonly TimeSpan PublishTimeout = TimeSpan.FromSeconds(10);
+
+        private readonly SemaphoreSlim channelLock = new(1, 1);
+        // a set, so registering the same handler again on every reconnect doesn't multiply it
+        private readonly ConcurrentDictionary<Func<Task>, byte> disconnectHandlers = new();
         private IWampChannel? channel = null;
-        private async Task<IWampChannel> GetChannelAsync()
+        private async Task<IWampChannel> GetChannelAsync(CancellationToken cancellationToken = default)
         {
-            if (channel != null && channel.RealmProxy.Monitor.IsConnected)
+            await channelLock.WaitAsync(cancellationToken);
+            try
+            {
+                if (channel != null && channel.RealmProxy.Monitor.IsConnected)
+                    return channel;
+                channel = await WampHelper.OpenWampChannelAsync($"{Address}?{AuthTokenQueryKey}={Uri.EscapeDataString(AuthToken)}", Realm, cancellationToken);
+                channel.RealmProxy.Monitor.ConnectionBroken += (s, e) => OnDisconnect();
+                channel.RealmProxy.Monitor.ConnectionError += (s, e) => OnDisconnect();
                 return channel;
-            channel = await WampHelper.OpenWampChannelAsync($"{Address}?{AuthTokenQueryKey}={Uri.EscapeDataString(AuthToken)}", Realm);
-            return channel;
+            }
+            finally
+            {
+                channelLock.Release();
+            }
+        }
+
+        private void OnDisconnect()
+        {
+            foreach (var handler in disconnectHandlers.Keys)
+                _ = handler();
         }
 
         public async Task<V> GetServiceAsync<V>(Func<Task>? onDisconnect = null) where V : class
         {
-            var channel = await GetChannelAsync();
             if (onDisconnect != null)
-            {
-                channel.RealmProxy.Monitor.ConnectionBroken += (s, e) => onDisconnect();
-                channel.RealmProxy.Monitor.ConnectionError += (s, e) => onDisconnect();
-            }
+                disconnectHandlers.TryAdd(onDisconnect, 0);
+            var channel = await GetChannelAsync();
             return channel.RealmProxy.Services.GetCalleeProxy<V>();
         }
 
         public async Task PublishMessageAsync<V>(string topic, V message)
         {
-            IWampChannel channel = await GetChannelAsync();
+            using var timeout = new CancellationTokenSource(PublishTimeout);
+            IWampChannel channel = await GetChannelAsync(timeout.Token);
             WampHelper.PublishMessage(channel.RealmProxy, topic, message);
         }
 
         public async Task PublishMessagesAsync<V>(string topic, IEnumerable<V> messages)
         {
-            IWampChannel channel = await GetChannelAsync();
+            using var timeout = new CancellationTokenSource(PublishTimeout);
+            IWampChannel channel = await GetChannelAsync(timeout.Token);
             WampHelper.PublishMessages(channel.RealmProxy, topic, messages);
         }
     }
