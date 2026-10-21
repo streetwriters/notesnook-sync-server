@@ -60,10 +60,6 @@ namespace Streetwriters.Data.DbContexts
             using (IClientSessionHandle session = await MongoClient.StartSessionAsync())
             {
                 // a session is not thread-safe, so the commands must run one after another
-#if (DEBUG || STAGING)
-                foreach (var command in _commands)
-                    await command(session, CancellationToken.None);
-#else
                 await session.WithTransactionAsync(
                     async (handle, token) =>
                     {
@@ -72,7 +68,6 @@ namespace Streetwriters.Data.DbContexts
                         return true;
                     }
                 );
-#endif
             }
             _commands.Clear();
             return count;
