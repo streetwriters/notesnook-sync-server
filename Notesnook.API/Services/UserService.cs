@@ -118,9 +118,13 @@ namespace Notesnook.API.Services
             var limit = StorageHelper.RolloverStorageLimit(userSettings.StorageLimit);
             if (userSettings.StorageLimit == null || limit.UpdatedAt != userSettings.StorageLimit?.UpdatedAt)
             {
+                // only roll over the usage we read, so a concurrent upload's increment isn't overwritten
+                var observedFilter = userSettings.StorageLimit == null
+                    ? Builders<UserSettings>.Filter.Eq(u => u.StorageLimit, null)
+                    : Builders<UserSettings>.Filter.Eq("StorageLimit.UpdatedAt", userSettings.StorageLimit.UpdatedAt);
                 userSettings.StorageLimit = limit;
                 await Repositories.UsersSettings.Collection.UpdateOneAsync(
-                    Builders<UserSettings>.Filter.Eq(u => u.UserId, user.UserId),
+                    Builders<UserSettings>.Filter.And(Builders<UserSettings>.Filter.Eq(u => u.UserId, user.UserId), observedFilter),
                     Builders<UserSettings>.Update.Set(u => u.StorageLimit, userSettings.StorageLimit)
                 );
             }

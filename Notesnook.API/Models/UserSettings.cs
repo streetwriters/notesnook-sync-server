@@ -26,21 +26,8 @@ namespace Notesnook.API.Models
 {
     public class Limit
     {
-        private long _value = 0;
-        public long Value
-        {
-            get => _value;
-            set
-            {
-                _value = value;
-                UpdatedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            }
-        }
-        public long UpdatedAt
-        {
-            get;
-            set;
-        }
+        public long Value { get; set; }
+        public long UpdatedAt { get; set; }
     }
 
     public class UserSettings

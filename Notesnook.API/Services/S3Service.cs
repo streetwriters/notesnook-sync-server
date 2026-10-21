@@ -339,8 +339,6 @@ namespace Notesnook.API.Services
                 await this.AbortMultipartUploadAsync(userId, uploadRequest.Key, uploadRequest.UploadId);
                 throw new Exception("User settings not found.");
             }
-            var observedStorageLimit = userSettings.StorageLimit;
-            userSettings.StorageLimit = StorageHelper.RolloverStorageLimit(userSettings.StorageLimit);
             long fileSize = 0;
 
             if (!Constants.IS_SELF_HOSTED)
@@ -354,7 +352,7 @@ namespace Notesnook.API.Services
                     throw new Exception("Max file size exceeded.");
                 }
 
-                if (StorageHelper.IsStorageLimitReached(subscription, userSettings.StorageLimit.Value + fileSize))
+                if (!await TryReserveStorageAsync(userId, fileSize, StorageHelper.GetStorageLimitForPlan(subscription)))
                 {
                     await this.AbortMultipartUploadAsync(userId, uploadRequest.Key, uploadRequest.UploadId);
                     throw new Exception("Storage limit reached.");
@@ -363,25 +361,21 @@ namespace Notesnook.API.Services
 
             uploadRequest.Key = objectName;
             uploadRequest.BucketName = INTERNAL_BUCKET_NAME;
-            var response = await S3InternalClient.ExecuteWithFailoverAsync((client) => client.CompleteMultipartUploadAsync(uploadRequest), operationName: "CompleteMultipartUpload", isWriteOperation: true);
-            if (!IsSuccessStatusCode((int)response.HttpStatusCode)) throw new Exception("Failed to complete multipart upload.");
-
-            if (!Constants.IS_SELF_HOSTED)
+            try
             {
-                try
-                {
-                    await IncrementStorageUsageAsync(userId, fileSize, observedStorageLimit);
-                }
-                catch (Exception ex)
-                {
-                    // The object is already committed. Accounting is best effort so
-                    // a Mongo failure cannot turn a successful upload into a retry.
-                    logger.LogError(ex, "Failed to account for multipart attachment usage for user {UserId}.", userId);
-                }
+                var response = await S3InternalClient.ExecuteWithFailoverAsync((client) => client.CompleteMultipartUploadAsync(uploadRequest), operationName: "CompleteMultipartUpload", isWriteOperation: true);
+                if (!IsSuccessStatusCode((int)response.HttpStatusCode)) throw new Exception("Failed to complete multipart upload.");
+            }
+            catch
+            {
+                if (!Constants.IS_SELF_HOSTED) await ReleaseStorageAsync(userId, fileSize);
+                throw;
             }
         }
 
-        public async Task IncrementStorageUsageAsync(string userId, long fileSize, Limit? observedStorageLimit)
+        // Atomically adds fileSize to this month's usage, unless that would take it past
+        // maxStorage (-1 means unlimited). Returns false when the limit would be exceeded.
+        public async Task<bool> TryReserveStorageAsync(string userId, long fileSize, long maxStorage)
         {
             var collection = Repositories.UsersSettings.Collection;
             var userFilter = Builders<UserSettings>.Filter.Eq(u => u.UserId, userId);
@@ -390,20 +384,12 @@ namespace Notesnook.API.Services
             {
                 var now = DateTimeOffset.UtcNow;
                 var monthStart = new DateTimeOffset(now.Year, now.Month, 1, 0, 0, 0, TimeSpan.Zero);
-                var nextMonthStart = monthStart.AddMonths(1);
                 var nowMilliseconds = now.ToUnixTimeMilliseconds();
-                var monthStartMilliseconds = monthStart.ToUnixTimeMilliseconds();
-                var nextMonthStartMilliseconds = nextMonthStart.ToUnixTimeMilliseconds();
-                var currentStorageLimit = observedStorageLimit;
+                var monthFilter = CurrentMonthFilter(now);
 
-                if (attempt > 0)
-                {
-                    currentStorageLimit = (await collection.Find(userFilter).FirstOrDefaultAsync())?.StorageLimit;
-                }
-
-                var isCurrentMonth = currentStorageLimit != null
-                    && currentStorageLimit.UpdatedAt >= monthStartMilliseconds
-                    && currentStorageLimit.UpdatedAt < nextMonthStartMilliseconds;
+                var userSettings = await collection.Find(userFilter).FirstOrDefaultAsync() ?? throw new Exception("User settings not found.");
+                var currentStorageLimit = userSettings.StorageLimit;
+                var isCurrentMonth = currentStorageLimit != null && currentStorageLimit.UpdatedAt >= monthStart.ToUnixTimeMilliseconds();
 
                 if (!isCurrentMonth)
                 {
@@ -420,21 +406,54 @@ namespace Notesnook.API.Services
                     if (resetResult.MatchedCount == 0)
                         continue;
                 }
+                else if (maxStorage != -1 && currentStorageLimit!.Value + fileSize > maxStorage)
+                {
+                    return false;
+                }
+
+                var filter = Builders<UserSettings>.Filter.And(userFilter, monthFilter);
+                if (maxStorage != -1)
+                    filter &= Builders<UserSettings>.Filter.Lte("StorageLimit.Value", maxStorage - fileSize);
 
                 var result = await collection.UpdateOneAsync(
-                    Builders<UserSettings>.Filter.And(
-                        userFilter,
-                        Builders<UserSettings>.Filter.Gte("StorageLimit.UpdatedAt", monthStartMilliseconds),
-                        Builders<UserSettings>.Filter.Lt("StorageLimit.UpdatedAt", nextMonthStartMilliseconds)),
+                    filter,
                     Builders<UserSettings>.Update.Combine(
                         Builders<UserSettings>.Update.Inc("StorageLimit.Value", fileSize),
                         Builders<UserSettings>.Update.Set("StorageLimit.UpdatedAt", nowMilliseconds)));
 
                 if (result.MatchedCount > 0)
-                    return;
+                    return true;
             }
 
             throw new Exception("Storage usage counter was not available after rollover retries.");
+        }
+
+        // Gives back a reservation whose upload failed. If the month rolled over in between,
+        // the reservation is already gone with the old month's usage. This is called while an
+        // upload error is being rethrown, so it never throws itself; a failure only overcharges.
+        public async Task ReleaseStorageAsync(string userId, long fileSize)
+        {
+            try
+            {
+                await Repositories.UsersSettings.Collection.UpdateOneAsync(
+                    Builders<UserSettings>.Filter.And(
+                        Builders<UserSettings>.Filter.Eq(u => u.UserId, userId),
+                        CurrentMonthFilter(DateTimeOffset.UtcNow),
+                        Builders<UserSettings>.Filter.Gte("StorageLimit.Value", fileSize)),
+                    Builders<UserSettings>.Update.Inc("StorageLimit.Value", -fileSize));
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to release reserved storage for user {UserId}.", userId);
+            }
+        }
+
+        private static FilterDefinition<UserSettings> CurrentMonthFilter(DateTimeOffset now)
+        {
+            var monthStart = new DateTimeOffset(now.Year, now.Month, 1, 0, 0, 0, TimeSpan.Zero);
+            return Builders<UserSettings>.Filter.And(
+                Builders<UserSettings>.Filter.Gte("StorageLimit.UpdatedAt", monthStart.ToUnixTimeMilliseconds()),
+                Builders<UserSettings>.Filter.Lt("StorageLimit.UpdatedAt", monthStart.AddMonths(1).ToUnixTimeMilliseconds()));
         }
 
         private async Task<string?> GetPresignedURLAsync(string userId, string name, HttpVerb httpVerb, S3ClientMode mode = S3ClientMode.EXTERNAL)

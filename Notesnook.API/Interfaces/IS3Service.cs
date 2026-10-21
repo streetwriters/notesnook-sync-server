@@ -35,6 +35,7 @@ namespace Notesnook.API.Interfaces
         Task<MultipartUploadMeta> StartMultipartUploadAsync(string userId, string name, int parts, string? uploadId = null);
         Task AbortMultipartUploadAsync(string userId, string name, string uploadId);
         Task CompleteMultipartUploadAsync(string userId, CompleteMultipartUploadRequest uploadRequest);
-        Task IncrementStorageUsageAsync(string userId, long fileSize, Limit? observedStorageLimit);
+        Task<bool> TryReserveStorageAsync(string userId, long fileSize, long maxStorage);
+        Task ReleaseStorageAsync(string userId, long fileSize);
     }
 }

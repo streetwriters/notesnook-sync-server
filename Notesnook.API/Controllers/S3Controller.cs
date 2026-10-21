@@ -77,30 +77,23 @@ namespace Notesnook.API.Controllers
 
         private async Task UploadFileWithChecksAsync(string userId, string name, long fileSize)
         {
-            var userSettings = await repositories.UsersSettings.FindOneAsync((u) => u.UserId == userId)
-                ?? throw new Exception("User settings not found.");
-            var observedStorageLimit = userSettings.StorageLimit;
-
             var subscription = await serviceAccessor.UserSubscriptionService.GetUserSubscriptionAsync(Clients.Notesnook.Id, userId) ?? throw new Exception("User subscription not found.");
 
             if (StorageHelper.IsFileSizeExceeded(subscription, fileSize))
                 throw new Exception("Max file size exceeded.");
 
-            userSettings.StorageLimit = StorageHelper.RolloverStorageLimit(userSettings.StorageLimit);
-            if (StorageHelper.IsStorageLimitReached(subscription, userSettings.StorageLimit.Value + fileSize))
+            if (!await s3Service.TryReserveStorageAsync(userId, fileSize, StorageHelper.GetStorageLimitForPlan(subscription)))
                 throw new Exception("Storage limit exceeded.");
-
-            var uploadedFileSize = await UploadFileAsync(userId, name, fileSize);
 
             try
             {
-                await s3Service.IncrementStorageUsageAsync(userId, uploadedFileSize, observedStorageLimit);
+                await UploadFileAsync(userId, name, fileSize);
             }
-            catch (Exception ex)
+            catch
             {
-                logger.LogError(ex, "Failed to account for attachment usage for user {UserId}.", userId);
+                await s3Service.ReleaseStorageAsync(userId, fileSize);
+                throw;
             }
-
         }
 
         private async Task<long> UploadFileAsync(string userId, string name, long fileSize)
