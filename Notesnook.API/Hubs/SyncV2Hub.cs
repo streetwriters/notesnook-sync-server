@@ -162,7 +162,16 @@ namespace Notesnook.API.Hubs
                 }
 
                 if (!await unit.Commit()) return 0;
-                await SyncDeviceService.UpdateLastAccessTimeAsync(userId, deviceId);
+
+                // the push is already committed, so failing to record the access time must not fail it
+                try
+                {
+                    await SyncDeviceService.UpdateLastAccessTimeAsync(userId, deviceId);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning(ex, "Failed to update last access time of device {DeviceId}", deviceId);
+                }
 
                 return 1;
             }
