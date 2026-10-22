@@ -10,6 +10,7 @@ using IdentityServer4.Stores;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using MongoDB.Driver;
 using Streetwriters.Common;
 using Streetwriters.Common.Enums;
 using Streetwriters.Common.Interfaces;
@@ -158,12 +159,21 @@ namespace Streetwriters.Identity.Services
                     Errors = ["Invalid email address."]
                 };
 
-            var result = await userManager.CreateAsync(new User
+            IdentityResult result;
+            try
             {
-                Email = email,
-                EmailConfirmed = Constants.IS_SELF_HOSTED,
-                UserName = email,
-            }, password);
+                result = await userManager.CreateAsync(new User
+                {
+                    Email = email,
+                    EmailConfirmed = Constants.IS_SELF_HOSTED,
+                    UserName = email,
+                }, password);
+            }
+            // concurrent signups can all pass Identity's duplicate check; the unique index rejects all but one
+            catch (MongoWriteException ex) when (ex.WriteError?.Code == 11000)
+            {
+                result = IdentityResult.Failed(new IdentityErrorDescriber().DuplicateEmail(email));
+            }
 
             if (result.Succeeded)
             {
