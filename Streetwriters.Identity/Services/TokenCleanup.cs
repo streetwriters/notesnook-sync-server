@@ -26,17 +26,10 @@ namespace Streetwriters.Identity.Services
         /// <returns></returns>
         public async Task RemoveExpiredGrantsAsync()
         {
-            try
-            {
-                _logger.LogTrace("Querying for expired grants to remove");
+            _logger.LogTrace("Querying for expired grants to remove");
 
-                await RemoveGrantsAsync();
-                //TODO: await RemoveDeviceCodesAsync();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError("Exception removing expired grants: {exception}", ex.Message);
-            }
+            await RemoveGrantsAsync();
+            //TODO: await RemoveDeviceCodesAsync();
         }
 
         /// <summary>

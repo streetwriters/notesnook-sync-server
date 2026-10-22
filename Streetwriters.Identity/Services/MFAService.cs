@@ -26,6 +26,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
 using Streetwriters.Common.Enums;
+using Streetwriters.Common.Exceptions;
 using Streetwriters.Common.Interfaces;
 using Streetwriters.Common.Models;
 using Streetwriters.Identity.Interfaces;
@@ -172,7 +173,7 @@ namespace Streetwriters.Identity.Services
         {
             var method = form.Type;
             if ((method != MFAMethods.Email && method != MFAMethods.SMS) || !IsValidMFAMethod(method))
-                throw new Exception("Invalid method.");
+                throw new ClientException("Invalid method.");
 
             await GetAuthenticatorDetailsAsync(user, client);
 
@@ -187,7 +188,7 @@ namespace Streetwriters.Identity.Services
                     ArgumentNullException.ThrowIfNull(form.PhoneNumber);
                     await UserManager.SetPhoneNumberAsync(user, form.PhoneNumber);
                     var id = await SMSSender.SendOTPAsync(form.PhoneNumber, client);
-                    if (string.IsNullOrEmpty(id)) throw new Exception("Failed to send SMS. Please try again.");
+                    if (string.IsNullOrEmpty(id)) throw new ClientException("Failed to send SMS. Please try again.");
 
                     logger.LogInformation("SMS OTP sent for user: {UserId}, SMS ID: {SmsId}", user.Id, id);
                     await this.ReplaceClaimAsync(user, MFAService.SMS_ID_CLAIM, id);
@@ -201,7 +202,7 @@ namespace Streetwriters.Identity.Services
             if (method == MFAMethods.SMS)
             {
                 var id = GetClaimValue(user, MFAService.SMS_ID_CLAIM);
-                if (string.IsNullOrEmpty(id)) throw new Exception("Could not find associated SMS verify id. Please try sending the code again.");
+                if (string.IsNullOrEmpty(id)) throw new ClientException("Could not find associated SMS verify id. Please try sending the code again.");
                 if (await SMSSender.VerifyOTPAsync(id, code))
                 {
                     // Auto confirm user phone number if not confirmed

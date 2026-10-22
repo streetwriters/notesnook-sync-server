@@ -29,6 +29,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Streetwriters.Common;
 using Streetwriters.Common.Enums;
+using Streetwriters.Common.Exceptions;
 using Streetwriters.Common.Helpers;
 using Streetwriters.Common.Models;
 using Streetwriters.Identity.Interfaces;
@@ -52,36 +53,29 @@ namespace Streetwriters.Identity.Controllers
             var client = Clients.FindClientById(User.FindFirstValue("client_id"));
             if (client == null) return BadRequest("Invalid client_id.");
 
-            var user = await UserManager.GetUserAsync(User) ?? throw new Exception("User not found.");
+            var user = await UserManager.GetUserAsync(User) ?? throw new NotFoundException("User not found.");
 
             if (form.Type == MFAMethods.SMS && !FeatureAuthorizationHelper.IsFeatureAllowed(Features.SMS_2FA, client.Id, User))
-                throw new Exception("2FA via SMS is only available on Pro & Believer plans.");
+                throw new ClientException("2FA via SMS is only available on Pro & Believer plans.");
 
-            try
+            switch (form.Type)
             {
-                switch (form.Type)
-                {
-                    case "app":
-                        var authenticatorDetails = await MFAService.GetAuthenticatorDetailsAsync(user, client);
-                        return Ok(authenticatorDetails);
-                    case "sms":
-                    case "email":
-                        await MFAService.SendOTPAsync(user, client, form);
-                        return Ok();
-                    default:
-                        return BadRequest("Invalid authenticator type.");
-                }
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(ex.Message);
+                case "app":
+                    var authenticatorDetails = await MFAService.GetAuthenticatorDetailsAsync(user, client);
+                    return Ok(authenticatorDetails);
+                case "sms":
+                case "email":
+                    await MFAService.SendOTPAsync(user, client, form);
+                    return Ok();
+                default:
+                    return BadRequest("Invalid authenticator type.");
             }
         }
 
         [HttpPost("disable")]
         public async Task<IActionResult> Disable2FA([FromForm] string password)
         {
-            var user = await UserManager.GetUserAsync(User) ?? throw new Exception("User not found.");
+            var user = await UserManager.GetUserAsync(User) ?? throw new NotFoundException("User not found.");
 
             var result = await SignInManager.CheckPasswordSignInAsync(user, password, true);
             if (result.IsLockedOut) return BadRequest("Too many failed attempts. Please try again later.");
@@ -95,7 +89,7 @@ namespace Streetwriters.Identity.Controllers
         [HttpGet("codes")]
         public async Task<IActionResult> GetRecoveryCodes()
         {
-            var user = await UserManager.GetUserAsync(User) ?? throw new Exception("User not found.");
+            var user = await UserManager.GetUserAsync(User) ?? throw new NotFoundException("User not found.");
             if (!await UserManager.GetTwoFactorEnabledAsync(user)) return BadRequest("Please enable 2FA.");
             return Ok(await UserManager.GenerateNewTwoFactorRecoveryCodesAsync(user, 16));
         }
@@ -123,7 +117,7 @@ namespace Streetwriters.Identity.Controllers
         [HttpPatch]
         public async Task<IActionResult> EnableAuthenticator([FromForm] MultiFactorEnableForm form)
         {
-            var user = await UserManager.GetUserAsync(User) ?? throw new Exception("User not found.");
+            var user = await UserManager.GetUserAsync(User) ?? throw new NotFoundException("User not found.");
 
             if (form.IsFallback && !await UserManager.GetTwoFactorEnabledAsync(user))
                 return BadRequest("Please enable 2FA.");

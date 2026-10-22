@@ -205,6 +205,7 @@ namespace Streetwriters.Identity
             services.AddScoped<IUserAccountService, UserAccountService>();
             services.AddTransient<IMFAService, MFAService>();
             services.AddControllers();
+            services.AddApiExceptionHandler();
             services.AddTransient<IIntrospectionResponseGenerator, CustomIntrospectionResponseGenerator>();
             services.AddTransient<IProfileService, ProfileService>();
             services.AddTransient<ITokenGenerationService, TokenGenerationService>();
@@ -219,6 +220,7 @@ namespace Streetwriters.Identity
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
             app.UseForwardedHeadersWithKnownProxies(env, "CF-Connecting-IP");
+            app.UseExceptionHandler(_ => { });
 
             app.UseCors("notesnook");
             app.UseVersion(Servers.IdentityServer);

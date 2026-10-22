@@ -140,82 +140,74 @@ namespace Streetwriters.Identity.Services
                     Errors = ["Creating new accounts is not allowed."]
                 };
 
-            try
+            var client = Clients.FindClientById(clientId);
+            if (client == null) return new SignupResponse
             {
-                var client = Clients.FindClientById(clientId);
-                if (client == null) return new SignupResponse
+                Errors = ["Invalid client id."]
+            };
+
+            if (await roleManager.FindByNameAsync(clientId) == null)
+                await roleManager.CreateAsync(new MongoRole(clientId));
+
+            // email addresses must be case-insensitive
+            email = email.ToLowerInvariant();
+
+            if (!await emailValidator.IsEmailAddressValidAsync(email))
+                return new SignupResponse
                 {
-                    Errors = ["Invalid client id."]
+                    Errors = ["Invalid email address."]
                 };
 
-                if (await roleManager.FindByNameAsync(clientId) == null)
-                    await roleManager.CreateAsync(new MongoRole(clientId));
+            var result = await userManager.CreateAsync(new User
+            {
+                Email = email,
+                EmailConfirmed = Constants.IS_SELF_HOSTED,
+                UserName = email,
+            }, password);
 
-                // email addresses must be case-insensitive
-                email = email.ToLowerInvariant();
+            if (result.Succeeded)
+            {
+                var user = await userManager.FindByEmailAsync(email);
+                if (user == null) return SignupResponse.Error(["User not found after creation."]);
 
-                if (!await emailValidator.IsEmailAddressValidAsync(email))
-                    return new SignupResponse
-                    {
-                        Errors = ["Invalid email address."]
-                    };
-
-                var result = await userManager.CreateAsync(new User
+                await userManager.AddToRoleAsync(user, client.Id);
+                if (Constants.IS_SELF_HOSTED)
                 {
-                    Email = email,
-                    EmailConfirmed = Constants.IS_SELF_HOSTED,
-                    UserName = email,
-                }, password);
-
-                if (result.Succeeded)
+                    await userManager.AddClaimAsync(user, new Claim(UserService.GetClaimKey(client.Id), "believer"));
+                }
+                else
                 {
-                    var user = await userManager.FindByEmailAsync(email);
-                    if (user == null) return SignupResponse.Error(["User not found after creation."]);
-
-                    await userManager.AddToRoleAsync(user, client.Id);
-                    if (Constants.IS_SELF_HOSTED)
+                    await mfaService.EnableMFAAsync(user, MFAMethods.Email);
+                    if (userAgent != null) await userManager.AddClaimAsync(user, new Claim("platform", PlatformFromUserAgent(userAgent)));
+                    var code = await userManager.GenerateEmailConfirmationTokenAsync(user);
+                    var callbackUrl = UrlExtensions.TokenLink(user.Id.ToString(), code, client.Id, TokenType.CONFRIM_EMAIL);
+                    if (!string.IsNullOrEmpty(user.Email) && callbackUrl != null)
                     {
-                        await userManager.AddClaimAsync(user, new Claim(UserService.GetClaimKey(client.Id), "believer"));
+                        await emailSender.SendConfirmationEmailAsync(user.Email, callbackUrl, client);
                     }
-                    else
-                    {
-                        await mfaService.EnableMFAAsync(user, MFAMethods.Email);
-                        if (userAgent != null) await userManager.AddClaimAsync(user, new Claim("platform", PlatformFromUserAgent(userAgent)));
-                        var code = await userManager.GenerateEmailConfirmationTokenAsync(user);
-                        var callbackUrl = UrlExtensions.TokenLink(user.Id.ToString(), code, client.Id, TokenType.CONFRIM_EMAIL);
-                        if (!string.IsNullOrEmpty(user.Email) && callbackUrl != null)
-                        {
-                            await emailSender.SendConfirmationEmailAsync(user.Email, callbackUrl, client);
-                        }
-                    }
-
-                    var response = await tokenGenerationService.CreateUserTokensAsync(user, client.Id, 3600);
-                    if (response == null) return SignupResponse.Error(["Failed  to generate access token."]);
-
-                    return new SignupResponse
-                    {
-                        AccessToken = response.AccessToken,
-                        AccessTokenLifetime = response.AccessTokenLifetime,
-                        RefreshToken = response.RefreshToken,
-                        Scope = response.Scope,
-                        UserId = user.Id.ToString()
-                    };
                 }
 
-                var otherErrors = result.Errors
-                    .Where(e => e.Code != "DuplicateUserName" && e.Code != "DuplicateEmail")
-                    .ToErrors();
-                var hasDuplicate = result.Errors.Any(e => e.Code == "DuplicateUserName" || e.Code == "DuplicateEmail");
-                var errors = hasDuplicate
-                    ? ["Unable to create an account on this email.", .. otherErrors]
-                    : otherErrors;
-                return SignupResponse.Error(errors);
+                var response = await tokenGenerationService.CreateUserTokensAsync(user, client.Id, 3600);
+                if (response == null) return SignupResponse.Error(["Failed  to generate access token."]);
+
+                return new SignupResponse
+                {
+                    AccessToken = response.AccessToken,
+                    AccessTokenLifetime = response.AccessTokenLifetime,
+                    RefreshToken = response.RefreshToken,
+                    Scope = response.Scope,
+                    UserId = user.Id.ToString()
+                };
             }
-            catch (System.Exception ex)
-            {
-                logger.LogError(ex, "Failed to create user account for email: {Email}", email);
-                return SignupResponse.Error(["Failed to create an account."]);
-            }
+
+            var otherErrors = result.Errors
+                .Where(e => e.Code != "DuplicateUserName" && e.Code != "DuplicateEmail")
+                .ToErrors();
+            var hasDuplicate = result.Errors.Any(e => e.Code == "DuplicateUserName" || e.Code == "DuplicateEmail");
+            var errors = hasDuplicate
+                ? ["Unable to create an account on this email.", .. otherErrors]
+                : otherErrors;
+            return SignupResponse.Error(errors);
         }
 
         private static string PlatformFromUserAgent(string? userAgent)

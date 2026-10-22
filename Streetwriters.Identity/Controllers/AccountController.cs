@@ -34,6 +34,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Logging;
 using Streetwriters.Common;
 using Streetwriters.Common.Enums;
+using Streetwriters.Common.Exceptions;
 using Streetwriters.Common.Helpers;
 using Streetwriters.Common.Interfaces;
 using Streetwriters.Common.Messages;
@@ -90,7 +91,7 @@ namespace Streetwriters.Identity.Controllers
             var client = Clients.FindClientById(clientId);
             if (client == null) return BadRequest("Invalid client_id.");
 
-            var user = await UserManager.FindByIdAsync(userId) ?? throw new Exception("User not found.");
+            var user = await UserManager.FindByIdAsync(userId) ?? throw new NotFoundException("User not found.");
             if (!await UserService.IsUserValidAsync(UserManager, user, clientId)) return BadRequest($"Unable to find user with ID '{userId}'.");
 
             switch (type)
@@ -147,7 +148,7 @@ namespace Streetwriters.Identity.Controllers
             var client = Clients.FindClientById(User.FindFirstValue("client_id"));
             if (client == null) return BadRequest("Invalid client_id.");
 
-            var user = await UserManager.GetUserAsync(User) ?? throw new Exception("User not found.");
+            var user = await UserManager.GetUserAsync(User) ?? throw new NotFoundException("User not found.");
             if (!await UserService.IsUserValidAsync(UserManager, user, client.Id)) return BadRequest($"Unable to find user with ID '{UserManager.GetUserId(User)}'.");
 
             if (string.IsNullOrEmpty(newEmail))
@@ -175,7 +176,7 @@ namespace Streetwriters.Identity.Controllers
         {
             var client = Clients.FindClientById(User.FindFirstValue("client_id"));
             if (client == null) return BadRequest("Invalid client_id.");
-            var user = await UserManager.GetUserAsync(User) ?? throw new Exception("User not found.");
+            var user = await UserManager.GetUserAsync(User) ?? throw new NotFoundException("User not found.");
             return Ok(await UserAccountService.GetUserAsync(client.Id, user.Id.ToString()));
         }
 
@@ -208,7 +209,7 @@ namespace Streetwriters.Identity.Controllers
             var client = Clients.FindClientById(User.FindFirstValue("client_id"));
             if (client == null) return BadRequest("Invalid client_id.");
 
-            var user = await UserManager.GetUserAsync(User) ?? throw new Exception("User not found.");
+            var user = await UserManager.GetUserAsync(User) ?? throw new NotFoundException("User not found.");
             if (!await UserService.IsUserValidAsync(UserManager, user, client.Id)) return BadRequest($"Unable to find user with ID '{UserManager.GetUserId(User)}'.");
 
             var subjectId = User.FindFirstValue("sub");
@@ -235,7 +236,7 @@ namespace Streetwriters.Identity.Controllers
         public async Task<IActionResult> GetAccessTokenFromCode([FromForm] GetAccessTokenForm form)
         {
             if (!Clients.IsValidClient(form.ClientId)) return BadRequest("Invalid clientId.");
-            var user = await UserManager.FindByIdAsync(form.UserId) ?? throw new Exception("User not found.");
+            var user = await UserManager.FindByIdAsync(form.UserId) ?? throw new NotFoundException("User not found.");
             if (!await UserService.IsUserValidAsync(UserManager, user, form.ClientId))
                 return BadRequest($"Unable to find user with ID '{form.UserId}'.");
 
@@ -256,7 +257,7 @@ namespace Streetwriters.Identity.Controllers
             var client = Clients.FindClientById(User.FindFirstValue("client_id"));
             if (client == null) return BadRequest("Invalid client_id.");
 
-            var user = await UserManager.GetUserAsync(User) ?? throw new Exception("User not found.");
+            var user = await UserManager.GetUserAsync(User) ?? throw new NotFoundException("User not found.");
             if (!await UserService.IsUserValidAsync(UserManager, user, client.Id))
                 return BadRequest($"Unable to find user with ID '{UserManager.GetUserId(User)}'.");
 

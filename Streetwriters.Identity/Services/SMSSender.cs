@@ -22,6 +22,7 @@ using Streetwriters.Common.Interfaces;
 using Streetwriters.Common;
 using Twilio.Rest.Verify.V2.Service;
 using Twilio;
+using Twilio.Exceptions;
 using System.Threading.Tasks;
 using System;
 using Microsoft.Extensions.Logging;
@@ -68,9 +69,9 @@ namespace Streetwriters.Identity.Services
                     code: code
                 )).Status == "approved";
             }
-            catch (Exception ex)
+            // Twilio deletes a verification once it expires, is approved or runs out of attempts
+            catch (ApiException ex) when (ex.Status == 404)
             {
-                Logger.LogError(ex, "Error verifying OTP with Twilio");
                 return false;
             }
         }
