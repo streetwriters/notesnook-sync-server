@@ -205,15 +205,13 @@ namespace Notesnook.API.Services
 
         public async Task<SyncDevice> RegisterDeviceAsync(string userId, string deviceId)
         {
-            var newDevice = new SyncDevice
-            {
-                UserId = userId,
-                DeviceId = deviceId,
-                LastAccessTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                IsSyncReset = true
-            };
-            await repositories.SyncDevices.Collection.InsertOneAsync(newDevice);
-            return newDevice;
+            // an upsert, so registering twice (even concurrently) leaves one device that does a full sync
+            return await repositories.SyncDevices.Collection.FindOneAndUpdateAsync(
+                DeviceFilter(userId, deviceId),
+                Builders<SyncDevice>.Update
+                    .Set(x => x.LastAccessTime, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+                    .Set(x => x.IsSyncReset, true),
+                new FindOneAndUpdateOptions<SyncDevice> { IsUpsert = true, ReturnDocument = ReturnDocument.After });
         }
 
         public async Task UnregisterDeviceAsync(string userId, string deviceId)

@@ -20,6 +20,22 @@ public class SyncDeviceServiceTests(TestDatabase db) : IClassFixture<TestDatabas
     }
 
     [Fact]
+    public async Task Registering_twice_leaves_one_reset_device()
+    {
+        var userId = NewUserId();
+        var collection = db.CreateScope().Repositories.SyncDevices.Collection;
+        await collection.Indexes.CreateOneAsync(new CreateIndexModel<SyncDevice>(
+            Builders<SyncDevice>.IndexKeys.Ascending((d) => d.UserId).Ascending((d) => d.DeviceId), new CreateIndexOptions { Unique = true }));
+        var devices = await RegisterSyncedDeviceAsync(userId, "B");
+
+        for (var i = 0; i < 20; i++)
+            await Task.WhenAll(devices.RegisterDeviceAsync(userId, "B"), db.CreateScope().Devices.RegisterDeviceAsync(userId, "B"));
+
+        var stored = await collection.Find((d) => d.UserId == userId).ToListAsync();
+        Assert.True(Assert.Single(stored).IsSyncReset);
+    }
+
+    [Fact]
     public async Task Fetch_merges_unsynced_into_pending()
     {
         var userId = NewUserId();

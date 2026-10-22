@@ -64,13 +64,18 @@ namespace Notesnook.API.Services
                 else throw new ClientException("Could not create a new account.");
             }
 
-            await Repositories.UsersSettings.InsertAsync(new UserSettings
+            try
             {
-                UserId = response.UserId,
-                StorageLimit = new Limit { UpdatedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), Value = 0 },
-                LastSynced = 0,
-                Salt = GetSalt()
-            });
+                await Repositories.UsersSettings.InsertAsync(new UserSettings
+                {
+                    UserId = response.UserId,
+                    StorageLimit = new Limit { UpdatedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), Value = 0 },
+                    LastSynced = 0,
+                    Salt = GetSalt()
+                });
+            }
+            // until Identity's users are unique, a double-submitted signup can get the same user twice
+            catch (MongoWriteException ex) when (ex.WriteError.Category == ServerErrorCategory.DuplicateKey) { }
 
             if (!Constants.IS_SELF_HOSTED)
             {
