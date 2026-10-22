@@ -135,6 +135,11 @@ namespace Notesnook.API.Services
                 objectsToDelete.Add(new KeyVersion { Key = objectName });
             }
 
+            await DeleteKeysAsync(objectsToDelete);
+        }
+
+        private async Task DeleteKeysAsync(List<KeyVersion> objectsToDelete)
+        {
             if (objectsToDelete.Count == 0)
             {
                 return;
@@ -192,7 +197,8 @@ namespace Notesnook.API.Services
             var request = new ListObjectsV2Request
             {
                 BucketName = INTERNAL_BUCKET_NAME,
-                Prefix = userId,
+                // without the "/", deleting user "ab" would also delete user "abc"'s objects
+                Prefix = $"{userId}/",
             };
 
             var response = new ListObjectsV2Response();
@@ -209,16 +215,7 @@ namespace Notesnook.API.Services
             }
             while (response.IsTruncated);
 
-            if (keys.Count <= 0) return;
-
-            var deleteObjectsResponse = await S3InternalClient.ExecuteWithFailoverAsync((client) => client.DeleteObjectsAsync(new DeleteObjectsRequest
-            {
-                BucketName = INTERNAL_BUCKET_NAME,
-                Objects = keys,
-            }), operationName: "DeleteObjects", isWriteOperation: true);
-
-            if (!IsSuccessStatusCode((int)deleteObjectsResponse.HttpStatusCode))
-                throw new Exception("Could not delete directory.");
+            await DeleteKeysAsync(keys);
         }
 
         public async Task<long> GetObjectSizeAsync(string userId, string name)

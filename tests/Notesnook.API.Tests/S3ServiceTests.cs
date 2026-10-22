@@ -108,6 +108,36 @@ public class S3ServiceTests(TestDatabase db, MinioFixture minio) : IClassFixture
     }
 
     [Fact]
+    public async Task Deleting_a_directory_ignores_users_whose_id_starts_with_the_same_characters()
+    {
+        var s3 = CreateService();
+        var userId = NewUserId();
+        var otherUserId = userId + "0";
+        await UploadAsync(s3, userId, "a", new byte[5]);
+        await UploadAsync(s3, otherUserId, "a", new byte[5]);
+
+        await s3.DeleteDirectoryAsync(userId);
+
+        Assert.Equal(0, await s3.GetObjectSizeAsync(userId, "a"));
+        Assert.Equal(5, await s3.GetObjectSizeAsync(otherUserId, "a"));
+    }
+
+    [Fact]
+    public async Task Deleting_a_directory_removes_more_objects_than_fit_in_one_request()
+    {
+        var s3 = CreateService();
+        var userId = NewUserId();
+        // S3 deletes at most 1000 keys per request
+        var names = Enumerable.Range(0, 1001).Select((i) => $"file{i}").ToArray();
+        await Parallel.ForEachAsync(names, new ParallelOptions { MaxDegreeOfParallelism = 32 }, async (name, _) => await UploadAsync(s3, userId, name, new byte[1]));
+
+        await s3.DeleteDirectoryAsync(userId);
+
+        Assert.Equal(0, await s3.GetObjectSizeAsync(userId, names[0]));
+        Assert.Equal(0, await s3.GetObjectSizeAsync(userId, names[^1]));
+    }
+
+    [Fact]
     public async Task A_multipart_upload_within_the_limit_is_completed_and_charged()
     {
         var userId = NewUserId();

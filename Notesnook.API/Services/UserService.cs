@@ -204,7 +204,7 @@ namespace Notesnook.API.Services
                 });
             }
 
-            await S3Service.DeleteDirectoryAsync(userId);
+            await DeleteAttachmentsAsync(userId);
         }
 
         public async Task DeleteUserAsync(string userId, string? jti, string password)
@@ -255,9 +255,22 @@ namespace Notesnook.API.Services
                 .Inc((s) => s.Revision, 1));
 
             if (removeAttachments)
-                await S3Service.DeleteDirectoryAsync(userId);
+                await DeleteAttachmentsAsync(userId);
 
             return true;
+        }
+
+        // runs after the user's data is already gone, so a failure here must not turn a completed deletion into an error
+        private async Task DeleteAttachmentsAsync(string userId)
+        {
+            try
+            {
+                await S3Service.DeleteDirectoryAsync(userId);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to delete attachments of user {UserId}", userId);
+            }
         }
 
         private static string GetSalt()
