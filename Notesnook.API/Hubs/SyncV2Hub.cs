@@ -30,6 +30,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
+using MongoDB.Bson;
 using MongoDB.Driver;
 using Notesnook.API.Authorization;
 using Notesnook.API.Extensions;
@@ -277,14 +278,16 @@ namespace Notesnook.API.Hubs
 
                 if (includeMonographs)
                 {
-                    var unsyncedMonographIds = ids.Where(k => k.Type == "monograph").Select(k => k.ItemId);
+                    var unsyncedMonographIds = ids.Where(k => k.Type == "monograph").Select(k => k.ItemId).ToList();
+                    // _id is stored as an ObjectId, so string IDs would never match it
+                    var unsyncedMonographObjectIds = unsyncedMonographIds.Where(id => ObjectId.TryParse(id, out _)).Select(ObjectId.Parse);
                     FilterDefinition<Monograph> filter = device.IsSyncReset
                         ? Builders<Monograph>.Filter.Eq(m => m.UserId, userId)
                         : Builders<Monograph>.Filter.And(
                             Builders<Monograph>.Filter.Eq(m => m.UserId, userId),
                             Builders<Monograph>.Filter.Or(
                                 Builders<Monograph>.Filter.In(m => m.ItemId, unsyncedMonographIds),
-                                Builders<Monograph>.Filter.In("_id", unsyncedMonographIds)
+                                Builders<Monograph>.Filter.In("_id", unsyncedMonographObjectIds)
                             )
                         );
                     var userMonographs = await Repositories.Monographs.Collection
