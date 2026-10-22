@@ -8,7 +8,7 @@ Run all commands from the **repository root**.
 
 | Step | Compose files | Role |
 |------|---------------|------|
-| 1. Infra | `examples/<example>/infra.compose.yml` | MongoDB, MinIO, or Garage on `notesnook-shared` |
+| 1. Infra | `examples/<example>/infra.compose.yml` | MongoDB, Silo, or Garage on `notesnook-shared` |
 | 2. Notesnook | `docker-compose.yml` + `examples/<example>/notesnook.override.yml` | Disables embedded services; patches connection strings |
 
 ```bash
@@ -37,8 +37,8 @@ Infra-only variables (e.g. `GARAGE_RPC_SECRET`) are in `infra.env.example` where
 
 | Example | External dependency | Notes |
 |---------|---------------------|-------|
-| [external-mongodb](external-mongodb/) | MongoDB | Embedded MinIO stays enabled |
-| [external-minio](external-minio/) | MinIO | Embedded MongoDB stays enabled |
+| [external-mongodb](external-mongodb/) | MongoDB | Embedded Silo stays enabled |
+| [external-silo](external-silo/) | Silo (MinIO-compatible S3) | Embedded MongoDB stays enabled |
 | [garage](garage/) | [GarageHQ](https://garagehq.deuxfleurs.fr/) S3 | Manual bucket setup via `setup-garage.sh` |
 
 ## Shared network

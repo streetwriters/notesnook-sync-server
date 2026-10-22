@@ -1,6 +1,6 @@
 # GarageHQ S3
 
-[Garage](https://garagehq.deuxfleurs.fr/) replaces embedded MinIO. The Notesnook stack uses the root [`docker-compose.yml`](../../docker-compose.yml) with [`notesnook.override.yml`](notesnook.override.yml). MongoDB stays embedded.
+[Garage](https://garagehq.deuxfleurs.fr/) replaces embedded Silo. The Notesnook stack uses the root [`docker-compose.yml`](../../docker-compose.yml) with [`notesnook.override.yml`](notesnook.override.yml). MongoDB stays embedded.
 
 Based on [PR #79](https://github.com/streetwriters/notesnook-sync-server/pull/79), with community review adjustments:
 
