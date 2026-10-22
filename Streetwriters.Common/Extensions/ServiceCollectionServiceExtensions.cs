@@ -18,7 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Streetwriters.Common.Accessors;
+using Streetwriters.Common.Helpers;
 using Streetwriters.Data.DbContexts;
 using Streetwriters.Data.Repositories;
 
@@ -30,6 +32,14 @@ namespace Streetwriters.Common.Extensions
         {
             services.AddSingleton<WampServiceAccessor>((provider) => new WampServiceAccessor(server));
             services.AddHostedService(provider => provider.GetRequiredService<WampServiceAccessor>());
+            return services;
+        }
+
+        public static IServiceCollection AddApiExceptionHandler(this IServiceCollection services)
+        {
+            services.AddExceptionHandler<ApiExceptionHandler>();
+            // the middleware logs every exception again, including 400s (SuppressDiagnosticsCallback is .NET 10+)
+            services.AddLogging((logging) => logging.AddFilter("Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddleware", LogLevel.None));
             return services;
         }
 
@@ -53,7 +63,7 @@ namespace Streetwriters.Common.Extensions
 
                     b.AllowAnyMethod()
                     .AllowAnyHeader()
-                    .WithExposedHeaders(["X-Object-Size", "Content-Length"]);
+                    .WithExposedHeaders(["X-Object-Size", "Content-Length", "Retry-After"]);
                 });
             });
             return services;
