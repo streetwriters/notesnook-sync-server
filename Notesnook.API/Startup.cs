@@ -308,8 +308,8 @@ namespace Notesnook.API
                 q.AddTrigger(opts => opts
                     .ForJob(jobKey)
                     .WithIdentity("DeviceCleanup-trigger")
-                    // first of every month
-                    .WithCronSchedule("0 0 0 1 * ? *"));
+                    // every day at midnight
+                    .WithCronSchedule("0 0 0 * * ? *"));
             });
         }
 
