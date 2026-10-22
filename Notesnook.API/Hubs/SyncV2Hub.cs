@@ -105,6 +105,7 @@ namespace Notesnook.API.Hubs
         public async Task<int> PushItems(string deviceId, SyncTransferItemV2 pushItem)
         {
             var userId = Context.User?.FindFirstValue("sub") ?? throw new HubException("Please login to sync.");
+            if (string.IsNullOrEmpty(deviceId)) throw new HubException("Missing device ID.");
 
             SyncEventCounterSource.Log.PushV2();
 
@@ -236,6 +237,7 @@ namespace Notesnook.API.Hubs
         private async Task<SyncV2Metadata> HandleRequestFetch(string deviceId, bool includeMonographs, bool includeInboxItems, CollectionDef[] collectionDefs)
         {
             var userId = Context.User?.FindFirstValue("sub") ?? throw new HubException("Please login to sync.");
+            if (string.IsNullOrEmpty(deviceId)) throw new HubException("Missing device ID.");
 
             SyncEventCounterSource.Log.FetchV2();
 
