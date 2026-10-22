@@ -35,6 +35,9 @@ namespace Notesnook.API
 #else
             DotNetEnv.Env.TraversePath().Load(".env");
 #endif
+#if DEBUG
+            await using var devS3 = await Helpers.DevS3.StartIfNeededAsync();
+#endif
             IHost host = CreateHostBuilder(args).Build();
             await host.RunAsync();
         }
