@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Json;
-using System.Reflection;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using System.Text.Json;
@@ -104,21 +103,6 @@ public class ApiErrorResponseTests(TestDatabase db) : IClassFixture<TestDatabase
             public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
                 => logs.Enqueue((logLevel, exception));
         }
-    }
-
-    public class Stub<T> : DispatchProxy where T : class
-    {
-        private Dictionary<string, Func<object?[], object?>> handlers = [];
-
-        public static T Create(params (string Method, Func<object?[], object?> Handler)[] handlers)
-        {
-            var proxy = Create<T, Stub<T>>();
-            ((Stub<T>)(object)proxy).handlers = handlers.ToDictionary((h) => h.Method, (h) => h.Handler);
-            return proxy;
-        }
-
-        protected override object? Invoke(MethodInfo? method, object?[]? args)
-            => handlers.TryGetValue(method!.Name, out var handler) ? handler(args ?? []) : throw new NotImplementedException(method.Name);
     }
 
     private static UserModel User => new() { UserId = UserId, Email = "user@example.com", MFA = new MFAConfig { PrimaryMethod = "app" } };
