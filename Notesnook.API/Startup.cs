@@ -236,6 +236,7 @@ namespace Notesnook.API
                 client.Timeout = Timeout.InfiniteTimeSpan;
             });
             services.AddHttpClient<IURLAnalyzer, URLAnalyzer>();
+            services.AddHostedService<MongoIndexesHostedService>();
 
             services.AddWampServiceAccessor(Servers.NotesnookAPI);
 
