@@ -239,6 +239,7 @@ namespace Notesnook.API
             services.AddHostedService<MongoIndexesHostedService>();
 
             services.AddWampServiceAccessor(Servers.NotesnookAPI);
+            services.AddCacheInvalidator(Servers.NotesnookAPI);
 
             services.AddControllers();
             services.AddApiExceptionHandler();
@@ -338,11 +339,7 @@ namespace Notesnook.API
                     await scope.ServiceProvider.GetRequiredService<IUserService>().DeleteUserAsync(ev.UserId);
                 });
 
-                realm.Subscribe<ClearCacheMessage>(IdentityServerTopics.ClearCacheTopic, (ev) =>
-                {
-                    IDistributedCache cache = app.GetService<IDistributedCache>();
-                    ev.Keys.ForEach((key) => cache.Remove(key));
-                });
+                realm.Subscribe<ClearCacheMessage>(IdentityServerTopics.ClearCacheTopic, (ev) => app.GetService<CacheInvalidator>().ClearAsync(ev.Keys));
             });
 
             app.UseRouting();

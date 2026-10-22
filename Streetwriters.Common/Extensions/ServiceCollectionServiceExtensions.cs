@@ -21,6 +21,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Streetwriters.Common.Accessors;
 using Streetwriters.Common.Helpers;
+using Streetwriters.Common.Services;
 using Streetwriters.Data.DbContexts;
 using Streetwriters.Data.Repositories;
 
@@ -32,6 +33,13 @@ namespace Streetwriters.Common.Extensions
         {
             services.AddSingleton<WampServiceAccessor>((provider) => new WampServiceAccessor(server));
             services.AddHostedService(provider => provider.GetRequiredService<WampServiceAccessor>());
+            return services;
+        }
+
+        public static IServiceCollection AddCacheInvalidator(this IServiceCollection services, Server server)
+        {
+            services.AddSingleton((provider) => ActivatorUtilities.CreateInstance<CacheInvalidator>(provider, server));
+            services.AddHostedService(provider => provider.GetRequiredService<CacheInvalidator>());
             return services;
         }
 
