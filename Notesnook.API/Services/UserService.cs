@@ -79,7 +79,8 @@ namespace Notesnook.API.Services
 
             if (!Constants.IS_SELF_HOSTED)
             {
-                await WampServers.SubscriptionServer.PublishMessageAsync(SubscriptionServerTopics.CreateSubscriptionV2Topic, new CreateSubscriptionMessageV2
+                // awaited rather than published so the client's first user fetch already sees the subscription
+                await serviceAccessor.UserSubscriptionService.CreateSubscriptionAsync(new CreateSubscriptionMessageV2
                 {
                     AppId = ApplicationType.NOTESNOOK,
                     Provider = SubscriptionProvider.STREETWRITERS,
