@@ -17,7 +17,15 @@ namespace Streetwriters.Identity.Tests;
 
 public sealed class SignupTests : IDisposable
 {
-    private static readonly IMongoRunner Runner = MongoRunner.Run(new MongoRunnerOptions { KillMongoProcessesWhenCurrentProcessExits = true });
+    private static readonly IMongoRunner Runner = StartRunner();
+
+    // EphemeralMongo only stops mongod when the runner is disposed
+    private static IMongoRunner StartRunner()
+    {
+        var runner = MongoRunner.Run(new MongoRunnerOptions { Version = MongoVersion.V8 });
+        AppDomain.CurrentDomain.ProcessExit += (_, _) => runner.Dispose();
+        return runner;
+    }
     private readonly string databaseName = "identity_test_" + Guid.NewGuid().ToString("N");
     private readonly ServiceProvider services;
 

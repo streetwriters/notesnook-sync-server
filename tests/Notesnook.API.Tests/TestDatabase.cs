@@ -22,7 +22,7 @@ public sealed class TestDatabase : IAsyncLifetime
         var runner = MongoRunner.Run(new MongoRunnerOptions
         {
             UseSingleNodeReplicaSet = true,
-            KillMongoProcessesWhenCurrentProcessExits = true
+            Version = MongoVersion.V8
         });
         AppDomain.CurrentDomain.ProcessExit += (_, _) => runner.Dispose();
         return runner;

@@ -8,9 +8,8 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="6.0.0" />
-    <PackageReference Include="MongoDB.Driver" Version="2.30.0" />
-    <PackageReference Include="MongoDB.Driver.Core" Version="2.30.0" />
-    <PackageReference Include="MongoDB.Bson" Version="2.30.0" />
+    <PackageReference Include="MongoDB.Driver" Version="3.12.0" />
+    <PackageReference Include="MongoDB.Bson" Version="3.12.0" />
   </ItemGroup>
 
 </Project>
