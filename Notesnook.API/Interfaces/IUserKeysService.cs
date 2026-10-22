@@ -30,8 +30,8 @@ namespace Notesnook.API.Interfaces
         Task<KeyWriteResult> StageKeysAsync(string userId, UserKeys keys, long? revision, long stagedAt);
         Task<KeyWriteResult> CommitStagedKeysAsync(string userId, long stagedAt);
         Task DiscardStagedKeysAsync(string userId, long stagedAt);
-        Task<KeyWriteResult> CommitPendingKeysAsync(string userId, long revision);
-        Task<KeyWriteResult> DiscardPendingKeysAsync(string userId, long revision);
+        Task<KeyWriteResult> CommitPendingKeysAsync(string userId, long revision, long authenticatedAt);
+        Task<KeyWriteResult> DiscardPendingKeysAsync(string userId, long revision, long authenticatedAt);
         Task<KeyWriteResult> GetOrCreateUserKeysAsync(string userId, UserKeys keys, long? revision);
         [Obsolete("Only for old clients (PATCH /users). Use GetOrCreateUserKeysAsync and SetInboxKeysAsync instead.")]
         Task<bool> AddUserKeysAsync(string userId, UserKeys keys);

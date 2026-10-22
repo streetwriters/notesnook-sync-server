@@ -91,7 +91,7 @@ namespace Notesnook.API.Controllers
         public async Task<IActionResult> CommitPendingKeys([FromQuery, BindRequired] long revision)
         {
             var userId = User.GetUserId();
-            var result = await UserKeysService.CommitPendingKeysAsync(userId, revision);
+            var result = await UserKeysService.CommitPendingKeysAsync(userId, revision, AuthenticatedAt());
             if (result != KeyWriteResult.Success) return KeyWriteRejected(result);
             await EndOtherSessionsAsync(userId);
             return Ok(await UserService.GetUserAsync(userId));
@@ -107,7 +107,7 @@ namespace Notesnook.API.Controllers
         public async Task<IActionResult> DiscardPendingKeys([FromQuery, BindRequired] long revision)
         {
             var userId = User.GetUserId();
-            var result = await UserKeysService.DiscardPendingKeysAsync(userId, revision);
+            var result = await UserKeysService.DiscardPendingKeysAsync(userId, revision, AuthenticatedAt());
             if (result != KeyWriteResult.Success) return KeyWriteRejected(result);
             return Ok(await UserService.GetUserAsync(userId));
         }
@@ -233,12 +233,19 @@ namespace Notesnook.API.Controllers
             }
         }
 
+        // auth_time is when the session logged in with a password; refreshed tokens keep it
+        private long AuthenticatedAt()
+        {
+            return long.TryParse(User.FindFirstValue(JwtClaimTypes.AuthenticationTime), out var seconds) ? seconds * 1000 : 0;
+        }
+
         private ConflictObjectResult KeyWriteRejected(KeyWriteResult result)
         {
             return result switch
             {
                 KeyWriteResult.WrappedWithOldPassword => Conflict(new { error = "password_changed", error_description = "Your password was changed on another device. Please log in again." }),
                 KeyWriteResult.KeysChanged => Conflict(new { error = "keys_changed", error_description = "Your account was updated on another device. Please try again." }),
+                KeyWriteResult.LoginRequired => Conflict(new { error = "login_required", error_description = "Please log in again to finish changing your password." }),
                 _ => Conflict(new { error = "password_change_in_progress", error_description = "Your password is being changed. If this doesn't go away, please log in again." })
             };
         }

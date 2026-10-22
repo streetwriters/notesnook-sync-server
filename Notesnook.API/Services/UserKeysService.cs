@@ -44,7 +44,11 @@ namespace Notesnook.API.Services
         /// <summary>
         /// The keys were rewrapped from an outdated copy of the user.
         /// </summary>
-        KeysChanged
+        KeysChanged,
+        /// <summary>
+        /// The session's last login was before the pending keys were staged.
+        /// </summary>
+        LoginRequired
     }
 
     public class UserKeysService(ISyncItemsRepositoryAccessor syncItemsRepositoryAccessor) : IUserKeysService
@@ -110,9 +114,17 @@ namespace Notesnook.API.Services
         /// Logging in proves that password is set.
         /// </summary>
         /// <param name="revision">revision of the user whose pending keys the client checked</param>
-        public async Task<KeyWriteResult> CommitPendingKeysAsync(string userId, long revision)
+        /// <param name="authenticatedAt">when the client's session logged in with a password</param>
+        public async Task<KeyWriteResult> CommitPendingKeysAsync(string userId, long revision, long authenticatedAt)
         {
-            return await PromotePendingKeysAsync(userId, Builders<UserSettings>.Filter.Eq((u) => u.Revision, revision));
+            var hasRevision = Builders<UserSettings>.Filter.Eq((u) => u.Revision, revision);
+            var result = await PromotePendingKeysAsync(userId, hasRevision & StagedBefore(authenticatedAt));
+            if (result == KeyWriteResult.Success) return result;
+
+            var userSettings = await Repositories.UsersSettings.FindOneAsync((u) => u.UserId == userId) ?? throw new NotFoundException("User not found.");
+            return IsPendingFor(userSettings, revision) && !(userSettings.PendingKeysSince < authenticatedAt)
+                ? KeyWriteResult.LoginRequired
+                : KeyWriteResult.KeysChanged;
         }
 
         /// <summary>
@@ -123,17 +135,34 @@ namespace Notesnook.API.Services
         /// that staged them is still running.
         /// </summary>
         /// <param name="revision">revision of the user whose pending keys the client checked</param>
-        public async Task<KeyWriteResult> DiscardPendingKeysAsync(string userId, long revision)
+        /// <param name="authenticatedAt">when the client's session logged in with a password</param>
+        public async Task<KeyWriteResult> DiscardPendingKeysAsync(string userId, long revision, long authenticatedAt)
         {
             var hasRevision = Builders<UserSettings>.Filter.Eq((u) => u.Revision, revision);
             var timedOut = Builders<UserSettings>.Filter.Lt((u) => u.PendingKeysSince, Now() - PendingKeysTimeout);
-            var result = await Repositories.UsersSettings.Collection.UpdateOneAsync(UserFilter(userId) & hasRevision & timedOut, ClearPendingKeys());
+            var result = await Repositories.UsersSettings.Collection.UpdateOneAsync(UserFilter(userId) & hasRevision & timedOut & StagedBefore(authenticatedAt), ClearPendingKeys());
             if (result.MatchedCount > 0) return KeyWriteResult.Success;
 
             var userSettings = await Repositories.UsersSettings.FindOneAsync((u) => u.UserId == userId) ?? throw new NotFoundException("User not found.");
-            return userSettings.Revision == revision && userSettings.PendingKeys != null
+            if (!IsPendingFor(userSettings, revision)) return KeyWriteResult.KeysChanged;
+            return userSettings.PendingKeysSince < authenticatedAt
                 ? KeyWriteResult.PasswordChangeInProgress
-                : KeyWriteResult.KeysChanged;
+                : KeyWriteResult.LoginRequired;
+        }
+
+        /// <summary>
+        /// Only a login after the keys were staged shows which password is
+        /// set. A session from before then can't know whether the password
+        /// change that staged them went through.
+        /// </summary>
+        private static FilterDefinition<UserSettings> StagedBefore(long authenticatedAt)
+        {
+            return Builders<UserSettings>.Filter.Lt((u) => u.PendingKeysSince, authenticatedAt);
+        }
+
+        private static bool IsPendingFor(UserSettings userSettings, long revision)
+        {
+            return userSettings.Revision == revision && userSettings.PendingKeys != null;
         }
 
         private async Task<KeyWriteResult> PromotePendingKeysAsync(string userId, FilterDefinition<UserSettings> pendingKeysFilter)
