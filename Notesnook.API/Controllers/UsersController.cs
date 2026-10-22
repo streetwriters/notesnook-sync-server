@@ -50,32 +50,16 @@ namespace Notesnook.API.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> Signup([FromForm] SignupForm form)
         {
-            try
-            {
-                return Ok(await UserService.CreateUserAsync(form));
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Failed to sign up user");
-                return BadRequest(new { error = ex.Message });
-            }
+            return Ok(await UserService.CreateUserAsync(form));
         }
 
         [HttpGet]
         public async Task<IActionResult> GetUser()
         {
             var userId = User.GetUserId();
-            try
-            {
-                UserResponse response = await UserService.GetUserAsync(userId);
-                if (!response.Success) return BadRequest();
-                return Ok(response);
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Failed to get user with id: {UserId}", userId);
-                return BadRequest(new { error = ex.Message });
-            }
+            UserResponse response = await UserService.GetUserAsync(userId);
+            if (!response.Success) return BadRequest();
+            return Ok(response);
         }
 
         [Obsolete("Only for old clients. Use POST /users/keys and PUT/DELETE /users/keys/inbox instead.")]
@@ -83,34 +67,18 @@ namespace Notesnook.API.Controllers
         public async Task<IActionResult> UpdateUser([FromBody] UserKeys keys)
         {
             var userId = User.GetUserId();
-            try
-            {
-                if (!await UserKeysService.AddUserKeysAsync(userId, keys))
-                    return Conflict(new { error = "Your encryption keys were changed on another device. Please try again." });
-                return Ok(await UserService.GetUserAsync(userId));
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Failed to update user with id: {UserId}", userId);
-                return BadRequest(new { error = ex.Message });
-            }
+            if (!await UserKeysService.AddUserKeysAsync(userId, keys))
+                return Conflict(new { error = "Your encryption keys were changed on another device. Please try again." });
+            return Ok(await UserService.GetUserAsync(userId));
         }
 
         [HttpPost("keys")]
         public async Task<IActionResult> GetOrCreateKeys([FromBody] UserKeys keys, [FromQuery] long? revision)
         {
             var userId = User.GetUserId();
-            try
-            {
-                var result = await UserKeysService.GetOrCreateUserKeysAsync(userId, keys, revision);
-                if (result != KeyWriteResult.Success) return KeyWriteRejected(result);
-                return Ok(await UserService.GetUserAsync(userId));
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Failed to create keys for user with id: {UserId}", userId);
-                return BadRequest(new { error = ex.Message });
-            }
+            var result = await UserKeysService.GetOrCreateUserKeysAsync(userId, keys, revision);
+            if (result != KeyWriteResult.Success) return KeyWriteRejected(result);
+            return Ok(await UserService.GetUserAsync(userId));
         }
 
         /// <summary>
@@ -123,18 +91,10 @@ namespace Notesnook.API.Controllers
         public async Task<IActionResult> CommitPendingKeys([FromQuery, BindRequired] long revision)
         {
             var userId = User.GetUserId();
-            try
-            {
-                var result = await UserKeysService.CommitPendingKeysAsync(userId, revision);
-                if (result != KeyWriteResult.Success) return KeyWriteRejected(result);
-                await EndOtherSessionsAsync(userId);
-                return Ok(await UserService.GetUserAsync(userId));
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Failed to commit pending keys for user with id: {UserId}", userId);
-                return BadRequest(new { error = ex.Message });
-            }
+            var result = await UserKeysService.CommitPendingKeysAsync(userId, revision);
+            if (result != KeyWriteResult.Success) return KeyWriteRejected(result);
+            await EndOtherSessionsAsync(userId);
+            return Ok(await UserService.GetUserAsync(userId));
         }
 
         /// <summary>
@@ -147,17 +107,9 @@ namespace Notesnook.API.Controllers
         public async Task<IActionResult> DiscardPendingKeys([FromQuery, BindRequired] long revision)
         {
             var userId = User.GetUserId();
-            try
-            {
-                var result = await UserKeysService.DiscardPendingKeysAsync(userId, revision);
-                if (result != KeyWriteResult.Success) return KeyWriteRejected(result);
-                return Ok(await UserService.GetUserAsync(userId));
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Failed to discard pending keys for user with id: {UserId}", userId);
-                return BadRequest(new { error = ex.Message });
-            }
+            var result = await UserKeysService.DiscardPendingKeysAsync(userId, revision);
+            if (result != KeyWriteResult.Success) return KeyWriteRejected(result);
+            return Ok(await UserService.GetUserAsync(userId));
         }
 
         [HttpPut("keys/inbox")]
@@ -166,34 +118,18 @@ namespace Notesnook.API.Controllers
             var userId = User.GetUserId();
             if (keys.Public == null || keys.Private == null)
                 return BadRequest(new { error = "Both public and private inbox keys are required." });
-            try
-            {
-                var result = await UserKeysService.SetInboxKeysAsync(userId, keys, revision);
-                if (result != KeyWriteResult.Success) return KeyWriteRejected(result);
-                return Ok(await UserService.GetUserAsync(userId));
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Failed to set inbox keys for user with id: {UserId}", userId);
-                return BadRequest(new { error = ex.Message });
-            }
+            var result = await UserKeysService.SetInboxKeysAsync(userId, keys, revision);
+            if (result != KeyWriteResult.Success) return KeyWriteRejected(result);
+            return Ok(await UserService.GetUserAsync(userId));
         }
 
         [HttpDelete("keys/inbox")]
         public async Task<IActionResult> RemoveInboxKeys()
         {
             var userId = User.GetUserId();
-            try
-            {
-                if (!await UserKeysService.RemoveInboxKeysAsync(userId))
-                    return KeyWriteRejected(KeyWriteResult.PasswordChangeInProgress);
-                return Ok(await UserService.GetUserAsync(userId));
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Failed to remove inbox keys for user with id: {UserId}", userId);
-                return BadRequest(new { error = ex.Message });
-            }
+            if (!await UserKeysService.RemoveInboxKeysAsync(userId))
+                return KeyWriteRejected(KeyWriteResult.PasswordChangeInProgress);
+            return Ok(await UserService.GetUserAsync(userId));
         }
 
         [HttpPatch("password/{type}")]
@@ -205,44 +141,36 @@ namespace Notesnook.API.Controllers
             // without the old one
             if (isPasswordReset && !User.HasClaim(JwtClaimTypes.AuthenticationMethod, Constants.PASSWORD_RESET_AUTHENTICATION_METHOD))
                 return StatusCode(StatusCodes.Status403Forbidden, new { error = "Please use the password reset link sent to your email to reset your password." });
-            try
+            // keys are staged first and replace the current keys only once
+            // the password has changed
+            var stagedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            var staged = await UserKeysService.StageKeysAsync(userId, form.UserKeys, form.Revision, stagedAt);
+            if (staged != KeyWriteResult.Success) return KeyWriteRejected(staged);
+
+            var changed = await TryChangePasswordAsync(userId, form, isPasswordReset);
+            // an interrupted change might still have set the password, so
+            // we ask Identity instead of assuming
+            if (changed == null) changed = await IsPasswordSetAsync(userId, form.NewPassword);
+            // if even that is unknown, the pending keys are kept: logging
+            // in commits or discards them
+            if (changed == null) return BadRequest(new { error = "Your password might have been changed. Please log in again." });
+            if (changed == false)
             {
-                // keys are staged first and replace the current keys only once
-                // the password has changed
-                var stagedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                var staged = await UserKeysService.StageKeysAsync(userId, form.UserKeys, form.Revision, stagedAt);
-                if (staged != KeyWriteResult.Success) return KeyWriteRejected(staged);
-
-                var changed = await TryChangePasswordAsync(userId, form, isPasswordReset);
-                // an interrupted change might still have set the password, so
-                // we ask Identity instead of assuming
-                if (changed == null) changed = await IsPasswordSetAsync(userId, form.NewPassword);
-                // if even that is unknown, the pending keys are kept: logging
-                // in commits or discards them
-                if (changed == null) return BadRequest(new { error = "Your password might have been changed. Please log in again." });
-                if (changed == false)
-                {
-                    await UserKeysService.DiscardStagedKeysAsync(userId, stagedAt);
-                    return BadRequest("Failed to change password.");
-                }
-
-                // only fails if the pending keys were resolved by a login
-                // while the password was being changed
-                var committed = await UserKeysService.CommitStagedKeysAsync(userId, stagedAt);
-                if (committed != KeyWriteResult.Success)
-                {
-                    logger.LogError("Password of user with id {UserId} was changed but its pending keys were gone", userId);
-                    return BadRequest(new { error = "Your password was changed but your encryption keys could not be updated. Please contact support." });
-                }
-
-                await EndOtherSessionsAsync(userId);
-                return Ok(await UserService.GetUserAsync(userId));
+                await UserKeysService.DiscardStagedKeysAsync(userId, stagedAt);
+                return BadRequest("Failed to change password.");
             }
-            catch (Exception ex)
+
+            // only fails if the pending keys were resolved by a login
+            // while the password was being changed
+            var committed = await UserKeysService.CommitStagedKeysAsync(userId, stagedAt);
+            if (committed != KeyWriteResult.Success)
             {
-                logger.LogError(ex, "Failed to change password");
-                return BadRequest(new { error = ex.Message });
+                logger.LogError("Password of user with id {UserId} was changed but its pending keys were gone", userId);
+                return BadRequest(new { error = "Your password was changed but your encryption keys could not be updated. Please contact support." });
             }
+
+            await EndOtherSessionsAsync(userId);
+            return Ok(await UserService.GetUserAsync(userId));
         }
 
 
@@ -319,17 +247,9 @@ namespace Notesnook.API.Controllers
         public async Task<IActionResult> GetEncryptionVerifier()
         {
             var userId = User.GetUserId();
-            try
-            {
-                var response = await UserService.GetEncryptionVerifier(userId);
-                if (response == null) return NotFound();
-                return Ok(response);
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Failed to get encryption verifier for user id: {UserId}", userId);
-                return BadRequest(new { error = ex.Message });
-            }
+            var response = await UserService.GetEncryptionVerifier(userId);
+            if (response == null) return NotFound();
+            return Ok(response);
         }
 
         [HttpPost("reset")]
@@ -348,16 +268,8 @@ namespace Notesnook.API.Controllers
         {
             var userId = this.User.GetUserId();
             var jti = User.FindFirstValue("jti");
-            try
-            {
-                await UserService.DeleteUserAsync(userId, jti, form.Password);
-                return Ok();
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Failed to delete user with id: {UserId}", userId);
-                return BadRequest(new { error = ex.Message });
-            }
+            await UserService.DeleteUserAsync(userId, jti, form.Password);
+            return Ok();
         }
     }
 }

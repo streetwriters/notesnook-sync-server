@@ -65,37 +65,29 @@ namespace Notesnook.API.Authorization
                 return AuthenticateResult.Fail("Missing API key");
             }
 
-            try
+            var inboxApiKey = await _inboxApiKeyRepository.FindOneAsync(k => k.Key == apiKey);
+            if (inboxApiKey == null)
             {
-                var inboxApiKey = await _inboxApiKeyRepository.FindOneAsync(k => k.Key == apiKey);
-                if (inboxApiKey == null)
-                {
-                    return AuthenticateResult.Fail("Invalid API key");
-                }
-
-                if (inboxApiKey.ExpiryDate > 0 && DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() > inboxApiKey.ExpiryDate)
-                {
-                    return AuthenticateResult.Fail("API key has expired");
-                }
-
-                inboxApiKey.LastUsedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                await _inboxApiKeyRepository.UpsertAsync(inboxApiKey, k => k.Key == apiKey);
-
-                var claims = new[]
-                {
-                    new Claim("sub", inboxApiKey.UserId),
-                };
-                var identity = new ClaimsIdentity(claims, Scheme.Name);
-                var principal = new ClaimsPrincipal(identity);
-                var ticket = new AuthenticationTicket(principal, Scheme.Name);
-
-                return AuthenticateResult.Success(ticket);
+                return AuthenticateResult.Fail("Invalid API key");
             }
-            catch (Exception ex)
+
+            if (inboxApiKey.ExpiryDate > 0 && DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() > inboxApiKey.ExpiryDate)
             {
-                Logger.LogError(ex, "Error validating inbox API key");
-                return AuthenticateResult.Fail("Error validating API key");
+                return AuthenticateResult.Fail("API key has expired");
             }
+
+            inboxApiKey.LastUsedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            await _inboxApiKeyRepository.UpsertAsync(inboxApiKey, k => k.Key == apiKey);
+
+            var claims = new[]
+            {
+                new Claim("sub", inboxApiKey.UserId),
+            };
+            var identity = new ClaimsIdentity(claims, Scheme.Name);
+            var principal = new ClaimsPrincipal(identity);
+            var ticket = new AuthenticationTicket(principal, Scheme.Name);
+
+            return AuthenticateResult.Success(ticket);
         }
     }
 }

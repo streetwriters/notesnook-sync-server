@@ -33,6 +33,7 @@ using Notesnook.API.Interfaces;
 using Notesnook.API.Models;
 using Streetwriters.Common;
 using Streetwriters.Common.Accessors;
+using Streetwriters.Common.Exceptions;
 
 namespace Notesnook.API.Services
 {
@@ -343,19 +344,19 @@ namespace Notesnook.API.Services
 
             if (!Constants.IS_SELF_HOSTED)
             {
-                var subscription = await ServiceAccessor.UserSubscriptionService.GetUserSubscriptionAsync(Clients.Notesnook.Id, userId) ?? throw new Exception("User subscription not found.");
+                var subscription = await ServiceAccessor.UserSubscriptionService.GetUserSubscriptionAsync(Clients.Notesnook.Id, userId) ?? throw new ClientException("User subscription not found.");
 
                 fileSize = await GetMultipartUploadSizeAsync(userId, uploadRequest.Key, uploadRequest.UploadId);
                 if (StorageHelper.IsFileSizeExceeded(subscription, fileSize))
                 {
                     await this.AbortMultipartUploadAsync(userId, uploadRequest.Key, uploadRequest.UploadId);
-                    throw new Exception("Max file size exceeded.");
+                    throw new ClientException("Max file size exceeded.");
                 }
 
                 if (!await TryReserveStorageAsync(userId, fileSize, StorageHelper.GetStorageLimitForPlan(subscription)))
                 {
                     await this.AbortMultipartUploadAsync(userId, uploadRequest.Key, uploadRequest.UploadId);
-                    throw new Exception("Storage limit reached.");
+                    throw new ClientException("Storage limit reached.");
                 }
             }
 

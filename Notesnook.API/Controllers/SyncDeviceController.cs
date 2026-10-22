@@ -24,7 +24,6 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 using Notesnook.API.Interfaces;
 using Notesnook.API.Models.Responses;
 using Notesnook.API.Services;
@@ -37,39 +36,23 @@ namespace Notesnook.API.Controllers
     [ApiController]
     [Authorize]
     [Route("devices")]
-    public class SyncDeviceController(SyncDeviceService syncDeviceService, ILogger<SyncDeviceController> logger) : ControllerBase
+    public class SyncDeviceController(SyncDeviceService syncDeviceService) : ControllerBase
     {
         [HttpPost]
         public async Task<IActionResult> RegisterDevice([FromQuery] string deviceId)
         {
-            try
-            {
-                var userId = this.User.GetUserId();
-                await syncDeviceService.RegisterDeviceAsync(userId, deviceId);
-                return Ok();
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Failed to register device: {DeviceId}", deviceId);
-                return BadRequest(new { error = ex.Message });
-            }
+            var userId = this.User.GetUserId();
+            await syncDeviceService.RegisterDeviceAsync(userId, deviceId);
+            return Ok();
         }
 
 
         [HttpDelete]
         public async Task<IActionResult> UnregisterDevice([FromQuery] string deviceId)
         {
-            try
-            {
-                var userId = this.User.GetUserId();
-                await syncDeviceService.UnregisterDeviceAsync(userId, deviceId);
-                return Ok();
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Failed to unregister device: {DeviceId}", deviceId);
-                return BadRequest(new { error = ex.Message });
-            }
+            var userId = this.User.GetUserId();
+            await syncDeviceService.UnregisterDeviceAsync(userId, deviceId);
+            return Ok();
         }
     }
 }

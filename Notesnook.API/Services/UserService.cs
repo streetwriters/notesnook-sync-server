@@ -34,6 +34,7 @@ using Notesnook.API.Repositories;
 using Streetwriters.Common;
 using Streetwriters.Common.Accessors;
 using Streetwriters.Common.Enums;
+using Streetwriters.Common.Exceptions;
 using Streetwriters.Common.Extensions;
 using Streetwriters.Common.Messages;
 using Streetwriters.Common.Models;
@@ -59,8 +60,8 @@ namespace Notesnook.API.Services
             {
                 logger.LogError("Failed to sign up user: {Response}", JsonSerializer.Serialize(response));
                 if (response.Errors != null && response.Errors.Length > 0)
-                    throw new Exception(string.Join(" ", response.Errors));
-                else throw new Exception("Could not create a new account.");
+                    throw new ClientException(string.Join(" ", response.Errors));
+                else throw new ClientException("Could not create a new account.");
             }
 
             await Repositories.UsersSettings.InsertAsync(new UserSettings
@@ -90,7 +91,7 @@ namespace Notesnook.API.Services
 
         public async Task<UserResponse> GetUserAsync(string userId)
         {
-            var user = await serviceAccessor.UserAccountService.GetUserAsync(Clients.Notesnook.Id, userId) ?? throw new Exception("User not found.");
+            var user = await serviceAccessor.UserAccountService.GetUserAsync(Clients.Notesnook.Id, userId) ?? throw new NotFoundException("User not found.");
 
             Subscription? subscription = null;
             if (Constants.IS_SELF_HOSTED)
@@ -109,7 +110,7 @@ namespace Notesnook.API.Services
             }
             else
             {
-                subscription = await serviceAccessor.UserSubscriptionService.GetUserSubscriptionAsync(Clients.Notesnook.Id, userId) ?? throw new Exception("User subscription not found.");
+                subscription = await serviceAccessor.UserSubscriptionService.GetUserSubscriptionAsync(Clients.Notesnook.Id, userId) ?? throw new ClientException("User subscription not found.");
             }
 
             var userSettings = await Repositories.UsersSettings.FindOneAsync((u) => u.UserId == user.UserId) ?? throw new Exception("User settings not found.");
@@ -204,6 +205,9 @@ namespace Notesnook.API.Services
         {
             logger.LogInformation("Deleting user account: {UserId}", userId);
 
+            // Identity's own "Wrong password." error only reaches us as a WAMP runtime error
+            if (!await serviceAccessor.UserAccountService.VerifyPasswordAsync(userId, password))
+                throw new ClientException("Wrong password.");
             await serviceAccessor.UserAccountService.DeleteUserAsync(Clients.Notesnook.Id, userId, password);
 
             await DeleteUserAsync(userId);

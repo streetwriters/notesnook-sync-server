@@ -27,6 +27,7 @@ using MongoDB.Driver;
 using Notesnook.API.Interfaces;
 using Notesnook.API.Models;
 using Streetwriters.Common;
+using Streetwriters.Common.Exceptions;
 using Streetwriters.Common.Messages;
 using Streetwriters.Common.Models;
 
@@ -129,7 +130,7 @@ namespace Notesnook.API.Services
             var result = await Repositories.UsersSettings.Collection.UpdateOneAsync(UserFilter(userId) & hasRevision & timedOut, ClearPendingKeys());
             if (result.MatchedCount > 0) return KeyWriteResult.Success;
 
-            var userSettings = await Repositories.UsersSettings.FindOneAsync((u) => u.UserId == userId) ?? throw new Exception("User not found.");
+            var userSettings = await Repositories.UsersSettings.FindOneAsync((u) => u.UserId == userId) ?? throw new NotFoundException("User not found.");
             return userSettings.Revision == revision && userSettings.PendingKeys != null
                 ? KeyWriteResult.PasswordChangeInProgress
                 : KeyWriteResult.KeysChanged;
@@ -269,7 +270,7 @@ namespace Notesnook.API.Services
         /// </summary>
         private async Task<KeyWriteResult> GetKeyWriteBlockerAsync(string userId, long? revision)
         {
-            var userSettings = await Repositories.UsersSettings.FindOneAsync((u) => u.UserId == userId) ?? throw new Exception("User not found.");
+            var userSettings = await Repositories.UsersSettings.FindOneAsync((u) => u.UserId == userId) ?? throw new NotFoundException("User not found.");
             if (userSettings.PendingKeys != null) return KeyWriteResult.PasswordChangeInProgress;
             if (revision < userSettings.MasterKeyRevision) return KeyWriteResult.WrappedWithOldPassword;
             return KeyWriteResult.Success;
@@ -364,7 +365,7 @@ namespace Notesnook.API.Services
 
         private async Task EnsureUserExistsAsync(string userId)
         {
-            _ = await Repositories.UsersSettings.FindOneAsync((u) => u.UserId == userId) ?? throw new Exception("User not found.");
+            _ = await Repositories.UsersSettings.FindOneAsync((u) => u.UserId == userId) ?? throw new NotFoundException("User not found.");
         }
     }
 }

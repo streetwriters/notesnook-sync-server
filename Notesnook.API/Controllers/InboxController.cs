@@ -24,7 +24,6 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 using MongoDB.Bson;
 using Notesnook.API.Authorization;
 using Notesnook.API.Models;
@@ -41,8 +40,7 @@ namespace Notesnook.API.Controllers
             Repository<InboxApiKey> inboxApiKeysRepository,
             Repository<UserSettings> userSettingsRepository,
             Repository<InboxSyncItem> inboxItemsRepository,
-            SyncDeviceService syncDeviceService,
-            ILogger<InboxController> logger) : ControllerBase
+            SyncDeviceService syncDeviceService) : ControllerBase
     {
 
         [HttpGet("api-keys")]
@@ -50,16 +48,8 @@ namespace Notesnook.API.Controllers
         public async Task<IActionResult> GetApiKeysAsync()
         {
             var userId = User.GetUserId();
-            try
-            {
-                var apiKeys = await inboxApiKeysRepository.FindAsync(t => t.UserId == userId);
-                return Ok(apiKeys);
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Couldn't get inbox api keys for user {UserId}", userId);
-                return BadRequest(new { error = ex.Message });
-            }
+            var apiKeys = await inboxApiKeysRepository.FindAsync(t => t.UserId == userId);
+            return Ok(apiKeys);
         }
 
         [HttpPost("api-keys")]
@@ -67,39 +57,31 @@ namespace Notesnook.API.Controllers
         public async Task<IActionResult> CreateApiKeyAsync([FromBody] CreateInboxApiKeyRequest request)
         {
             var userId = User.GetUserId();
-            try
+            if (string.IsNullOrWhiteSpace(request.Name))
             {
-                if (string.IsNullOrWhiteSpace(request.Name))
-                {
-                    return BadRequest(new { error = "Api key name is required." });
-                }
-                if (request.ExpiryDate == null)
-                {
-                    return BadRequest(new { error = "Expiry date is required." });
-                }
-
-                var count = await inboxApiKeysRepository.CountAsync(t => t.UserId == userId);
-                if (count >= 10)
-                {
-                    return BadRequest(new { error = "Maximum of 10 inbox api keys allowed." });
-                }
-
-                var inboxApiKey = new InboxApiKey
-                {
-                    UserId = userId,
-                    Name = request.Name,
-                    DateCreated = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                    ExpiryDate = request.ExpiryDate,
-                    LastUsedAt = 0
-                };
-                await inboxApiKeysRepository.InsertAsync(inboxApiKey);
-                return Ok(inboxApiKey);
+                return BadRequest(new { error = "Api key name is required." });
             }
-            catch (Exception ex)
+            if (request.ExpiryDate == null)
             {
-                logger.LogError(ex, "Couldn't create inbox api key for {UserId}.", userId);
-                return BadRequest(new { error = ex.Message });
+                return BadRequest(new { error = "Expiry date is required." });
             }
+
+            var count = await inboxApiKeysRepository.CountAsync(t => t.UserId == userId);
+            if (count >= 10)
+            {
+                return BadRequest(new { error = "Maximum of 10 inbox api keys allowed." });
+            }
+
+            var inboxApiKey = new InboxApiKey
+            {
+                UserId = userId,
+                Name = request.Name,
+                DateCreated = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                ExpiryDate = request.ExpiryDate,
+                LastUsedAt = 0
+            };
+            await inboxApiKeysRepository.InsertAsync(inboxApiKey);
+            return Ok(inboxApiKey);
         }
 
         [HttpDelete("api-keys/{apiKey}")]
@@ -107,21 +89,13 @@ namespace Notesnook.API.Controllers
         public async Task<IActionResult> DeleteApiKeyAsync(string apiKey)
         {
             var userId = User.GetUserId();
-            try
+            if (string.IsNullOrWhiteSpace(apiKey))
             {
-                if (string.IsNullOrWhiteSpace(apiKey))
-                {
-                    return BadRequest(new { error = "Api key is required." });
-                }
+                return BadRequest(new { error = "Api key is required." });
+            }
 
-                await inboxApiKeysRepository.DeleteAsync(t => t.UserId == userId && t.Key == apiKey);
-                return Ok(new { message = "Api key deleted successfully." });
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Couldn't delete inbox api key for user {UserId}", userId);
-                return BadRequest(new { error = ex.Message });
-            }
+            await inboxApiKeysRepository.DeleteAsync(t => t.UserId == userId && t.Key == apiKey);
+            return Ok(new { message = "Api key deleted successfully." });
         }
 
         [HttpGet("public-encryption-key")]
@@ -129,20 +103,12 @@ namespace Notesnook.API.Controllers
         public async Task<IActionResult> GetPublicKeyAsync()
         {
             var userId = User.GetUserId();
-            try
+            var userSetting = await userSettingsRepository.FindOneAsync(u => u.UserId == userId);
+            if (string.IsNullOrWhiteSpace(userSetting?.InboxKeys?.Public))
             {
-                var userSetting = await userSettingsRepository.FindOneAsync(u => u.UserId == userId);
-                if (string.IsNullOrWhiteSpace(userSetting?.InboxKeys?.Public))
-                {
-                    return NotFound(new { error = "Inbox public key is not configured." });
-                }
-                return Ok(new { key = userSetting.InboxKeys.Public });
+                return NotFound(new { error = "Inbox public key is not configured." });
             }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Couldn't get user's inbox's public key for user {UserId}", userId);
-                return BadRequest(new { error = ex.Message });
-            }
+            return Ok(new { key = userSetting.InboxKeys.Public });
         }
 
         [HttpPost("items")]
@@ -150,42 +116,34 @@ namespace Notesnook.API.Controllers
         public async Task<IActionResult> CreateInboxItemAsync([FromBody] InboxSyncItem request)
         {
             var userId = User.GetUserId();
-            try
+            if (string.IsNullOrWhiteSpace(request.Cipher))
             {
-                if (string.IsNullOrWhiteSpace(request.Cipher))
-                {
-                    return BadRequest(new { error = "Inbox item is required." });
-                }
-                if (string.IsNullOrWhiteSpace(request.Algorithm))
-                {
-                    return BadRequest(new { error = "Inbox item algorithm is required." });
-                }
-                if (request.Version <= 0)
-                {
-                    return BadRequest(new { error = "Valid inbox item version is required." });
-                }
+                return BadRequest(new { error = "Inbox item is required." });
+            }
+            if (string.IsNullOrWhiteSpace(request.Algorithm))
+            {
+                return BadRequest(new { error = "Inbox item algorithm is required." });
+            }
+            if (request.Version <= 0)
+            {
+                return BadRequest(new { error = "Valid inbox item version is required." });
+            }
 
-                request.UserId = userId;
-                request.ItemId = ObjectId.GenerateNewId().ToString();
-                await inboxItemsRepository.InsertAsync(request);
-                await syncDeviceService.AddIdsToAllDevicesAsync(userId, [new(request.ItemId, "inbox_item")]);
-                await WampServers.MessengerServer.PublishMessageAsync(MessengerServerTopics.SendSSETopic, new SendSSEMessage
-                {
-                    OriginTokenId = null,
-                    UserId = userId,
-                    Message = new Message
-                    {
-                        Type = "triggerSync",
-                        Data = JsonSerializer.Serialize(new { reason = "Inbox items updated." })
-                    }
-                });
-                return Ok();
-            }
-            catch (Exception ex)
+            request.UserId = userId;
+            request.ItemId = ObjectId.GenerateNewId().ToString();
+            await inboxItemsRepository.InsertAsync(request);
+            await syncDeviceService.AddIdsToAllDevicesAsync(userId, [new(request.ItemId, "inbox_item")]);
+            await WampServers.MessengerServer.PublishMessageAsync(MessengerServerTopics.SendSSETopic, new SendSSEMessage
             {
-                logger.LogError(ex, "Couldn't create inbox item for user {UserId}", userId);
-                return BadRequest(new { error = ex.Message });
-            }
+                OriginTokenId = null,
+                UserId = userId,
+                Message = new Message
+                {
+                    Type = "triggerSync",
+                    Data = JsonSerializer.Serialize(new { reason = "Inbox items updated." })
+                }
+            });
+            return Ok();
         }
     }
 }

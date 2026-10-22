@@ -26,6 +26,7 @@ using System.Threading.Tasks;
 using Amazon.S3;
 using Amazon.S3.Model;
 using Microsoft.Extensions.Logging;
+using Streetwriters.Common.Exceptions;
 
 namespace Notesnook.API.Helpers
 {
@@ -73,7 +74,7 @@ namespace Notesnook.API.Helpers
         };
     }
 
-    public sealed class S3StorageUnavailableException : Exception
+    public sealed class S3StorageUnavailableException : ServiceUnavailableException
     {
         public S3StorageUnavailableException(string message, Exception? innerException = null)
             : base(message, innerException)
@@ -171,6 +172,8 @@ namespace Notesnook.API.Helpers
             var result = await ExecuteWithFailoverInternalAsync(operation, operationName, isWriteOperation);
             if (result.Result == null)
             {
+                if (result.LastException != null && S3TransientErrorClassifier.IsTransient(result.LastException))
+                    throw new S3StorageUnavailableException("Attachment storage is temporarily unavailable. Please try again later.", result.LastException);
                 throw result.LastException ?? new Exception($"Failed to execute {operationName} on all endpoints");
             }
             return result.Result;

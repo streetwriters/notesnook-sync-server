@@ -240,6 +240,7 @@ namespace Notesnook.API
             services.AddWampServiceAccessor(Servers.NotesnookAPI);
 
             services.AddControllers();
+            services.AddApiExceptionHandler();
 
             services.AddHealthChecks();
 
@@ -314,6 +315,7 @@ namespace Notesnook.API
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
             app.UseForwardedHeadersWithKnownProxies(env);
+            app.UseExceptionHandler(_ => { });
 
             app.UseOpenTelemetryPrometheusScrapingEndpoint((context) => context.Request.Path == "/metrics" && context.Connection.LocalPort == 5067);
             app.UseResponseCompression();

@@ -36,6 +36,7 @@ using Notesnook.API.Services;
 using Streetwriters.Common;
 using Streetwriters.Common.Accessors;
 using Streetwriters.Common.Enums;
+using Streetwriters.Common.Exceptions;
 using Streetwriters.Common.Helpers;
 using Streetwriters.Common.Interfaces;
 using Streetwriters.Common.Messages;
@@ -121,136 +122,112 @@ namespace Notesnook.API.Controllers
         [HttpPost]
         public async Task<IActionResult> PublishAsync([FromQuery] string? deviceId, [FromBody] Monograph monograph)
         {
-            try
+            var userId = this.User.GetUserId();
+            var jti = this.User.FindFirstValue("jti");
+
+            var existingMonograph = await FindMonographAsync(userId, monograph);
+            if (existingMonograph != null && !existingMonograph.Deleted) return await UpdateAsync(deviceId, monograph);
+
+            monograph = await CreateMonographAsync(monograph, userId);
+            if (existingMonograph != null)
             {
-                var userId = this.User.GetUserId();
-                var jti = this.User.FindFirstValue("jti");
-
-                var existingMonograph = await FindMonographAsync(userId, monograph);
-                if (existingMonograph != null && !existingMonograph.Deleted) return await UpdateAsync(deviceId, monograph);
-
-                monograph = await CreateMonographAsync(monograph, userId);
-                if (existingMonograph != null)
-                {
-                    monograph.Id = existingMonograph.Id;
-                }
-
-                await monographs.Collection.ReplaceOneAsync(
-                    CreateMonographFilter(userId, monograph),
-                    monograph,
-                    new ReplaceOptions { IsUpsert = true }
-                );
-
-                await MarkMonographForSyncAsync(userId, monograph.ItemId ?? monograph.Id, deviceId, jti);
-
-                return Ok(new
-                {
-                    id = monograph.ItemId,
-                    datePublished = monograph.DatePublished,
-                });
+                monograph.Id = existingMonograph.Id;
             }
-            catch (Exception e)
+
+            await monographs.Collection.ReplaceOneAsync(
+                CreateMonographFilter(userId, monograph),
+                monograph,
+                new ReplaceOptions { IsUpsert = true }
+            );
+
+            await MarkMonographForSyncAsync(userId, monograph.ItemId ?? monograph.Id, deviceId, jti);
+
+            return Ok(new
             {
-                logger.LogError(e, "Failed to publish monograph");
-                return BadRequest(new { error = e.Message });
-            }
+                id = monograph.ItemId,
+                datePublished = monograph.DatePublished,
+            });
         }
 
         [HttpPost("v2")]
         public async Task<IActionResult> PublishV2Async([FromQuery] string? deviceId, [FromBody] Monograph monograph)
         {
-            try
+            var userId = this.User.GetUserId();
+            var jti = this.User.FindFirstValue("jti");
+
+            var existingMonograph = await FindMonographAsync(userId, monograph);
+            if (existingMonograph != null && !existingMonograph.Deleted) return await UpdateAsync(deviceId, monograph);
+
+            monograph = await CreateMonographAsync(monograph, userId);
+            monograph.Slug = await GenerateUniqueSlugAsync();
+
+            if (existingMonograph != null)
             {
-                var userId = this.User.GetUserId();
-                var jti = this.User.FindFirstValue("jti");
-
-                var existingMonograph = await FindMonographAsync(userId, monograph);
-                if (existingMonograph != null && !existingMonograph.Deleted) return await UpdateAsync(deviceId, monograph);
-
-                monograph = await CreateMonographAsync(monograph, userId);
-                monograph.Slug = await GenerateUniqueSlugAsync();
-
-                if (existingMonograph != null)
-                {
-                    monograph.Id = existingMonograph.Id;
-                }
-
-                await monographs.Collection.ReplaceOneAsync(
-                    CreateMonographFilter(userId, monograph),
-                    monograph,
-                    new ReplaceOptions { IsUpsert = true }
-                );
-
-                await MarkMonographForSyncAsync(userId, monograph.ItemId ?? monograph.Id, deviceId, jti);
-
-                return Ok(new
-                {
-                    id = monograph.ItemId,
-                    datePublished = monograph.DatePublished,
-                    publishUrl = Helpers.UrlHelper.ConstructPublishUrl(monograph)
-                });
+                monograph.Id = existingMonograph.Id;
             }
-            catch (Exception e)
+
+            await monographs.Collection.ReplaceOneAsync(
+                CreateMonographFilter(userId, monograph),
+                monograph,
+                new ReplaceOptions { IsUpsert = true }
+            );
+
+            await MarkMonographForSyncAsync(userId, monograph.ItemId ?? monograph.Id, deviceId, jti);
+
+            return Ok(new
             {
-                logger.LogError(e, "Failed to publish monograph");
-                return BadRequest(new { error = e.Message });
-            }
+                id = monograph.ItemId,
+                datePublished = monograph.DatePublished,
+                publishUrl = Helpers.UrlHelper.ConstructPublishUrl(monograph)
+            });
         }
 
         [HttpPatch]
         public async Task<IActionResult> UpdateAsync([FromQuery] string? deviceId, [FromBody] Monograph monograph)
         {
-            try
+            var userId = this.User.GetUserId();
+            var jti = this.User.FindFirstValue("jti");
+
+            var existingMonograph = await FindMonographAsync(userId, monograph);
+            if (existingMonograph == null || existingMonograph.Deleted)
             {
-                var userId = this.User.GetUserId();
-                var jti = this.User.FindFirstValue("jti");
-
-                var existingMonograph = await FindMonographAsync(userId, monograph);
-                if (existingMonograph == null || existingMonograph.Deleted)
-                {
-                    return NotFound();
-                }
-
-                if (monograph.EncryptedContent?.Cipher.Length > MAX_DOC_SIZE || monograph.CompressedContent?.Length > MAX_DOC_SIZE)
-                    return base.BadRequest("Monograph is too big. Max allowed size is 15mb.");
-
-                var sanitizationLevel = ContentSanitizationLevel.Unknown;
-                if (monograph.EncryptedContent == null)
-                {
-                    sanitizationLevel = User.IsUserSubscribed() ? ContentSanitizationLevel.Partial : ContentSanitizationLevel.Full;
-                    monograph.CompressedContent = (await SanitizeContentAsync(monograph.Content, sanitizationLevel)).CompressBrotli();
-                }
-                else
-                    monograph.Content = null;
-
-                monograph.DatePublished = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                var result = await monographs.Collection.UpdateOneAsync(
-                    CreateMonographFilter(userId, monograph),
-                    Builders<Monograph>.Update
-                    .Set(m => m.DatePublished, monograph.DatePublished)
-                    .Set(m => m.CompressedContent, monograph.CompressedContent)
-                    .Set(m => m.EncryptedContent, monograph.EncryptedContent)
-                    .Set(m => m.SelfDestruct, monograph.SelfDestruct)
-                    .Set(m => m.Title, monograph.Title)
-                    .Set(m => m.Password, monograph.Password)
-                    .Set(m => m.ContentSanitizationLevel, sanitizationLevel)
-                );
-                if (!result.IsAcknowledged) return BadRequest();
-
-                await MarkMonographForSyncAsync(userId, monograph.ItemId ?? monograph.Id, deviceId, jti);
-
-                return Ok(new
-                {
-                    id = monograph.ItemId,
-                    datePublished = monograph.DatePublished,
-                    publishUrl = Helpers.UrlHelper.ConstructPublishUrl(existingMonograph)
-                });
+                return NotFound();
             }
-            catch (Exception e)
+
+            if (monograph.EncryptedContent?.Cipher.Length > MAX_DOC_SIZE || monograph.CompressedContent?.Length > MAX_DOC_SIZE)
+                return base.BadRequest("Monograph is too big. Max allowed size is 15mb.");
+
+            var sanitizationLevel = ContentSanitizationLevel.Unknown;
+            if (monograph.EncryptedContent == null)
             {
-                logger.LogError(e, "Failed to update monograph");
-                return BadRequest(new { error = e.Message });
+                sanitizationLevel = User.IsUserSubscribed() ? ContentSanitizationLevel.Partial : ContentSanitizationLevel.Full;
+                monograph.CompressedContent = (await SanitizeContentAsync(monograph.Content, sanitizationLevel)).CompressBrotli();
             }
+            else
+                monograph.Content = null;
+
+            monograph.DatePublished = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            var result = await monographs.Collection.UpdateOneAsync(
+                CreateMonographFilter(userId, monograph),
+                Builders<Monograph>.Update
+                .Set(m => m.DatePublished, monograph.DatePublished)
+                .Set(m => m.CompressedContent, monograph.CompressedContent)
+                .Set(m => m.EncryptedContent, monograph.EncryptedContent)
+                .Set(m => m.SelfDestruct, monograph.SelfDestruct)
+                .Set(m => m.Title, monograph.Title)
+                .Set(m => m.Password, monograph.Password)
+                .Set(m => m.ContentSanitizationLevel, sanitizationLevel)
+            );
+            if (!result.IsAcknowledged) return BadRequest();
+
+            await MarkMonographForSyncAsync(userId, monograph.ItemId ?? monograph.Id, deviceId, jti);
+
+            return Ok(new
+            {
+                id = monograph.ItemId,
+                datePublished = monograph.DatePublished,
+                publishUrl = Helpers.UrlHelper.ConstructPublishUrl(existingMonograph)
+            });
         }
 
         [HttpGet]
@@ -437,7 +414,7 @@ namespace Notesnook.API.Controllers
             monograph.DatePublished = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
             if (monograph.EncryptedContent?.Cipher.Length > MAX_DOC_SIZE || monograph.CompressedContent?.Length > MAX_DOC_SIZE)
-                throw new Exception("Monograph is too big. Max allowed size is 15mb.");
+                throw new ClientException("Monograph is too big. Max allowed size is 15mb.");
 
             monograph.Deleted = false;
             monograph.ViewCount = 0;
@@ -510,57 +487,49 @@ namespace Notesnook.API.Controllers
         {
             if (string.IsNullOrEmpty(content)) return string.Empty;
             if (Constants.IS_SELF_HOSTED) return content;
-            try
+            var json = JsonSerializer.Deserialize<MonographContent>(content) ?? throw new ClientException("Invalid monograph content.");
+            var html = json.Data;
+
+            if (level == ContentSanitizationLevel.Partial)
             {
-                var json = JsonSerializer.Deserialize<MonographContent>(content) ?? throw new Exception("Invalid monograph content.");
-                var html = json.Data;
+                var config = Configuration.Default.WithDefaultLoader();
+                var context = BrowsingContext.New(config);
+                var document = await context.OpenAsync(r => r.Content(html));
 
-                if (level == ContentSanitizationLevel.Partial)
+                foreach (var (selector, attribute) in urlElements)
                 {
-                    var config = Configuration.Default.WithDefaultLoader();
-                    var context = BrowsingContext.New(config);
-                    var document = await context.OpenAsync(r => r.Content(html));
-
-                    foreach (var (selector, attribute) in urlElements)
+                    foreach (var element in document.QuerySelectorAll(selector))
                     {
-                        foreach (var element in document.QuerySelectorAll(selector))
+                        var url = element.GetAttribute(attribute);
+                        if (string.IsNullOrEmpty(url)) continue;
+                        if (!await analyzer.IsURLSafeAsync(url))
                         {
-                            var url = element.GetAttribute(attribute);
-                            if (string.IsNullOrEmpty(url)) continue;
-                            if (!await analyzer.IsURLSafeAsync(url))
-                            {
-                                logger.LogInformation("Malicious URL detected in <{Selector} {Attribute}>: {Url}", selector, attribute, url);
-                                element.RemoveAttribute(attribute);
-                            }
+                            logger.LogInformation("Malicious URL detected in <{Selector} {Attribute}>: {Url}", selector, attribute, url);
+                            element.RemoveAttribute(attribute);
                         }
                     }
-
-                    html = document.ToHtml();
-                }
-                else if (level == ContentSanitizationLevel.Full)
-                {
-                    var config = Configuration.Default.WithDefaultLoader();
-                    var context = BrowsingContext.New(config);
-                    var document = await context.OpenAsync(r => r.Content(html));
-                    foreach (var element in document.QuerySelectorAll("a,iframe,img,object,svg,button,link"))
-                    {
-                        foreach (var attr in element.Attributes.ToList())
-                            element.RemoveAttribute(attr.Name);
-                    }
-                    html = document.ToHtml();
                 }
 
-                return JsonSerializer.Serialize<MonographContent>(new MonographContent
-                {
-                    Type = json.Type,
-                    Data = html
-                });
+                html = document.ToHtml();
             }
-            catch (Exception ex)
+            else if (level == ContentSanitizationLevel.Full)
             {
-                logger.LogError(ex, "Failed to cleanup monograph content");
-                return content;
+                var config = Configuration.Default.WithDefaultLoader();
+                var context = BrowsingContext.New(config);
+                var document = await context.OpenAsync(r => r.Content(html));
+                foreach (var element in document.QuerySelectorAll("a,iframe,img,object,svg,button,link"))
+                {
+                    foreach (var attr in element.Attributes.ToList())
+                        element.RemoveAttribute(attr.Name);
+                }
+                html = document.ToHtml();
             }
+
+            return JsonSerializer.Serialize<MonographContent>(new MonographContent
+            {
+                Type = json.Type,
+                Data = html
+            });
         }
     }
 }
