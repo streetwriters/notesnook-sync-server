@@ -24,6 +24,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using MongoDB.Driver;
 using Notesnook.API.Models;
 using Streetwriters.Data.Repositories;
 
@@ -76,8 +77,10 @@ namespace Notesnook.API.Authorization
                 return AuthenticateResult.Fail("API key has expired");
             }
 
-            inboxApiKey.LastUsedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            await _inboxApiKeyRepository.UpsertAsync(inboxApiKey, k => k.Key == apiKey);
+            // not an upsert, which would recreate a key deleted while this request was in flight
+            await _inboxApiKeyRepository.Collection.UpdateOneAsync(
+                Builders<InboxApiKey>.Filter.Eq(k => k.Key, apiKey),
+                Builders<InboxApiKey>.Update.Set(k => k.LastUsedAt, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()));
 
             var claims = new[]
             {
