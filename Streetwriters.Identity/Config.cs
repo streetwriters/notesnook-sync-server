@@ -33,6 +33,10 @@ namespace Streetwriters.Identity
         public const string MFA_GRANT_TYPE_SCOPE = "auth:grant_types:mfa";
         public const string MFA_PASSWORD_GRANT_TYPE_SCOPE = "auth:grant_types:mfa_password";
 
+        // which token server to run: IdentityServer4 (the default) or OpenIddict, while migrating between them
+        public const string ENGINE_SETTING = "IDENTITY_ENGINE";
+        public const string OPENIDDICT_ENGINE = "openiddict";
+
         // the policy of the account and MFA APIs, which accept this server's own access tokens
         public const string ACCOUNT_API_POLICY = IdentityServerConstants.LocalApi.PolicyName;
 
