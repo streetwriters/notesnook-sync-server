@@ -292,6 +292,8 @@ namespace Notesnook.API
                         .AddService(serviceName: "Notesnook.API"))
                     .WithMetrics((builder) => builder
                             .AddMeter("Notesnook.API.Metrics.Sync")
+                            // built-in GC/heap, Kestrel and SignalR connection metrics
+                            .AddMeter("System.Runtime", "Microsoft.AspNetCore.Server.Kestrel", "Microsoft.AspNetCore.Http.Connections")
                             .AddPrometheusExporter());
 
             services.AddQuartzHostedService(q =>

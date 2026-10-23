@@ -333,6 +333,11 @@ namespace Notesnook.API.Hubs
                     Synced = true,
                 };
             }
+            catch
+            {
+                SyncEventCounterSource.Log.FetchV2Failed();
+                throw;
+            }
             finally
             {
                 SyncEventCounterSource.Log.RecordFetchDuration(stopwatch.ElapsedMilliseconds);

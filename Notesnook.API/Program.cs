@@ -66,7 +66,8 @@ namespace Notesnook.API
                                 listenerOptions.UseHttps(Servers.NotesnookAPI.SSLCertificate);
                             });
                         }
-                        options.Listen(IPAddress.Parse("127.0.0.1"), 5067);
+                        // metrics for Prometheus on the internal network; Traefik only routes to the API port
+                        options.ListenAnyIP(5067);
                     });
                 });
     }
