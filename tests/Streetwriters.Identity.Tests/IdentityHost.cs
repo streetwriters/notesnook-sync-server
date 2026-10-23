@@ -30,6 +30,9 @@ static class TestEnvironment
 {
     public static readonly int NotesnookWampPort = FreePort();
     public static readonly int MessengerWampPort = FreePort();
+    // one per process: every host publishes to the same ports
+    public static readonly WampRecorder NotesnookServer = new(NotesnookWampPort);
+    public static readonly WampRecorder MessengerServer = new(MessengerWampPort);
     public const string ApiSecret = "test-secret";
 
     // Servers and WampServers read these once, in static initializers
@@ -137,11 +140,13 @@ public abstract class IdentityHost : IAsyncLifetime
         return runner;
     }
 
-    public string DatabaseName { get; } = "identity_host_" + Guid.NewGuid().ToString("N");
+    public string DatabaseName { get; init; } = "identity_host_" + Guid.NewGuid().ToString("N");
+    /// <summary>Leave the database when the host stops, for another host to carry on with.</summary>
+    public bool KeepDatabase { get; init; }
     public IMongoDatabase Database => new MongoClient(Mongo.ConnectionString).GetDatabase(DatabaseName);
     public TestClock Clock { get; } = new();
-    public WampRecorder NotesnookServer { get; } = new(TestEnvironment.NotesnookWampPort);
-    public WampRecorder MessengerServer { get; } = new(TestEnvironment.MessengerWampPort);
+    public WampRecorder NotesnookServer => TestEnvironment.NotesnookServer;
+    public WampRecorder MessengerServer => TestEnvironment.MessengerServer;
     public RecordingProxy<ITemplatedEmailSender> Emails { get; private set; } = null!;
     public IHost Host { get; private set; } = null!;
     private readonly string contentRoot = Directory.CreateTempSubdirectory("identity_host_").FullName;
@@ -207,9 +212,7 @@ public abstract class IdentityHost : IAsyncLifetime
     {
         await Host.StopAsync();
         Host.Dispose();
-        NotesnookServer.Dispose();
-        MessengerServer.Dispose();
-        await new MongoClient(Mongo.ConnectionString).DropDatabaseAsync(DatabaseName);
+        if (!KeepDatabase) await new MongoClient(Mongo.ConnectionString).DropDatabaseAsync(DatabaseName);
         Directory.Delete(contentRoot, true);
     }
 

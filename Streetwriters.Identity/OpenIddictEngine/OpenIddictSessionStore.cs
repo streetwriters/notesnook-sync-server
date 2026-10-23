@@ -28,7 +28,7 @@ namespace Streetwriters.Identity.OpenIddictEngine
 {
     /// <summary>Sessions as OpenIddict keeps them: an authorization per session, holding all of its tokens.</summary>
     /// <remarks>Sessions IdentityServer4 started are ended where it stored them, as it ended them.</remarks>
-    public class OpenIddictSessionStore(IOpenIddictAuthorizationManager authorizations, IOpenIddictTokenManager tokens, IOpenIddictApplicationManager applications, TokenRecords records, LegacyGrants legacyGrants) : ISessionStore
+    public class OpenIddictSessionStore(IOpenIddictAuthorizationManager authorizations, IOpenIddictTokenManager tokens, IOpenIddictApplicationManager applications, TokenRecords records, LegacyGrants legacyGrants, RollbackBridge bridge) : ISessionStore
     {
         public async Task EndSessionAsync(string clientId, string subjectId, string jti)
         {
@@ -84,6 +84,7 @@ namespace Streetwriters.Identity.OpenIddictEngine
                 if (await authorizations.FindByIdAsync(id) is object authorization) await authorizations.TryRevokeAsync(authorization);
             }
             var revoked = await records.FindByAuthorizationsAsync(authorizationIds);
+            await bridge.RemoveAsync(revoked.Select((r) => r.BridgeKey));
             // a session that was refreshed from a legacy one ends that one too
             foreach (var record in revoked.Where((r) => r.Replaced?.StartsWith(LegacyGrants.LineagePrefix) == true))
                 await legacyGrants.RemoveAsync(record.Replaced![LegacyGrants.LineagePrefix.Length..]);

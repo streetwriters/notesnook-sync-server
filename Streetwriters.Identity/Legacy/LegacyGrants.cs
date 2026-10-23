@@ -133,6 +133,9 @@ namespace Streetwriters.Identity.Legacy
 
         public Task RemoveAllAsync(string subjectId) => Grants.DeleteManyAsync(new BsonDocument("SubjectId", subjectId));
 
+        public async Task<long> RemoveExpiredAsync() =>
+            (await Grants.DeleteManyAsync(Builders<BsonDocument>.Filter.Lt("Expiration", timeProvider.GetUtcNow().UtcDateTime))).DeletedCount;
+
         private static FilterDefinition<BsonDocument> SubjectAndClient(string subjectId, string clientId) =>
             Builders<BsonDocument>.Filter.And(Builders<BsonDocument>.Filter.Eq("SubjectId", subjectId), Builders<BsonDocument>.Filter.Eq("ClientId", clientId));
 
