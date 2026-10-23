@@ -1,0 +1,57 @@
+{
+  "status": 200,
+  "headers": {
+    "Content-Type": "application/json; charset=utf-8"
+  },
+  "body": {
+    "claims": {
+      "active": [
+        "true"
+      ],
+      "aud": [
+        "notesnook"
+      ],
+      "auth_time": [
+        "<time>"
+      ],
+      "client_id": [
+        "notesnook"
+      ],
+      "exp": [
+        "<time>"
+      ],
+      "iat": [
+        "<time>"
+      ],
+      "idp": [
+        "local"
+      ],
+      "iss": [
+        "http://localhost"
+      ],
+      "jti": [
+        "<id>"
+      ],
+      "nbf": [
+        "<time>"
+      ],
+      "notesnook:status": [
+        "believer"
+      ],
+      "role": [
+        "notesnook"
+      ],
+      "scope": [
+        "notesnook.sync"
+      ],
+      "sub": [
+        "<objectid>"
+      ],
+      "verified": [
+        "true"
+      ]
+    },
+    "notesnookUser": true,
+    "sync": true
+  }
+}

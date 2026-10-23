@@ -1,3 +1,4 @@
+using System.Diagnostics.Metrics;
 using System.Net;
 using System.Runtime.CompilerServices;
 using Microsoft.AspNetCore.Identity;
@@ -127,19 +128,19 @@ public abstract class LegacyFixtureTests(IdentityHost host) : IdentityTestBase(h
     {
         var fixture = BsonDocument.Parse(await File.ReadAllTextAsync(FixturePath()));
 
-        // the database may already have the client's role, under another id
-        var roleIds = new Dictionary<BsonValue, BsonValue>();
+        // the database may already have the client's role, under another id (users hold role ids as strings)
+        var roleIds = new Dictionary<string, string>();
         foreach (var role in fixture["roles"].AsBsonArray.Select((r) => r.AsBsonDocument))
         {
             var existing = await Collection("roles").Find(new BsonDocument("NormalizedName", role["NormalizedName"])).FirstOrDefaultAsync();
             if (existing == null) await Collection("roles").InsertOneAsync(role);
-            roleIds[role["_id"]] = existing?["_id"] ?? role["_id"];
+            roleIds[role["_id"].ToString()!] = (existing ?? role)["_id"].ToString()!;
         }
 
         foreach (var user in fixture["users"].AsBsonArray.Select((u) => u.AsBsonDocument))
         {
             if (user.TryGetValue("Roles", out var roles) && roles.IsBsonArray)
-                user["Roles"] = new BsonArray(roles.AsBsonArray.Select((id) => roleIds.GetValueOrDefault(id, id)));
+                user["Roles"] = new BsonArray(roles.AsBsonArray.Select((id) => roleIds.GetValueOrDefault(id.ToString()!, id.ToString()!)));
             await Collection("users").ReplaceOneAsync(new BsonDocument("_id", user["_id"]), user, new ReplaceOptions { IsUpsert = true });
         }
 
@@ -259,6 +260,35 @@ public abstract class LegacyFixtureTests(IdentityHost host) : IdentityTestBase(h
         await host.WithServicesAsync((services) => services.GetRequiredService<UserManager<User>>().DeleteAsync(user));
         Assert.False(await IsActiveAsync(Get(fixture, "mfa", "access_token")));
         Assert.Equal(400, await RefreshStatusAsync(fixture, "mfa"));
+    }
+
+    [Fact]
+    public async Task Restored_tokens_are_counted()
+    {
+        // what tells when no session needs IdentityServer4's grants any more
+        var hits = new List<string>();
+        using var listener = new MeterListener();
+        listener.InstrumentPublished = (instrument, listener) =>
+        {
+            if (instrument.Meter.Name == "Streetwriters.Identity.Legacy") listener.EnableMeasurementEvents(instrument);
+        };
+        listener.SetMeasurementEventCallback<long>((_, _, tags, _) =>
+        {
+            lock (hits) hits.Add(string.Join(",", tags.ToArray().Select((t) => $"{t.Key}={t.Value}")));
+        });
+        listener.Start();
+
+        var fixture = await RestoreAsync(TimeSpan.FromMinutes(1));
+        Assert.True(await IsActiveAsync(Get(fixture, "fresh", "access_token")));
+        Assert.Equal(200, await RefreshStatusAsync(fixture, "fresh"));
+
+        // only OpenIddict reads them through LegacyGrants; IdentityServer4 reads them as its own
+        if (host.IsOpenIddict)
+        {
+            Assert.Contains("type=reference_token,outcome=valid", hits);
+            Assert.Contains("type=refresh_token,outcome=valid", hits);
+        }
+        else Assert.Empty(hits);
     }
 
     // Sessions that carry on after the switch, whose tokens the new server issues

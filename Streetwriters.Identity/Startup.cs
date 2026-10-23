@@ -39,6 +39,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
 using MongoDB.Bson.Serialization;
 using Streetwriters.Common;
 using Streetwriters.Common.Extensions;
@@ -179,6 +181,15 @@ namespace Streetwriters.Identity
             if (UseOpenIddict) services.AddOpenIddictEngine(connectionString);
             else AddIdentityServer4(services, connectionString);
 
+            services.AddOpenTelemetry()
+                    .ConfigureResource(resource => resource
+                        .AddService(serviceName: "Streetwriters.Identity"))
+                    .WithMetrics((builder) => builder
+                            // how many sessions still depend on IdentityServer4's grants (see LegacyGrants)
+                            .AddMeter("Streetwriters.Identity.Legacy")
+                            .AddMeter("System.Runtime", "Microsoft.AspNetCore.Server.Kestrel")
+                            .AddPrometheusExporter());
+
             services.AddHealthChecks();
         }
 
@@ -228,6 +239,8 @@ namespace Streetwriters.Identity
         {
             app.UseForwardedHeadersWithKnownProxies(env, "CF-Connecting-IP");
             app.UseExceptionHandler(_ => { });
+
+            app.UseOpenTelemetryPrometheusScrapingEndpoint((context) => context.Request.Path == "/metrics" && context.Connection.LocalPort == Program.MetricsPort);
 
             app.UseCors("notesnook");
             app.UseVersion(Servers.IdentityServer);
