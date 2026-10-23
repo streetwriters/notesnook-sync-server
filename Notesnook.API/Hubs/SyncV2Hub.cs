@@ -343,25 +343,19 @@ namespace Notesnook.API.Hubs
         );
     }
 
-    [MessagePack.MessagePackObject]
     public struct SyncV2Metadata
     {
-        [MessagePack.Key("synced")]
         [JsonPropertyName("synced")]
         public bool Synced { get; set; }
     }
 
-    [MessagePack.MessagePackObject]
     public struct SyncTransferItemV2
     {
-        [MessagePack.Key("items")]
         [JsonPropertyName("items")]
         public IEnumerable<SyncItem> Items { get; set; }
 
-        [MessagePack.Key("type")]
         [JsonPropertyName("type")]
         public string Type { get; set; }
-        [MessagePack.Key("count")]
         [JsonPropertyName("count")]
         public int Count { get; set; }
     }

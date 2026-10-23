@@ -26,7 +26,6 @@ namespace Notesnook.API.Models
     {
         [DataMember(Name = "id")]
         [JsonPropertyName("id")]
-        [MessagePack.Key("id")]
         public required string ItemId
         {
             get; set;

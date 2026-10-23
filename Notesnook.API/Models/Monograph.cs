@@ -43,14 +43,12 @@ namespace Notesnook.API.Models
 
         [DataMember(Name = "id")]
         [JsonPropertyName("id")]
-        [MessagePack.Key("id")]
         public string? ItemId { get; set; }
 
         [BsonId]
         [BsonIgnoreIfDefault]
         [BsonRepresentation(BsonType.ObjectId)]
         [JsonIgnore]
-        [MessagePack.IgnoreMember]
         public string Id { get; set; } = string.Empty;
 
         [JsonPropertyName("title")]

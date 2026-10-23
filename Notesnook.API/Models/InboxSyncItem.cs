@@ -26,12 +26,10 @@ using MongoDB.Bson.Serialization.Attributes;
 namespace Notesnook.API.Models
 {
 
-    [MessagePack.MessagePackObject]
     public class InboxSyncItem
     {
         [DataMember(Name = "cipher")]
         [JsonPropertyName("cipher")]
-        [MessagePack.Key("cipher")]
         [Required]
         public string Cipher
         {
@@ -40,7 +38,6 @@ namespace Notesnook.API.Models
 
         [DataMember(Name = "userId")]
         [JsonPropertyName("userId")]
-        [MessagePack.Key("userId")]
         public string? UserId
         {
             get; set;
@@ -48,7 +45,6 @@ namespace Notesnook.API.Models
 
         [DataMember(Name = "id")]
         [JsonPropertyName("id")]
-        [MessagePack.Key("id")]
         public string? ItemId
         {
             get; set;
@@ -58,7 +54,6 @@ namespace Notesnook.API.Models
         [BsonIgnoreIfDefault]
         [BsonRepresentation(BsonType.ObjectId)]
         [JsonIgnore]
-        [MessagePack.IgnoreMember]
         public ObjectId Id
         {
             get; set;
@@ -66,7 +61,6 @@ namespace Notesnook.API.Models
 
         [JsonPropertyName("v")]
         [DataMember(Name = "v")]
-        [MessagePack.Key("v")]
         [Required]
         public double Version
         {
@@ -75,7 +69,6 @@ namespace Notesnook.API.Models
 
         [JsonPropertyName("alg")]
         [DataMember(Name = "alg")]
-        [MessagePack.Key("alg")]
         [Required]
         public string Algorithm
         {
