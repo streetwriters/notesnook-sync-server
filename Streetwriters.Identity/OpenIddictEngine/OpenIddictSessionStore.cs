@@ -22,16 +22,23 @@ using System.Linq;
 using System.Threading.Tasks;
 using OpenIddict.Abstractions;
 using Streetwriters.Identity.Interfaces;
+using Streetwriters.Identity.Legacy;
 
 namespace Streetwriters.Identity.OpenIddictEngine
 {
     /// <summary>Sessions as OpenIddict keeps them: an authorization per session, holding all of its tokens.</summary>
-    public class OpenIddictSessionStore(IOpenIddictAuthorizationManager authorizations, IOpenIddictTokenManager tokens, IOpenIddictApplicationManager applications, TokenRecords records) : ISessionStore
+    /// <remarks>Sessions IdentityServer4 started are ended where it stored them, as it ended them.</remarks>
+    public class OpenIddictSessionStore(IOpenIddictAuthorizationManager authorizations, IOpenIddictTokenManager tokens, IOpenIddictApplicationManager applications, TokenRecords records, LegacyGrants legacyGrants) : ISessionStore
     {
         public async Task EndSessionAsync(string clientId, string subjectId, string jti)
         {
             var record = await records.FindByJtiAsync(jti);
-            if (record?.AuthorizationId == null || record.Subject != subjectId) return;
+            if (record == null)
+            {
+                await legacyGrants.RemoveByJtiAsync(subjectId, clientId, jti);
+                return;
+            }
+            if (record.AuthorizationId == null || record.Subject != subjectId) return;
             await EndAsync([record.AuthorizationId]);
         }
 
@@ -54,7 +61,7 @@ namespace Streetwriters.Identity.OpenIddictEngine
                 var id = await authorizations.GetIdAsync(authorization);
                 if (id != null && !except.Contains(id)) ended.Add(id);
             }
-            return await EndAsync(ended);
+            return [.. await EndAsync(ended), .. await legacyGrants.RemoveSessionsAsync(subjectId, clientId, exceptJti, exceptRefreshToken)];
         }
 
         public async Task EndAllSessionsAsync(string subjectId)
@@ -65,6 +72,7 @@ namespace Streetwriters.Identity.OpenIddictEngine
                 if (await authorizations.GetIdAsync(authorization) is string id) ended.Add(id);
             }
             await EndAsync(ended);
+            await legacyGrants.RemoveAllAsync(subjectId);
         }
 
         /// <returns>The keys under which introspection results of the sessions' access tokens are cached.</returns>
@@ -76,6 +84,9 @@ namespace Streetwriters.Identity.OpenIddictEngine
                 if (await authorizations.FindByIdAsync(id) is object authorization) await authorizations.TryRevokeAsync(authorization);
             }
             var revoked = await records.FindByAuthorizationsAsync(authorizationIds);
+            // a session that was refreshed from a legacy one ends that one too
+            foreach (var record in revoked.Where((r) => r.Replaced?.StartsWith(LegacyGrants.LineagePrefix) == true))
+                await legacyGrants.RemoveAsync(record.Replaced![LegacyGrants.LineagePrefix.Length..]);
             return [.. revoked.Where((r) => r.CacheKey != null).Select((r) => r.CacheKey!)];
         }
     }

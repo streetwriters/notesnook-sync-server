@@ -23,11 +23,13 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using MongoDB.Driver;
 using OpenIddict.Abstractions;
 using OpenIddict.Server;
 using Streetwriters.Common;
 using Streetwriters.Identity.Interfaces;
+using Streetwriters.Identity.Legacy;
 using static OpenIddict.Abstractions.OpenIddictConstants;
 using static OpenIddict.Server.OpenIddictServerEvents;
 
@@ -62,7 +64,8 @@ namespace Streetwriters.Identity.OpenIddictEngine
                         .AllowRefreshTokenFlow()
                         .AllowCustomFlow(Config.EMAIL_GRANT_TYPE)
                         .AllowCustomFlow(Config.MFA_GRANT_TYPE)
-                        .AllowCustomFlow(Config.MFA_PASSWORD_GRANT_TYPE);
+                        .AllowCustomFlow(Config.MFA_PASSWORD_GRANT_TYPE)
+                        .AllowCustomFlow(TokenController.LegacyRefreshGrantType);
                     options.RegisterScopes(Scopes);
 
                     options.SetAccessTokenLifetime(TimeSpan.FromHours(6));
@@ -78,6 +81,20 @@ namespace Streetwriters.Identity.OpenIddictEngine
                     options.UseAspNetCore().EnableTokenEndpointPassthrough().DisableTransportSecurityRequirement();
 
                     options.AddEventHandler(RecordIssuedTokens.Descriptor);
+
+                    // OpenIddict would reject refresh tokens IdentityServer4 issued, so they're refreshed by TokenController
+                    options.AddEventHandler<ExtractTokenRequestContext>((builder) => builder
+                        .UseInlineHandler((context) =>
+                        {
+                            if (context.Request?.GrantType == GrantTypes.RefreshToken && LegacyGrants.IsLegacyHandle(context.Request.RefreshToken))
+                            {
+                                context.Request.GrantType = TokenController.LegacyRefreshGrantType;
+                                context.Request[TokenController.LegacyRefreshTokenParameter] = context.Request.RefreshToken;
+                                context.Request.RefreshToken = null;
+                            }
+                            return default;
+                        })
+                        .SetOrder(int.MaxValue));
 
                     // IdentityServer4 didn't issue identity tokens from the token endpoint
                     options.AddEventHandler<ProcessSignInContext>((builder) => builder
@@ -132,10 +149,12 @@ namespace Streetwriters.Identity.OpenIddictEngine
                     options.EnableTokenEntryValidation();
                 });
 
+            services.TryAddSingleton(TimeProvider.System);
             services.AddHostedService<StoreIndexes>();
             services.AddHostedService<ClientRegistration>();
             services.AddHostedService<TokenPruning>();
             services.AddSingleton((_) => new TokenRecords(database));
+            services.AddSingleton((services) => new LegacyGrants(database, services.GetRequiredService<TimeProvider>()));
             services.AddTransient<StepTokens>();
             services.AddTransient<SessionPrincipals>();
             services.AddTransient<AccessTokens>();

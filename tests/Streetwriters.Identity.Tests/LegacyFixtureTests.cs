@@ -13,8 +13,7 @@ namespace Streetwriters.Identity.Tests;
 /// Sessions exactly as IdentityServer4 stored them, restored into the database. Whatever replaces
 /// IdentityServer4 must keep every one of them working as it does here, or users get logged out.
 /// </summary>
-[Collection(IdentityServer4Collection.Name)]
-public sealed class LegacyFixtureTests(IdentityServer4Host host) : IdentityTestBase(host)
+public abstract class LegacyFixtureTests(IdentityHost host) : IdentityTestBase(host)
 {
     private static string FixturePath([CallerFilePath] string path = "") => Path.Combine(Path.GetDirectoryName(path)!, "Fixtures", "legacy-sessions.json");
 
@@ -35,7 +34,7 @@ public sealed class LegacyFixtureTests(IdentityServer4Host host) : IdentityTestB
     [Fact]
     public async Task Export()
     {
-        if (Environment.GetEnvironmentVariable("EXPORT_LEGACY_FIXTURES") != "1") return;
+        if (Environment.GetEnvironmentVariable("EXPORT_LEGACY_FIXTURES") != "1" || host.IsOpenIddict) return;
 
         var sessions = new BsonDocument();
         var emails = new List<string>();
@@ -261,4 +260,80 @@ public sealed class LegacyFixtureTests(IdentityServer4Host host) : IdentityTestB
         Assert.False(await IsActiveAsync(Get(fixture, "mfa", "access_token")));
         Assert.Equal(400, await RefreshStatusAsync(fixture, "mfa"));
     }
+
+    // Sessions that carry on after the switch, whose tokens the new server issues
+
+    [Fact]
+    public async Task Restored_refresh_token_works_until_the_next_one_is_used()
+    {
+        var fixture = await RestoreAsync(TimeSpan.FromMinutes(1));
+        var (_, next) = await TokensAsync(await RefreshAsync(Get(fixture, "fresh", "refresh_token")));
+        // the response was lost, so the client refreshes with the restored token again
+        var (_, lost) = await TokensAsync(await RefreshAsync(Get(fixture, "fresh", "refresh_token")));
+
+        var (access, after) = await TokensAsync(await RefreshAsync(next));
+        Assert.True(await IsActiveAsync(access));
+        Assert.Equal(400, await RefreshStatusAsync(fixture, "fresh"));
+        Assert.Equal(HttpStatusCode.BadRequest, (await RefreshAsync(lost)).StatusCode);
+        await TokensAsync(await RefreshAsync(after));
+    }
+
+    [Fact]
+    public async Task Restored_refresh_token_can_be_revoked()
+    {
+        var fixture = await RestoreAsync(TimeSpan.FromMinutes(1));
+        var response = await client.PostAsync("/connect/revocation", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["client_id"] = ClientId,
+            ["token"] = Get(fixture, "two_devices", "refresh_token"),
+            ["token_type_hint"] = "refresh_token"
+        }));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(400, await RefreshStatusAsync(fixture, "two_devices"));
+        // as with IdentityServer4, all of the user's access tokens go, but not their other refresh tokens
+        Assert.False(await IsActiveAsync(Get(fixture, "two_devices", "access_token")));
+        Assert.False(await IsActiveAsync(Get(fixture, "two_devices", "other_access")));
+        Assert.Equal(200, await RefreshStatusAsync(fixture, "two_devices", "other_refresh"));
+    }
+
+    [Fact]
+    public async Task Restored_sessions_are_cleared_with_new_ones()
+    {
+        var fixture = await RestoreAsync(TimeSpan.FromMinutes(1));
+        var (access, refresh) = await TokensAsync(await RefreshAsync(Get(fixture, "two_devices", "refresh_token")));
+
+        var response = await AccountAsync(HttpMethod.Post, "/account/sessions/clear?all=false", access, new() { ["refresh_token"] = refresh });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(await IsActiveAsync(access));
+        await TokensAsync(await RefreshAsync(refresh));
+        Assert.False(await IsActiveAsync(Get(fixture, "two_devices", "other_access")));
+        Assert.Equal(400, await RefreshStatusAsync(fixture, "two_devices", "other_refresh"));
+
+        // the API servers evict the restored token's cached introspection
+        var key = (Get(fixture, "two_devices", "other_access") + ":reference_token").Sha256();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        while (!host.NotesnookServer.ClearCache.SelectMany((m) => m.Keys).Contains(key)) await Task.Delay(50, cts.Token);
+    }
+
+    [Fact]
+    public async Task Restored_session_refreshed_and_logged_out()
+    {
+        var fixture = await RestoreAsync(TimeSpan.FromMinutes(1));
+        var (access, refresh) = await TokensAsync(await RefreshAsync(Get(fixture, "fresh", "refresh_token")));
+
+        Assert.Equal(HttpStatusCode.OK, (await AccountAsync(HttpMethod.Post, "/account/logout", access)).StatusCode);
+        Assert.False(await IsActiveAsync(access));
+        // IdentityServer4 left both refresh tokens working (see Logout_after_refresh_leaves_the_refresh_token_alive);
+        // OpenIddict ends the session, and the restored one it came from
+        // (the restored one first: using its replacement would end it on either server)
+        var expected = host.IsOpenIddict ? HttpStatusCode.BadRequest : HttpStatusCode.OK;
+        Assert.Equal((int)expected, await RefreshStatusAsync(fixture, "fresh"));
+        Assert.Equal(expected, (await RefreshAsync(refresh)).StatusCode);
+    }
 }
+
+[Collection(IdentityServer4Collection.Name)]
+public sealed class IdentityServer4LegacyFixtureTests(IdentityServer4Host host) : LegacyFixtureTests(host);
+
+[Collection(OpenIddictCollection.Name)]
+public sealed class OpenIddictLegacyFixtureTests(OpenIddictHost host) : LegacyFixtureTests(host);

@@ -25,25 +25,19 @@ using Microsoft.AspNetCore.Identity;
 using OpenIddict.Abstractions;
 using OpenIddict.Validation;
 using Streetwriters.Common.Models;
+using Streetwriters.Identity.Legacy;
 using static OpenIddict.Abstractions.OpenIddictConstants;
 
 namespace Streetwriters.Identity.OpenIddictEngine
 {
     /// <summary>Validates session access tokens, with the claims IdentityServer4 gave them.</summary>
-    public class AccessTokens(OpenIddictValidationService validation, TokenRecords records, UserManager<User> userManager)
+    public class AccessTokens(OpenIddictValidationService validation, TokenRecords records, LegacyGrants legacyGrants, UserManager<User> userManager)
     {
         /// <returns>The token's claims, or null if it isn't an active access token of a user that still exists.</returns>
         public async Task<ClaimsPrincipal?> ValidateAsync(string token)
         {
-            ClaimsPrincipal principal;
-            try
-            {
-                principal = await validation.ValidateAccessTokenAsync(token);
-            }
-            catch (OpenIddictExceptions.ProtocolException)
-            {
-                return null;
-            }
+            var principal = LegacyGrants.IsLegacyHandle(token) ? await legacyGrants.ValidateAccessTokenAsync(token) : await ValidateOpenIddictTokenAsync(token);
+            if (principal == null) return null;
 
             var subject = principal.GetClaim(Claims.Subject);
             // deleted users must not be able to use or introspect their tokens
@@ -55,6 +49,18 @@ namespace Streetwriters.Identity.OpenIddictEngine
             if (principal.GetPresenters().FirstOrDefault() is string clientId) identity.SetClaim(Claims.ClientId, clientId);
             foreach (var scope in principal.GetScopes()) identity.AddClaim(new Claim(Claims.Scope, scope));
             return principal;
+        }
+
+        private async Task<ClaimsPrincipal?> ValidateOpenIddictTokenAsync(string token)
+        {
+            try
+            {
+                return await validation.ValidateAccessTokenAsync(token);
+            }
+            catch (OpenIddictExceptions.ProtocolException)
+            {
+                return null;
+            }
         }
     }
 }

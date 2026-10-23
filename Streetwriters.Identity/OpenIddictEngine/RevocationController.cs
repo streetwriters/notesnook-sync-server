@@ -21,6 +21,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using OpenIddict.Abstractions;
 using Streetwriters.Common;
+using Streetwriters.Identity.Legacy;
 using static OpenIddict.Abstractions.OpenIddictConstants;
 
 namespace Streetwriters.Identity.OpenIddictEngine
@@ -31,7 +32,7 @@ namespace Streetwriters.Identity.OpenIddictEngine
     /// </summary>
     [ApiController]
     [ApiExplorerSettings(IgnoreApi = true)]
-    public class RevocationController(IOpenIddictTokenManager tokens) : ControllerBase
+    public class RevocationController(IOpenIddictTokenManager tokens, LegacyGrants legacyGrants) : ControllerBase
     {
         [HttpPost("~/connect/revocation")]
         [IgnoreAntiforgeryToken]
@@ -40,18 +41,36 @@ namespace Streetwriters.Identity.OpenIddictEngine
             if (Clients.FindClientById(clientId) == null) return BadRequest(new { error = "invalid_client" });
             if (string.IsNullOrEmpty(token)) return BadRequest(new { error = "invalid_request" });
 
+            if (LegacyGrants.IsLegacyHandle(token))
+            {
+                if (await legacyGrants.FindAsync(token, LegacyGrants.RefreshTokenType) is { } refreshToken)
+                {
+                    await RevokeAccessTokensAsync(refreshToken.SubjectId, refreshToken.ClientId);
+                    await legacyGrants.RemoveAsync(refreshToken.Key);
+                }
+                else if (await legacyGrants.FindAsync(token, LegacyGrants.ReferenceTokenType) is { } accessToken)
+                {
+                    await legacyGrants.RemoveAsync(accessToken.Key);
+                }
+                return Ok();
+            }
+
             var entry = await tokens.FindByReferenceIdAsync(token);
             if (entry == null) return Ok();
 
             if (await tokens.HasTypeAsync(entry, TokenTypeIdentifiers.RefreshToken) && await tokens.GetSubjectAsync(entry) is string subject)
-            {
-                await foreach (var other in tokens.FindBySubjectAsync(subject))
-                {
-                    if (await tokens.HasTypeAsync(other, TokenTypeIdentifiers.AccessToken)) await tokens.TryRevokeAsync(other);
-                }
-            }
+                await RevokeAccessTokensAsync(subject, clientId!);
             await tokens.TryRevokeAsync(entry);
             return Ok();
+        }
+
+        private async Task RevokeAccessTokensAsync(string subject, string clientId)
+        {
+            await foreach (var other in tokens.FindBySubjectAsync(subject))
+            {
+                if (await tokens.HasTypeAsync(other, TokenTypeIdentifiers.AccessToken)) await tokens.TryRevokeAsync(other);
+            }
+            await legacyGrants.RemoveAccessTokensAsync(subject, clientId);
         }
     }
 }
