@@ -1,0 +1,74 @@
+{
+  "status": 200,
+  "headers": {
+    "Content-Type": "application/json; charset=UTF-8"
+  },
+  "body": {
+    "authorization_endpoint": "http://localhost/connect/authorize",
+    "backchannel_logout_session_supported": true,
+    "backchannel_logout_supported": true,
+    "check_session_iframe": "http://localhost/connect/checksession",
+    "claims_supported": [
+      "sub",
+      "verified"
+    ],
+    "code_challenge_methods_supported": [
+      "plain",
+      "S<n>"
+    ],
+    "device_authorization_endpoint": "http://localhost/connect/deviceauthorization",
+    "end_session_endpoint": "http://localhost/connect/endsession",
+    "frontchannel_logout_session_supported": true,
+    "frontchannel_logout_supported": true,
+    "grant_types_supported": [
+      "authorization_code",
+      "client_credentials",
+      "refresh_token",
+      "implicit",
+      "password",
+      "urn:ietf:params:oauth:grant-type:device_code",
+      "email",
+      "mfa",
+      "mfa_password"
+    ],
+    "id_token_signing_alg_values_supported": [
+      "RS<n>"
+    ],
+    "introspection_endpoint": "http://localhost/connect/introspect",
+    "issuer": "http://localhost",
+    "jwks_uri": "http://localhost/.well-known/openid-configuration/jwks",
+    "request_parameter_supported": true,
+    "response_modes_supported": [
+      "form_post",
+      "query",
+      "fragment"
+    ],
+    "response_types_supported": [
+      "code",
+      "token",
+      "id_token",
+      "id_token token",
+      "code id_token",
+      "code token",
+      "code id_token token"
+    ],
+    "revocation_endpoint": "http://localhost/connect/revocation",
+    "scopes_supported": [
+      "openid",
+      "notesnook.sync",
+      "IdentityServerApi",
+      "auth:grant_types:mfa",
+      "auth:grant_types:mfa_password",
+      "offline_access"
+    ],
+    "subject_types_supported": [
+      "public"
+    ],
+    "token_endpoint": "http://localhost/connect/token",
+    "token_endpoint_auth_methods_supported": [
+      "client_secret_basic",
+      "client_secret_post"
+    ],
+    "userinfo_endpoint": "http://localhost/connect/userinfo"
+  }
+}

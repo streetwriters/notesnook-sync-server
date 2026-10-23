@@ -1,0 +1,8 @@
+{
+  "Errors": null,
+  "access_token": "<opaque>",
+  "expires_in": 3600,
+  "refresh_token": "<opaque>",
+  "scope": "notesnook.sync openid IdentityServerApi mfa offline_access",
+  "user_id": "<objectid>"
+}
