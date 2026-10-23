@@ -17,6 +17,7 @@ You should have received a copy of the Affero GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -31,6 +32,7 @@ using OpenIddict.Abstractions;
 using OpenIddict.Server.AspNetCore;
 using Streetwriters.Common;
 using Streetwriters.Common.Models;
+using Streetwriters.Identity.Legacy;
 using Streetwriters.Identity.Models;
 using Streetwriters.Identity.Services;
 using static OpenIddict.Abstractions.OpenIddictConstants;
@@ -43,8 +45,15 @@ namespace Streetwriters.Identity.OpenIddictEngine
     /// </summary>
     [ApiController]
     [ApiExplorerSettings(IgnoreApi = true)]
-    public class TokenController(GrantService grants, StepTokens stepTokens, SessionPrincipals principals, TokenRecords records, IOpenIddictTokenManager tokens, UserManager<User> userManager) : ControllerBase
+    public class TokenController(GrantService grants, StepTokens stepTokens, SessionPrincipals principals, TokenRecords records, IOpenIddictTokenManager tokens, LegacyGrants legacyGrants, TimeProvider timeProvider, UserManager<User> userManager) : ControllerBase
     {
+        /// <summary>
+        /// Refreshing with a refresh token IdentityServer4 issued, which OpenIddict can't read. Requests
+        /// to refresh with one are rewritten to this before OpenIddict validates them (see OpenIddictEngineExtensions).
+        /// </summary>
+        public const string LegacyRefreshGrantType = "legacy_refresh_token";
+        public const string LegacyRefreshTokenParameter = "legacy_refresh_token";
+
         // what IdentityServer4 granted when the request named no scopes: all of the client's valid ones
         private static readonly string[] DefaultScopes = [AccountAuthenticationHandler.Scope, OpenIddictEngineExtensions.SyncScope, Scopes.OfflineAccess, Scopes.OpenId];
 
@@ -52,7 +61,7 @@ namespace Streetwriters.Identity.OpenIddictEngine
         [IgnoreAntiforgeryToken]
         public async Task<IActionResult> ExchangeAsync()
         {
-            var request = HttpContext.GetOpenIddictServerRequest() ?? throw new System.InvalidOperationException("The OpenID Connect request cannot be retrieved.");
+            var request = HttpContext.GetOpenIddictServerRequest() ?? throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
             var client = Clients.FindClientById(request.ClientId);
             if (client == null) return Error("invalid_client");
 
@@ -76,6 +85,8 @@ namespace Streetwriters.Identity.OpenIddictEngine
                     }
                 case GrantTypes.RefreshToken:
                     return await RefreshAsync();
+                case LegacyRefreshGrantType:
+                    return await LegacyRefreshAsync(request);
                 default:
                     return Error("unsupported_grant_type");
             }
@@ -97,7 +108,7 @@ namespace Streetwriters.Identity.OpenIddictEngine
             {
                 case GrantResult.Authenticated authenticated:
                     var scopes = request.GetScopes().Any() ? request.GetScopes() : [.. DefaultScopes];
-                    var principal = await principals.CreateAsync(authenticated.User, scopes.Order(System.StringComparer.Ordinal), [authenticated.AuthenticationMethod]);
+                    var principal = await principals.CreateAsync(authenticated.User, scopes.Order(StringComparer.Ordinal), [authenticated.AuthenticationMethod]);
                     return SignIn(principal, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
 
                 case GrantResult.Step step:
@@ -134,7 +145,7 @@ namespace Streetwriters.Identity.OpenIddictEngine
                     return Error(failed.Error, failed.Description);
 
                 default:
-                    throw new System.InvalidOperationException($"Unknown grant result {result}.");
+                    throw new InvalidOperationException($"Unknown grant result {result}.");
             }
         }
 
@@ -150,23 +161,59 @@ namespace Streetwriters.Identity.OpenIddictEngine
             // tokens that replaced that one (from concurrent refreshes or lost responses), must stop working.
             var tokenId = session.GetTokenId()!;
             var record = await records.FindAsync(tokenId);
-            if (record?.Replaced != null)
-            {
-                await RevokeAsync(record.Replaced);
-                foreach (var sibling in await records.FindReplacementsAsync(record.Replaced))
-                {
-                    if (sibling.TokenId != tokenId) await RevokeAsync(sibling.TokenId);
-                }
-            }
+            if (record?.Replaced != null) await RevokeReplacedAsync(record.Replaced, tokenId);
 
             var principal = await principals.RefreshAsync(user, session);
             var properties = new AuthenticationProperties(new Dictionary<string, string?> { [RecordIssuedTokens.ReplacedTokenProperty] = tokenId });
             return SignIn(principal, properties, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
         }
 
-        private async Task RevokeAsync(string tokenId)
+        /// <summary>
+        /// Refreshes a session IdentityServer4 started, as CustomRefreshTokenService did, into an OpenIddict
+        /// session. The legacy token keeps working until the token that replaces it is used.
+        /// </summary>
+        private async Task<IActionResult> LegacyRefreshAsync(OpenIddictRequest request)
         {
-            if (await tokens.FindByIdAsync(tokenId) is object token) await tokens.TryRevokeAsync(token);
+            var grant = await legacyGrants.FindAsync((string?)request[LegacyRefreshTokenParameter] ?? "", LegacyGrants.RefreshTokenType);
+            if (grant == null || legacyGrants.IsExpired(grant) || grant.ClientId != request.ClientId) return Error("invalid_grant");
+            var user = await userManager.FindByIdAsync(grant.SubjectId);
+            if (user == null) return Error("invalid_grant");
+
+            if (grant.ReplacedKey != null) await RevokeReplacedAsync(LegacyGrants.LineagePrefix + grant.ReplacedKey, LegacyGrants.LineagePrefix + grant.Key);
+            await legacyGrants.MarkConsumedAsync(grant.Key);
+
+            var session = LegacyGrants.ToPrincipal(grant);
+            var principal = await principals.RefreshAsync(user, session);
+            var properties = new AuthenticationProperties(new Dictionary<string, string?> { [RecordIssuedTokens.ReplacedTokenProperty] = LegacyGrants.LineagePrefix + grant.Key });
+            return SignIn(principal, properties, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+        }
+
+        /// <summary>
+        /// Using a refresh token proves the client received it, so the token it replaced, and any other
+        /// tokens that replaced that one (from concurrent refreshes or lost responses), must stop working.
+        /// </summary>
+        /// <param name="replaced">The replaced token: an OpenIddict token id, or a legacy grant's key with <see cref="LegacyGrants.LineagePrefix"/>.</param>
+        /// <param name="used">The token being used, in the same form.</param>
+        private async Task RevokeReplacedAsync(string replaced, string used)
+        {
+            await RevokeAsync(replaced);
+            foreach (var sibling in await records.FindReplacementsAsync(replaced))
+            {
+                if (sibling.TokenId != used) await RevokeAsync(sibling.TokenId);
+            }
+            if (replaced.StartsWith(LegacyGrants.LineagePrefix))
+            {
+                foreach (var key in await legacyGrants.FindReplacementsAsync(replaced[LegacyGrants.LineagePrefix.Length..]))
+                {
+                    if (LegacyGrants.LineagePrefix + key != used) await legacyGrants.RemoveAsync(key);
+                }
+            }
+        }
+
+        private async Task RevokeAsync(string token)
+        {
+            if (token.StartsWith(LegacyGrants.LineagePrefix)) await legacyGrants.RemoveAsync(token[LegacyGrants.LineagePrefix.Length..]);
+            else if (await tokens.FindByIdAsync(token) is object entry) await tokens.TryRevokeAsync(entry);
         }
 
         private static ContentResult Error(string error, string? description = null) => Json(400, (writer) =>
@@ -176,7 +223,7 @@ namespace Streetwriters.Identity.OpenIddictEngine
         });
 
         /// <summary>Writes a JSON object directly, since IdentityServer4 sometimes repeated properties.</summary>
-        private static ContentResult Json(int status, System.Action<Utf8JsonWriter> write)
+        private static ContentResult Json(int status, Action<Utf8JsonWriter> write)
         {
             using var stream = new MemoryStream();
             using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { SkipValidation = true }))

@@ -47,6 +47,7 @@ namespace Streetwriters.Identity.OpenIddictEngine
                     Permissions.Prefixes.GrantType + Config.EMAIL_GRANT_TYPE,
                     Permissions.Prefixes.GrantType + Config.MFA_GRANT_TYPE,
                     Permissions.Prefixes.GrantType + Config.MFA_PASSWORD_GRANT_TYPE,
+                    Permissions.Prefixes.GrantType + TokenController.LegacyRefreshGrantType,
                     .. OpenIddictEngineExtensions.Scopes.Select((scope) => Permissions.Prefixes.Scope + scope),
                 ]);
                 return descriptor;
