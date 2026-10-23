@@ -19,6 +19,9 @@ public static partial class Golden
     private static readonly HashSet<string> TimeKeys = new(["exp", "iat", "nbf", "auth_time"], StringComparer.OrdinalIgnoreCase);
     private static readonly string[] Headers = ["Content-Type", "Cache-Control", "Pragma", "WWW-Authenticate", "Location"];
 
+    /// <summary>Only IdentityServer4, whose behaviour the snapshots record, may record them; anything else is compared.</summary>
+    public static bool RecordingAllowed { get; set; } = true;
+
     private static string Directory([CallerFilePath] string path = "") => Path.Combine(Path.GetDirectoryName(path)!, "Golden");
 
     public static async Task<JsonObject> SnapshotAsync(HttpResponseMessage response)
@@ -97,7 +100,7 @@ public static partial class Golden
     private static JsonNode NormalizeString(string s, string? key)
     {
         if (key != null && TokenKeys.Contains(key)) return DescribeToken(s);
-        if (key != null && IdKeys.Contains(key)) return ObjectId().IsMatch(s) ? "<objectid>" : "<id>";
+        if (key != null && IdKeys.Contains(key)) return ObjectId().Replace(s, "") == "" ? "<objectid>" : "<id>";
         if (key != null && TimeKeys.Contains(key)) return "<time>";
         // JSON serialized into a string, e.g. the data of an mfa_required error
         if (s.StartsWith('{'))
@@ -136,13 +139,15 @@ public static partial class Golden
         return Encoding.UTF8.GetString(Convert.FromBase64String(s));
     }
 
+    public static JsonNode Read(string name) => JsonNode.Parse(File.ReadAllText(Path.Combine(Directory(), name + ".json")))!;
+
     public static async Task AssertMatchesAsync(string name, HttpResponseMessage response) => AssertMatches(name, await SnapshotAsync(response));
 
     public static void AssertMatches(string name, JsonNode actual)
     {
         var file = Path.Combine(Directory(), name + ".json");
         var text = actual.ToJsonString(new JsonSerializerOptions { WriteIndented = true, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping }) + "\n";
-        if (Environment.GetEnvironmentVariable("UPDATE_GOLDEN") == "1")
+        if (Environment.GetEnvironmentVariable("UPDATE_GOLDEN") == "1" && RecordingAllowed)
         {
             System.IO.Directory.CreateDirectory(Directory());
             File.WriteAllText(file, text);

@@ -13,8 +13,8 @@ namespace Streetwriters.Identity.Tests;
 /// Sessions exactly as IdentityServer4 stored them, restored into the database. Whatever replaces
 /// IdentityServer4 must keep every one of them working as it does here, or users get logged out.
 /// </summary>
-[Collection(IdentityHostCollection.Name)]
-public sealed class LegacyFixtureTests(IdentityHost host) : IdentityTestBase(host)
+[Collection(IdentityServer4Collection.Name)]
+public sealed class LegacyFixtureTests(IdentityServer4Host host) : IdentityTestBase(host)
 {
     private static string FixturePath([CallerFilePath] string path = "") => Path.Combine(Path.GetDirectoryName(path)!, "Fixtures", "legacy-sessions.json");
 

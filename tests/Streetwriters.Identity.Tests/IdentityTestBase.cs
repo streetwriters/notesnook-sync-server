@@ -29,6 +29,7 @@ public abstract class IdentityTestBase
     {
         this.host = host;
         host.Reset();
+        Golden.RecordingAllowed = !host.IsOpenIddict;
         client = host.CreateClient();
     }
 

@@ -51,6 +51,7 @@ using Streetwriters.Common.Services;
 using Streetwriters.Identity.Helpers;
 using Streetwriters.Identity.Interfaces;
 using Streetwriters.Identity.Jobs;
+using Streetwriters.Identity.OpenIddictEngine;
 using Streetwriters.Identity.Services;
 using Streetwriters.Identity.Validation;
 using IdentityServer4.MongoDB.Configuration;
@@ -102,6 +103,11 @@ namespace Streetwriters.Identity
                 options.User.RequireUniqueEmail = true;
 
                 options.Tokens.ChangeEmailTokenProvider = TokenOptions.DefaultPhoneProvider;
+
+                // the claims of the tokens' users (IdentityServer4's AddAspNetIdentity sets these too)
+                options.ClaimsIdentity.UserIdClaimType = "sub";
+                options.ClaimsIdentity.UserNameClaimType = "name";
+                options.ClaimsIdentity.RoleClaimType = "role";
             }, (options) =>
             {
                 options.RolesCollection = "roles";
@@ -109,30 +115,6 @@ namespace Streetwriters.Identity
                 // options.MigrationCollection = "migration";
                 options.ConnectionString = connectionString;
             }).AddDefaultTokenProviders();
-
-            services.AddIdentityServer(
-            options =>
-            {
-                options.Events.RaiseSuccessEvents = true;
-                options.Events.RaiseFailureEvents = true;
-                options.Events.RaiseErrorEvents = true;
-                options.IssuerUri = Servers.IdentityServer.ToString();
-            })
-            .AddExtensionGrantValidator<EmailGrantValidator>()
-            .AddExtensionGrantValidator<MFAGrantValidator>()
-            .AddExtensionGrantValidator<MFAPasswordGrantValidator>()
-            .AddAspNetIdentity<User>()
-            .AddInMemoryClients(Config.Clients)
-            .AddInMemoryApiResources(Config.ApiResources)
-            .AddInMemoryApiScopes(Config.ApiScopes)
-            .AddInMemoryIdentityResources(Config.IdentityResources)
-            .AddKeyManagement()
-            .AddFileSystemPersistence(Path.Combine(WebHostEnvironment.ContentRootPath, @"keystore"));
-
-            services.Configure<MongoDBConfiguration>(options =>
-            {
-                options.ConnectionString = connectionString;
-            });
 
             services.Configure<DataProtectionTokenProviderOptions>(options =>
             {
@@ -172,7 +154,6 @@ namespace Streetwriters.Identity
                 policy.RequireClaim("scope", Config.MFA_GRANT_TYPE_SCOPE);
             });
 
-            services.AddLocalApiAuthentication();
             services.AddAuthentication()
             .AddJwtBearer("Bearer+jwt", options =>
             {
@@ -185,8 +166,53 @@ namespace Streetwriters.Identity
                     ValidateAudience = false,
                     ValidateIssuerSigningKey = true,
                     ValidateIssuer = true,
+                    // OpenIddict states the issuer with a trailing slash, IdentityServer4 without
+                    ValidIssuers = [Servers.IdentityServer.ToString(), Servers.IdentityServer + "/"],
                 };
             });
+
+            services.AddHttpClient<EmailAddressValidator>();
+            services.AddScoped<IUserAccountService, UserAccountService>();
+            services.AddTransient<IMFAService, MFAService>();
+            services.AddTransient<GrantService>();
+            services.AddControllers();
+            services.AddApiExceptionHandler();
+
+            if (UseOpenIddict) services.AddOpenIddictEngine(connectionString);
+            else AddIdentityServer4(services, connectionString);
+
+            services.AddHealthChecks();
+        }
+
+        private bool UseOpenIddict => Configuration[Config.ENGINE_SETTING] == Config.OPENIDDICT_ENGINE;
+
+        private void AddIdentityServer4(IServiceCollection services, string connectionString)
+        {
+            services.AddIdentityServer(
+            options =>
+            {
+                options.Events.RaiseSuccessEvents = true;
+                options.Events.RaiseFailureEvents = true;
+                options.Events.RaiseErrorEvents = true;
+                options.IssuerUri = Servers.IdentityServer.ToString();
+            })
+            .AddExtensionGrantValidator<EmailGrantValidator>()
+            .AddExtensionGrantValidator<MFAGrantValidator>()
+            .AddExtensionGrantValidator<MFAPasswordGrantValidator>()
+            .AddAspNetIdentity<User>()
+            .AddInMemoryClients(Config.Clients)
+            .AddInMemoryApiResources(Config.ApiResources)
+            .AddInMemoryApiScopes(Config.ApiScopes)
+            .AddInMemoryIdentityResources(Config.IdentityResources)
+            .AddKeyManagement()
+            .AddFileSystemPersistence(Path.Combine(WebHostEnvironment.ContentRootPath, @"keystore"));
+
+            services.Configure<MongoDBConfiguration>(options =>
+            {
+                options.ConnectionString = connectionString;
+            });
+
+            services.AddLocalApiAuthentication();
 
             services.AddQuartzHostedService(q =>
             {
@@ -197,12 +223,6 @@ namespace Streetwriters.Identity
 
             AddOperationalStore(services, new TokenCleanupOptions { Enable = true, Interval = 3600 * 12 });
 
-            services.AddHttpClient<EmailAddressValidator>();
-            services.AddScoped<IUserAccountService, UserAccountService>();
-            services.AddTransient<IMFAService, MFAService>();
-            services.AddTransient<GrantService>();
-            services.AddControllers();
-            services.AddApiExceptionHandler();
             services.AddTransient<IIntrospectionResponseGenerator, CustomIntrospectionResponseGenerator>();
             services.AddTransient<IProfileService, ProfileService>();
             services.AddTransient<ITokenGenerationService, TokenGenerationService>();
@@ -210,8 +230,6 @@ namespace Streetwriters.Identity
             services.AddTransient<ITokenResponseGenerator, TokenResponseHandler>();
             services.AddTransient<IRefreshTokenService, CustomRefreshTokenService>();
             services.AddTransient<IResourceOwnerPasswordValidator, CustomResourceOwnerValidator>();
-
-            services.AddHealthChecks();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -225,7 +243,8 @@ namespace Streetwriters.Identity
 
             app.UseRouting();
 
-            app.UseIdentityServer();
+            if (UseOpenIddict) app.UseOpenIddictEngine();
+            else app.UseIdentityServer();
             app.UseRateLimiter();
 
             app.UseAuthentication();

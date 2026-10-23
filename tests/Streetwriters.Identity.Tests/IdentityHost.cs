@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Configuration;
 using MongoDB.Driver;
 using Streetwriters.Common;
 using Streetwriters.Common.Messages;
@@ -19,6 +20,9 @@ using Streetwriters.Common.Models;
 using Streetwriters.Identity.Interfaces;
 using Streetwriters.Identity.Services;
 using WampSharp.V2;
+
+// the hosts share process-wide environment variables, so their tests can't run at the same time
+[assembly: CollectionBehavior(DisableTestParallelization = true)]
 
 namespace Streetwriters.Identity.Tests;
 
@@ -52,10 +56,12 @@ static class TestEnvironment
     }
 }
 
-public sealed class TestClock : ISystemClock
+/// <summary>The clock of both token servers: IdentityServer4 reads ISystemClock, OpenIddict TimeProvider.</summary>
+public sealed class TestClock : TimeProvider, ISystemClock
 {
     private TimeSpan offset;
     public DateTimeOffset UtcNow => DateTimeOffset.UtcNow + offset;
+    public override DateTimeOffset GetUtcNow() => UtcNow;
     public void Advance(TimeSpan by) => offset += by;
     public void Set(DateTimeOffset now) => offset = now - DateTimeOffset.UtcNow;
     public void Reset() => offset = TimeSpan.Zero;
@@ -112,11 +118,15 @@ public class RecordingProxy<T> : DispatchProxy where T : class
 }
 
 /// <summary>
-/// The whole Identity server, in-process, against a throwaway database. Shared by every
-/// test in <see cref="IdentityHostCollection"/>, which run one at a time.
+/// The whole Identity server, in-process, against a throwaway database, on one of the token servers.
+/// Shared by the tests of its collection.
 /// </summary>
-public sealed class IdentityHost : IAsyncLifetime
+public abstract class IdentityHost : IAsyncLifetime
 {
+    /// <summary>The value of <see cref="Config.ENGINE_SETTING"/>; null for the default, IdentityServer4.</summary>
+    public abstract string? Engine { get; }
+    public bool IsOpenIddict => Engine == Config.OPENIDDICT_ENGINE;
+
     private static readonly IMongoRunner Mongo = StartMongo();
 
     // EphemeralMongo only stops mongod when the runner is disposed
@@ -152,6 +162,7 @@ public sealed class IdentityHost : IAsyncLifetime
 
         Host = Program.CreateHostBuilder([])
             .UseContentRoot(contentRoot)
+            .ConfigureAppConfiguration((configuration) => configuration.AddInMemoryCollection([KeyValuePair.Create(Config.ENGINE_SETTING, Engine)]))
             .ConfigureWebHost((builder) => builder
                 .UseTestServer()
                 .ConfigureTestServices((services) =>
@@ -159,6 +170,7 @@ public sealed class IdentityHost : IAsyncLifetime
                     services.AddSingleton(emails);
                     services.AddSingleton(sms);
                     services.AddSingleton<ISystemClock>(Clock);
+                    services.AddSingleton<TimeProvider>(Clock);
                     // the disposable domains list is fetched from GitHub; tests must not need the network
                     services.AddHttpClient<EmailAddressValidator>().ConfigurePrimaryHttpMessageHandler(() => new OfflineHandler());
                     // the MFA step tokens are validated through discovery, which must reach the test server
@@ -217,8 +229,24 @@ public sealed class IdentityHost : IAsyncLifetime
     }
 }
 
-[CollectionDefinition(Name)]
-public sealed class IdentityHostCollection : ICollectionFixture<IdentityHost>
+public sealed class IdentityServer4Host : IdentityHost
 {
-    public const string Name = "Identity host";
+    public override string? Engine => null;
+}
+
+public sealed class OpenIddictHost : IdentityHost
+{
+    public override string? Engine => Config.OPENIDDICT_ENGINE;
+}
+
+[CollectionDefinition(Name)]
+public sealed class IdentityServer4Collection : ICollectionFixture<IdentityServer4Host>
+{
+    public const string Name = "IdentityServer4";
+}
+
+[CollectionDefinition(Name)]
+public sealed class OpenIddictCollection : ICollectionFixture<OpenIddictHost>
+{
+    public const string Name = "OpenIddict";
 }

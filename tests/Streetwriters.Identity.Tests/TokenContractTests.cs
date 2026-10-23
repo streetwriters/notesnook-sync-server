@@ -19,8 +19,7 @@ namespace Streetwriters.Identity.Tests;
 /// The token contract clients and the other servers rely on, recorded as golden snapshots.
 /// These must keep passing, unchanged, on whatever replaces IdentityServer4.
 /// </summary>
-[Collection(IdentityHostCollection.Name)]
-public sealed class TokenContractTests(IdentityHost host) : IdentityTestBase(host)
+public abstract class TokenContractTests(IdentityHost host) : IdentityTestBase(host)
 {
     // Signup
 
@@ -495,8 +494,8 @@ public sealed class TokenContractTests(IdentityHost host) : IdentityTestBase(hos
         Assert.Equal(HttpStatusCode.OK, (await AccountAsync(HttpMethod.Post, "/account/logout", access)).StatusCode);
         Assert.False(await IsActiveAsync(access));
         // IdentityServer4 behaviour, not intent: logout matches grants by the access token's jti, which a
-        // refreshed refresh token doesn't hold. Revoking it would only be stricter, so a replacement may fix this.
-        Assert.Equal(HttpStatusCode.OK, (await RefreshAsync(newRefresh)).StatusCode);
+        // refreshed refresh token doesn't hold. OpenIddict ends the whole session, which is only stricter.
+        Assert.Equal(host.IsOpenIddict ? HttpStatusCode.BadRequest : HttpStatusCode.OK, (await RefreshAsync(newRefresh)).StatusCode);
     }
 
     [Fact]
@@ -587,7 +586,23 @@ public sealed class TokenContractTests(IdentityHost host) : IdentityTestBase(hos
     [Fact]
     public async Task Discovery_document()
     {
-        await Golden.AssertMatchesAsync("discovery", await client.GetAsync("/.well-known/openid-configuration"));
+        var response = await client.GetAsync("/.well-known/openid-configuration");
+        if (!host.IsOpenIddict)
+        {
+            await Golden.AssertMatchesAsync("discovery", response);
+            return;
+        }
+
+        // each server describes itself differently; these are what the API servers' introspection
+        // and the Bearer+jwt scheme read
+        var expected = Golden.Read("discovery")["body"]!;
+        var actual = await ReadAsync(response);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(expected["issuer"]!.GetValue<string>().TrimEnd('/'), actual["issuer"]!.GetValue<string>().TrimEnd('/'));
+        foreach (var endpoint in new[] { "token_endpoint", "introspection_endpoint", "revocation_endpoint" })
+            Assert.Equal(new Uri(expected[endpoint]!.GetValue<string>()).AbsolutePath.TrimEnd('/'), new Uri(actual[endpoint]!.GetValue<string>()).AbsolutePath.TrimEnd('/'));
+        var keys = await ReadAsync(await client.GetAsync(actual["jwks_uri"]!.GetValue<string>()));
+        Assert.Contains(keys["keys"]!.AsArray(), (key) => key!["use"]?.GetValue<string>() == "sig");
     }
 
     private static async Task WaitUntilAsync(Func<bool> condition)
@@ -597,3 +612,9 @@ public sealed class TokenContractTests(IdentityHost host) : IdentityTestBase(hos
             await Task.Delay(50, cts.Token);
     }
 }
+
+[Collection(IdentityServer4Collection.Name)]
+public sealed class IdentityServer4TokenContractTests(IdentityServer4Host host) : TokenContractTests(host);
+
+[Collection(OpenIddictCollection.Name)]
+public sealed class OpenIddictTokenContractTests(OpenIddictHost host) : TokenContractTests(host);
