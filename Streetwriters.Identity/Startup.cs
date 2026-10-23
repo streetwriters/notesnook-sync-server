@@ -121,10 +121,6 @@ namespace Streetwriters.Identity
             .AddExtensionGrantValidator<EmailGrantValidator>()
             .AddExtensionGrantValidator<MFAGrantValidator>()
             .AddExtensionGrantValidator<MFAPasswordGrantValidator>()
-            .AddConfigurationStore(options =>
-            {
-                options.ConnectionString = connectionString;
-            })
             .AddAspNetIdentity<User>()
             .AddInMemoryClients(Config.Clients)
             .AddInMemoryApiResources(Config.ApiResources)
