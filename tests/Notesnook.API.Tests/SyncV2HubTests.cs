@@ -134,4 +134,105 @@ public class SyncV2HubTests(TestDatabase db) : IClassFixture<TestDatabase>
         Assert.True(result.Synced);
         Assert.Equal(monograph.Id, Assert.Single(sent).ItemId);
     }
+
+    private async Task<List<SyncItem>> InsertNotesAsync(string userId, int count, int cipherLength, long length)
+    {
+        var notes = Enumerable.Range(0, count).Select((_) => new SyncItem
+        {
+            UserId = userId,
+            ItemId = Guid.NewGuid().ToString("N"),
+            Cipher = new string('a', cipherLength),
+            IV = "iv",
+            Length = length,
+            Version = 5.9,
+            Algorithm = Algorithms.Default
+        }).ToList();
+        await db.CreateScope().Repositories.Notes.Collection.InsertManyAsync(notes);
+        return notes;
+    }
+
+    private SyncV2Hub HubWithClient(string userId, List<SyncTransferRawItemV2> sent, Func<int, bool>? accept = null)
+    {
+        var client = Stub<ISyncV2HubClient>.Create(
+            ("SendItems", (args) =>
+            {
+                sent.Add((SyncTransferRawItemV2)args[0]!);
+                return Task.FromResult(accept?.Invoke(sent.Count) ?? true);
+            }),
+            ("SendMonographs", (_) => Task.FromResult(true)),
+            ("SendInboxItems", (_) => Task.FromResult(true)));
+        var hub = Hub(userId);
+        hub.Clients = Stub<IHubCallerClients<ISyncV2HubClient>>.Create(("get_Caller", (_) => client));
+        return hub;
+    }
+
+    [Fact]
+    public async Task A_full_sync_chunks_items_by_their_stored_size_not_the_declared_length()
+    {
+        var userId = Guid.NewGuid().ToString("N");
+        // each item claims to be 1 byte, so chunking by Length would send all of them in one message
+        var notes = await InsertNotesAsync(userId, 8, 1024 * 1024, length: 1);
+        await db.CreateScope().Devices.RegisterDeviceAsync(userId, "new");
+        var sent = new List<SyncTransferRawItemV2>();
+
+        await HubWithClient(userId, sent).RequestFetchV4("new");
+
+        var chunks = sent.Where((c) => c.Type == "note").ToList();
+        Assert.True(chunks.Count > 1);
+        Assert.All(chunks, (c) => Assert.True(c.Items.Count() <= 3));
+        Assert.Equal(notes.Select((n) => n.ItemId).Order(), chunks.SelectMany((c) => c.Items).Select((i) => i.ItemId).Order());
+        Assert.Equal(notes.Count, chunks[^1].Count);
+    }
+
+    [Fact]
+    public async Task Small_items_are_capped_per_chunk()
+    {
+        var userId = Guid.NewGuid().ToString("N");
+        await InsertNotesAsync(userId, 1200, 100, length: 100);
+        await db.CreateScope().Devices.RegisterDeviceAsync(userId, "new");
+        var sent = new List<SyncTransferRawItemV2>();
+
+        await HubWithClient(userId, sent).RequestFetchV4("new");
+
+        Assert.Equal([500, 500, 200], sent.Where((c) => c.Type == "note").Select((c) => c.Items.Count()));
+    }
+
+    [Fact]
+    public async Task An_incremental_fetch_sends_only_the_pending_items_and_clears_them()
+    {
+        var userId = Guid.NewGuid().ToString("N");
+        var notes = await InsertNotesAsync(userId, 5, 100, length: 100);
+        var devices = db.CreateScope().Devices;
+        await devices.RegisterDeviceAsync(userId, "device");
+        await devices.ResetAsync(userId, "device");
+        var changed = notes.Take(3).ToList();
+        await devices.AddIdsToAllDevicesAsync(userId, changed.Select((n) => new ItemKey(n.ItemId!, "note")));
+        var sent = new List<SyncTransferRawItemV2>();
+
+        await HubWithClient(userId, sent).RequestFetchV4("device");
+
+        Assert.Equal(changed.Select((n) => n.ItemId).Order(), sent.SelectMany((c) => c.Items).Select((i) => i.ItemId).Order());
+        Assert.Empty(await devices.GetIdsAsync(userId, "device", "pending"));
+        Assert.Empty(await devices.GetIdsAsync(userId, "device", "unsynced"));
+    }
+
+    [Fact]
+    public async Task A_rejected_chunk_is_sent_again_on_the_next_fetch()
+    {
+        var userId = Guid.NewGuid().ToString("N");
+        var notes = await InsertNotesAsync(userId, 8, 1024 * 1024, length: 1024 * 1024);
+        var devices = db.CreateScope().Devices;
+        await devices.RegisterDeviceAsync(userId, "device");
+        await devices.ResetAsync(userId, "device");
+        await devices.AddIdsToAllDevicesAsync(userId, notes.Select((n) => new ItemKey(n.ItemId!, "note")));
+        var firstAttempt = new List<SyncTransferRawItemV2>();
+
+        // the client applies the first chunk and rejects the second
+        await Assert.ThrowsAsync<HubException>(() => HubWithClient(userId, firstAttempt, (n) => n == 1).RequestFetchV4("device"));
+        var retry = new List<SyncTransferRawItemV2>();
+        await HubWithClient(userId, retry).RequestFetchV4("device");
+
+        var acked = firstAttempt[0].Items.Select((i) => i.ItemId);
+        Assert.Equal(notes.Select((n) => n.ItemId).Except(acked).Order(), retry.SelectMany((c) => c.Items).Select((i) => i.ItemId).Order());
+    }
 }
