@@ -60,35 +60,35 @@ namespace Streetwriters.Identity.Services
             EmailSender = emailSender;
         }
 
-        readonly EmailTemplate Email2FATemplate = new()
+        static readonly EmailTemplate Email2FATemplate = new()
         {
             Html = HtmlHelper.ReadMinifiedHtmlFile("Templates/Email2FACode.html"),
             Text = File.ReadAllText("Templates/Email2FACode.txt"),
             Subject = "Your {{app_name}} account 2FA code",
         };
 
-        readonly EmailTemplate ConfirmEmailTemplate = new()
+        static readonly EmailTemplate ConfirmEmailTemplate = new()
         {
             Html = HtmlHelper.ReadMinifiedHtmlFile("Templates/ConfirmEmail.html"),
             Text = File.ReadAllText("Templates/ConfirmEmail.txt"),
             Subject = "Confirm your {{app_name}} account",
         };
 
-        readonly EmailTemplate ConfirmChangeEmailTemplate = new()
+        static readonly EmailTemplate ConfirmChangeEmailTemplate = new()
         {
             Html = HtmlHelper.ReadMinifiedHtmlFile("Templates/EmailChangeConfirmation.html"),
             Text = File.ReadAllText("Templates/EmailChangeConfirmation.txt"),
             Subject = "Change {{app_name}} account email address",
         };
 
-        readonly EmailTemplate PasswordResetEmailTemplate = new()
+        static readonly EmailTemplate PasswordResetEmailTemplate = new()
         {
             Html = HtmlHelper.ReadMinifiedHtmlFile("Templates/ResetAccountPassword.html"),
             Text = File.ReadAllText("Templates/ResetAccountPassword.txt"),
             Subject = "Reset {{app_name}} account password",
         };
 
-        readonly EmailTemplate FailedLoginAlertTemplate = new()
+        static readonly EmailTemplate FailedLoginAlertTemplate = new()
         {
             Html = HtmlHelper.ReadMinifiedHtmlFile("Templates/FailedLoginAlert.html"),
             Text = File.ReadAllText("Templates/FailedLoginAlert.txt"),
