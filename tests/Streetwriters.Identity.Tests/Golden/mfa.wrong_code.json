@@ -1,0 +1,12 @@
+{
+  "status": 400,
+  "headers": {
+    "Content-Type": "application/json; charset=UTF-8",
+    "Cache-Control": "no-store, no-cache, max-age=0",
+    "Pragma": "no-cache"
+  },
+  "body": {
+    "error": "invalid_mfa",
+    "error_description": "Please provide a valid multi-factor authentication code."
+  }
+}

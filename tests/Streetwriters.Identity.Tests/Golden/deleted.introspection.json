@@ -1,0 +1,11 @@
+{
+  "status": 200,
+  "headers": {
+    "Content-Type": "application/json; charset=UTF-8",
+    "Cache-Control": "no-store, no-cache, max-age=0",
+    "Pragma": "no-cache"
+  },
+  "body": {
+    "active": false
+  }
+}

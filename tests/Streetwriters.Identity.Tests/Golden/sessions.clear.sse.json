@@ -1,0 +1,13 @@
+{
+  "message": {
+    "data": {
+      "<json>": {
+        "reason": "Session revoked."
+      }
+    },
+    "type": "logout"
+  },
+  "originTokenId": "<id>",
+  "sendToAll": false,
+  "userId": "<objectid>"
+}
