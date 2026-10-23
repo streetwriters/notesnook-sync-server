@@ -24,7 +24,6 @@ using System.Threading.RateLimiting;
 using AspNetCore.Identity.Mongo;
 using IdentityServer4.MongoDB.Entities;
 using IdentityServer4.MongoDB.Interfaces;
-using IdentityServer4.MongoDB.Options;
 using IdentityServer4.MongoDB.Stores;
 using IdentityServer4.ResponseHandling;
 using IdentityServer4.Services;
@@ -41,7 +40,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using MongoDB.Bson.Serialization;
-using Quartz;
 using Streetwriters.Common;
 using Streetwriters.Common.Extensions;
 using Streetwriters.Common.Interfaces;
@@ -214,14 +212,7 @@ namespace Streetwriters.Identity
 
             services.AddLocalApiAuthentication();
 
-            services.AddQuartzHostedService(q =>
-            {
-                q.WaitForJobsToComplete = true;
-                q.AwaitApplicationStarted = true;
-                q.StartDelay = TimeSpan.FromMinutes(1);
-            });
-
-            AddOperationalStore(services, new TokenCleanupOptions { Enable = true, Interval = 3600 * 12 });
+            AddOperationalStore(services);
 
             services.AddTransient<IIntrospectionResponseGenerator, CustomIntrospectionResponseGenerator>();
             services.AddTransient<IProfileService, ProfileService>();
@@ -282,36 +273,23 @@ namespace Streetwriters.Identity
             });
         }
 
-        private static void AddOperationalStore(IServiceCollection services, TokenCleanupOptions? tokenCleanUpOptions = null)
+        private static void AddOperationalStore(IServiceCollection services)
         {
-            BsonClassMap.RegisterClassMap<PersistedGrant>(cm =>
+            if (!BsonClassMap.IsClassMapRegistered(typeof(PersistedGrant)))
             {
-                cm.AutoMap();
-                cm.SetIgnoreExtraElements(true);
-            });
+                BsonClassMap.RegisterClassMap<PersistedGrant>(cm =>
+                {
+                    cm.AutoMap();
+                    cm.SetIgnoreExtraElements(true);
+                });
+            }
 
             services.AddSingleton<CustomPersistedGrantDbContext>();
             services.AddSingleton<IPersistedGrantDbContext>((sp) => sp.GetRequiredService<CustomPersistedGrantDbContext>());
             services.AddTransient<IPersistedGrantStore, PersistedGrantStore>();
             services.AddTransient<ISessionStore, PersistedGrantSessionStore>();
             services.AddTransient<TokenCleanup>();
-
-            services.AddQuartz(q =>
-            {
-                q.UseMicrosoftDependencyInjectionJobFactory();
-
-                if (tokenCleanUpOptions?.Enable == true)
-                {
-                    var jobKey = new JobKey("TokenCleanupJob");
-                    q.AddJob<TokenCleanupJob>(opts => opts.WithIdentity(jobKey));
-                    q.AddTrigger(opts => opts
-                        .ForJob(jobKey)
-                        .WithIdentity("TokenCleanup-trigger")
-                        // the scheduler starts after a delay, so the first run always
-                        // misfires and must not be skipped until the next interval
-                        .WithSimpleSchedule((s) => s.RepeatForever().WithIntervalInSeconds(tokenCleanUpOptions.Interval).WithMisfireHandlingInstructionFireNow()));
-                }
-            });
+            services.AddHostedService<TokenCleanupJob>();
         }
     }
 }

@@ -21,12 +21,14 @@ using System;
 using System.Threading.Tasks;
 using OpenIddict.Abstractions;
 using OpenIddict.Server;
+using Streetwriters.Identity.Legacy;
 using static OpenIddict.Server.OpenIddictServerEvents;
 
 namespace Streetwriters.Identity.OpenIddictEngine
 {
     /// <summary>Keeps a <see cref="TokenRecord"/> of the tokens of every session OpenIddict starts or refreshes.</summary>
-    public class RecordIssuedTokens(TokenRecords records) : IOpenIddictServerHandler<ProcessSignInContext>
+    /// <remarks>Also copies the tokens for IdentityServer4 (see <see cref="RollbackBridge"/>).</remarks>
+    public class RecordIssuedTokens(TokenRecords records, RollbackBridge bridge) : IOpenIddictServerHandler<ProcessSignInContext>
     {
         /// <summary>The sign-in property holding the id of the refresh token being replaced.</summary>
         public const string ReplacedTokenProperty = "replaced_token";
@@ -42,6 +44,9 @@ namespace Streetwriters.Identity.OpenIddictEngine
             var subject = context.Principal?.GetClaim(OpenIddictConstants.Claims.Subject);
             if (subject == null) return;
 
+            // as IdentityServer4 formatted them; the API servers and clients only compare them
+            var jti = Guid.NewGuid().ToString("N").ToUpperInvariant();
+
             if (context.AccessToken != null && context.AccessTokenPrincipal?.GetTokenId() is string accessTokenId)
             {
                 await records.AddAsync(new TokenRecord
@@ -50,22 +55,27 @@ namespace Streetwriters.Identity.OpenIddictEngine
                     Type = TokenRecords.AccessToken,
                     Subject = subject,
                     AuthorizationId = context.AccessTokenPrincipal.GetAuthorizationId(),
-                    // as IdentityServer4 formatted them; the API servers and clients only compare them
-                    Jti = Guid.NewGuid().ToString("N").ToUpperInvariant(),
+                    Jti = jti,
                     CacheKey = (context.AccessToken + ":reference_token").Sha256(),
+                    BridgeKey = await bridge.CopyAccessTokenAsync(context.AccessToken, context.AccessTokenPrincipal, jti),
                     ExpiresAt = ExpirationOf(context.AccessTokenPrincipal),
                 });
             }
 
-            if (context.RefreshTokenPrincipal?.GetTokenId() is string refreshTokenId)
+            if (context.RefreshToken != null && context.RefreshTokenPrincipal?.GetTokenId() is string refreshTokenId)
             {
+                var replaced = context.Properties.TryGetValue(ReplacedTokenProperty, out var value) ? value as string : null;
+                var replacedKey = replaced == null ? null
+                    : replaced.StartsWith(LegacyGrants.LineagePrefix) ? replaced[LegacyGrants.LineagePrefix.Length..]
+                    : (await records.FindAsync(replaced))?.BridgeKey;
                 await records.AddAsync(new TokenRecord
                 {
                     TokenId = refreshTokenId,
                     Type = TokenRecords.RefreshToken,
                     Subject = subject,
                     AuthorizationId = context.RefreshTokenPrincipal.GetAuthorizationId(),
-                    Replaced = context.Properties.TryGetValue(ReplacedTokenProperty, out var replaced) ? replaced as string : null,
+                    Replaced = replaced,
+                    BridgeKey = await bridge.CopyRefreshTokenAsync(context.RefreshToken, context.RefreshTokenPrincipal, context.AccessTokenPrincipal ?? context.RefreshTokenPrincipal, jti, replacedKey),
                     ExpiresAt = ExpirationOf(context.RefreshTokenPrincipal),
                 });
             }

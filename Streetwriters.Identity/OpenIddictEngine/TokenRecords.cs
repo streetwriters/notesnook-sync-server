@@ -39,6 +39,8 @@ namespace Streetwriters.Identity.OpenIddictEngine
         public string? Jti { get; set; }
         public string? CacheKey { get; set; }
         public string? Replaced { get; set; }
+        /// <summary>The key of the token's copy in IdentityServer4's grants (see RollbackBridge).</summary>
+        public string? BridgeKey { get; set; }
         public DateTime ExpiresAt { get; set; }
     }
 

@@ -28,6 +28,7 @@ using MongoDB.Driver;
 using OpenIddict.Abstractions;
 using OpenIddict.MongoDb;
 using OpenIddict.MongoDb.Models;
+using Streetwriters.Identity.Legacy;
 
 namespace Streetwriters.Identity.OpenIddictEngine
 {
@@ -88,7 +89,9 @@ namespace Streetwriters.Identity.OpenIddictEngine
                     var threshold = timeProvider.GetUtcNow() - Age;
                     var tokens = await scope.ServiceProvider.GetRequiredService<IOpenIddictTokenManager>().PruneAsync(threshold, stoppingToken);
                     var authorizations = await scope.ServiceProvider.GetRequiredService<IOpenIddictAuthorizationManager>().PruneAsync(threshold, stoppingToken);
-                    logger.LogInformation("Pruned {Tokens} tokens and {Authorizations} authorizations", tokens, authorizations);
+                    // IdentityServer4's grants, and the copies of OpenIddict's, which TokenCleanupJob removed until the switch
+                    var grants = await scope.ServiceProvider.GetRequiredService<LegacyGrants>().RemoveExpiredAsync();
+                    logger.LogInformation("Pruned {Tokens} tokens, {Authorizations} authorizations and {Grants} IdentityServer4 grants", tokens, authorizations, grants);
                 }
                 catch (Exception e) when (e is not OperationCanceledException)
                 {

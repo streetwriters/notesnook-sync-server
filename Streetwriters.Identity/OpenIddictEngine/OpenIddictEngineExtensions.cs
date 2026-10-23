@@ -155,6 +155,7 @@ namespace Streetwriters.Identity.OpenIddictEngine
             services.AddHostedService<TokenPruning>();
             services.AddSingleton((_) => new TokenRecords(database));
             services.AddSingleton((services) => new LegacyGrants(database, services.GetRequiredService<TimeProvider>()));
+            services.AddSingleton((_) => new RollbackBridge(database));
             services.AddTransient<StepTokens>();
             services.AddTransient<SessionPrincipals>();
             services.AddTransient<AccessTokens>();
