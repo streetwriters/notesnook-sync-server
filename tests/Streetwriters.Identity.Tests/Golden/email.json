@@ -21,10 +21,7 @@
           "idp": "local",
           "iss": "http://localhost",
           "jti": "<id>",
-          "mfa:primary": "email",
           "nbf": "<time>",
-          "notesnook:status": "believer",
-          "role": "notesnook",
           "scope": [
             "auth:grant_types:mfa"
           ],

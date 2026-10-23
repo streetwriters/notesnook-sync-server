@@ -151,10 +151,38 @@ public sealed class TokenContractTests(IdentityHost host) : IdentityTestBase(hos
     }
 
     [Fact]
-    public async Task Email_grant_doesnt_reveal_unregistered_users()
+    public async Task Unregistered_users_cant_be_told_apart_from_registered_ones()
     {
-        await Golden.AssertMatchesAsync("email.unregistered", await EmailGrantAsync(NewEmail()));
-        await Golden.AssertMatchesAsync("email.unregistered.optional_mfa", await EmailGrantAsync(NewEmail(), optionalMFA: true));
+        async Task<JsonArray> StepsAsync(string email, bool optionalMFA)
+        {
+            var response = await EmailGrantAsync(email, optionalMFA);
+            var mfaToken = Token(await ReadAsync(response), "access_token");
+            return
+            [
+                await Golden.SnapshotAsync(response),
+                await Golden.SnapshotAsync(await MFAGrantAsync(mfaToken, "000000")),
+                await Golden.SnapshotAsync(await MFAGrantAsync(mfaToken, "000000", "app")),
+                await Golden.SnapshotAsync(await MFAGrantAsync(mfaToken, "nope", "recoveryCode")),
+                await Golden.SnapshotAsync(await TokenAsync(new() { ["grant_type"] = "mfa", ["client_id"] = ClientId, ["mfa:method"] = "email" }, mfaToken)),
+                await Golden.SnapshotAsync(await AccountAsync(HttpMethod.Post, "/mfa/send", mfaToken, new() { ["type"] = "email" })),
+                // step tokens open nothing else
+                await Golden.SnapshotAsync(await AccountAsync(HttpMethod.Get, "/account", mfaToken)),
+                await Golden.SnapshotAsync(await AccountAsync(HttpMethod.Post, "/mfa", mfaToken, new() { ["type"] = "app" })),
+            ];
+        }
+
+        foreach (var optionalMFA in new[] { false, true })
+        {
+            // signups get email MFA
+            var email = NewEmail();
+            await SignupAsync(email);
+            await EnableEmailMFAAsync(email);
+
+            var registered = await StepsAsync(email, optionalMFA);
+            var unregistered = await StepsAsync(NewEmail(), optionalMFA);
+            Assert.Equal(registered.ToJsonString(), unregistered.ToJsonString());
+            Golden.AssertMatches(optionalMFA ? "email.unregistered.optional_mfa" : "email.unregistered", unregistered);
+        }
     }
 
     [Fact]
@@ -167,6 +195,115 @@ public sealed class TokenContractTests(IdentityHost host) : IdentityTestBase(hos
 
         await Golden.AssertMatchesAsync("mfa.send", await AccountAsync(HttpMethod.Post, "/mfa/send", mfaToken, new() { ["type"] = "email" }));
         Assert.Contains(host.Emails.Calls, (c) => c.Method == nameof(ITemplatedEmailSender.Send2FACodeEmailAsync));
+    }
+
+    private JsonArray EmailsSent() => new([.. host.Emails.Calls.Select((c) => JsonValue.Create(c.Method))]);
+
+    private async Task LockOutAsync(string email)
+    {
+        var user = await UserAsync(email);
+        await host.WithServicesAsync((services) => services.GetRequiredService<UserManager<User>>().SetLockoutEndDateAsync(user, DateTimeOffset.UtcNow.AddMinutes(5)));
+    }
+
+    [Fact]
+    public async Task Mfa_grant_alerts_on_failures()
+    {
+        var email = NewEmail();
+        await SignupAsync(email);
+        await EnableEmailMFAAsync(email);
+        var mfaToken = Token(await ReadAsync(await EmailGrantAsync(email)), "access_token");
+
+        await MFAGrantAsync(mfaToken, "000000");
+        await MFAGrantAsync(mfaToken, "nope", "recoveryCode");
+        Golden.AssertMatches("mfa.failures.emails", EmailsSent());
+    }
+
+    [Fact]
+    public async Task Mfa_grant_accepts_recovery_codes()
+    {
+        var email = NewEmail();
+        await SignupAsync(email);
+        await EnableEmailMFAAsync(email);
+        var mfaToken = Token(await ReadAsync(await EmailGrantAsync(email)), "access_token");
+
+        await Golden.AssertMatchesAsync("mfa.wrong_recovery_code", await MFAGrantAsync(mfaToken, "nope", "recoveryCode"));
+        await Golden.AssertMatchesAsync("mfa.recovery_code", await MFAGrantAsync(mfaToken, await RecoveryCodeAsync(email), "recoveryCode"));
+    }
+
+    [Fact]
+    public async Task Mfa_grant_rejects_locked_out_users()
+    {
+        var email = NewEmail();
+        await SignupAsync(email);
+        await EnableEmailMFAAsync(email);
+        var mfaToken = Token(await ReadAsync(await EmailGrantAsync(email)), "access_token");
+        await LockOutAsync(email);
+
+        await Golden.AssertMatchesAsync("mfa.locked_out", await MFAGrantAsync(mfaToken, await EmailCodeAsync(email)));
+    }
+
+    [Fact]
+    public async Task Mfa_password_grant_locks_out()
+    {
+        var email = NewEmail();
+        await SignupAsync(email);
+        var passwordToken = Token(await ReadAsync(await EmailGrantAsync(email, optionalMFA: true)), "access_token");
+
+        for (var i = 0; i < 5; i++) await MFAPasswordGrantAsync(passwordToken, "wrong-password");
+        await Golden.AssertMatchesAsync("mfa_password.locked_out", await MFAPasswordGrantAsync(passwordToken, Password));
+        Golden.AssertMatches("mfa_password.failures.emails", EmailsSent());
+    }
+
+    [Fact]
+    public async Task Mfa_grant_enables_mfa_for_old_clients()
+    {
+        var email = NewEmail();
+        await SignupAsync(email);
+        var mfaToken = Token(await ReadAsync(await EmailGrantAsync(email)), "access_token");
+        await TokensAsync(await MFAPasswordGrantAsync(Token(await ReadAsync(await MFAGrantAsync(mfaToken, await EmailCodeAsync(email))), "access_token"), Password));
+        Assert.True((await UserAsync(email)).TwoFactorEnabled);
+
+        email = NewEmail();
+        await SignupAsync(email);
+        mfaToken = Token(await ReadAsync(await EmailGrantAsync(email)), "access_token");
+        await TokensAsync(await MFAPasswordGrantAsync(Token(await ReadAsync(await MFAGrantAsync(mfaToken, await EmailCodeAsync(email), optionalMFA: true)), "access_token"), Password));
+        Assert.False((await UserAsync(email)).TwoFactorEnabled);
+    }
+
+    [Fact]
+    public async Task Successful_steps_reset_failed_attempts()
+    {
+        var email = NewEmail();
+        await SignupAsync(email);
+        await EnableEmailMFAAsync(email);
+
+        var mfaToken = Token(await ReadAsync(await EmailGrantAsync(email)), "access_token");
+        for (var i = 0; i < 3; i++) await MFAGrantAsync(mfaToken, "000000");
+        Assert.Equal(3, (await UserAsync(email)).AccessFailedCount);
+        var passwordToken = Token(await ReadAsync(await MFAGrantAsync(mfaToken, await EmailCodeAsync(email))), "access_token");
+        Assert.Equal(0, (await UserAsync(email)).AccessFailedCount);
+
+        for (var i = 0; i < 3; i++) await MFAPasswordGrantAsync(passwordToken, "wrong-password");
+        Assert.Equal(3, (await UserAsync(email)).AccessFailedCount);
+        await TokensAsync(await MFAPasswordGrantAsync(passwordToken, Password));
+        Assert.Equal(0, (await UserAsync(email)).AccessFailedCount);
+
+        for (var i = 0; i < 3; i++) await PasswordGrantAsync(email, Password, ("mfa:code", "000000"), ("mfa:method", "email"));
+        Assert.Equal(3, (await UserAsync(email)).AccessFailedCount);
+        await TokensAsync(await PasswordGrantAsync(email, Password, ("mfa:code", await EmailCodeAsync(email)), ("mfa:method", "email")));
+        Assert.Equal(0, (await UserAsync(email)).AccessFailedCount);
+    }
+
+    [Fact]
+    public async Task Password_grant_failures_dont_alert()
+    {
+        var email = NewEmail();
+        await SignupAsync(email);
+        await EnableEmailMFAAsync(email);
+        await PasswordGrantAsync(email, "wrong-password", ("mfa:code", "000000"), ("mfa:method", "email"));
+        await PasswordGrantAsync(email, Password, ("mfa:code", "000000"), ("mfa:method", "email"));
+        Golden.AssertMatches("password.failures.emails", EmailsSent());
+        await Golden.AssertMatchesAsync("password.mfa.wrong_password", await PasswordGrantAsync(email, "wrong-password", ("mfa:code", await EmailCodeAsync(email)), ("mfa:method", "email")));
     }
 
     // Refresh tokens

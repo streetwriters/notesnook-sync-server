@@ -1,11 +1,104 @@
-{
-  "status": 400,
-  "headers": {
-    "Content-Type": "application/json; charset=UTF-8",
-    "Cache-Control": "no-store, no-cache, max-age=0",
-    "Pragma": "no-cache"
+[
+  {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json; charset=UTF-8",
+      "Cache-Control": "no-store, no-cache, max-age=0",
+      "Pragma": "no-cache"
+    },
+    "body": {
+      "access_token": {
+        "<jwt>": {
+          "header": {
+            "alg": "RS<n>",
+            "kid": "<id>",
+            "typ": "at+jwt"
+          },
+          "payload": {
+            "auth_time": "<time>",
+            "client_id": "notesnook",
+            "exp": "<time>",
+            "iat": "<time>",
+            "idp": "local",
+            "iss": "http://localhost",
+            "jti": "<id>",
+            "nbf": "<time>",
+            "scope": [
+              "auth:grant_types:mfa"
+            ],
+            "sub": "<objectid>"
+          }
+        }
+      },
+      "additional_data": {
+        "primaryMethod": "email"
+      },
+      "expires_in": 1200,
+      "scope": "auth:grant_types:mfa",
+      "token_type": "Bearer"
+    }
   },
-  "body": {
-    "error": "invalid_grant"
+  {
+    "status": 400,
+    "headers": {
+      "Content-Type": "application/json; charset=UTF-8",
+      "Cache-Control": "no-store, no-cache, max-age=0",
+      "Pragma": "no-cache"
+    },
+    "body": {
+      "error": "invalid_mfa",
+      "error_description": "Please provide a valid multi-factor authentication code."
+    }
+  },
+  {
+    "status": 400,
+    "headers": {
+      "Content-Type": "application/json; charset=UTF-8",
+      "Cache-Control": "no-store, no-cache, max-age=0",
+      "Pragma": "no-cache"
+    },
+    "body": {
+      "error": "invalid_mfa",
+      "error_description": "Please provide a valid multi-factor authentication method."
+    }
+  },
+  {
+    "status": 400,
+    "headers": {
+      "Content-Type": "application/json; charset=UTF-8",
+      "Cache-Control": "no-store, no-cache, max-age=0",
+      "Pragma": "no-cache"
+    },
+    "body": {
+      "error": "invalid_mfa",
+      "error_description": "Please provide a valid multi-factor authentication recovery code."
+    }
+  },
+  {
+    "status": 400,
+    "headers": {
+      "Content-Type": "application/json; charset=UTF-8",
+      "Cache-Control": "no-store, no-cache, max-age=0",
+      "Pragma": "no-cache"
+    },
+    "body": {
+      "error": "invalid_mfa",
+      "error_description": "Please provide a valid multi-factor authentication code."
+    }
+  },
+  {
+    "status": 200,
+    "headers": {},
+    "body": null
+  },
+  {
+    "status": 401,
+    "headers": {},
+    "body": null
+  },
+  {
+    "status": 401,
+    "headers": {},
+    "body": null
   }
-}
+]

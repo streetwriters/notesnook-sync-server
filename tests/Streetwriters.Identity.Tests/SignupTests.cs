@@ -2,8 +2,6 @@ using System.Reflection;
 using AspNetCore.Identity.Mongo;
 using AspNetCore.Identity.Mongo.Model;
 using EphemeralMongo;
-using IdentityServer4.ResponseHandling;
-using IdentityServer4.Stores;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -95,11 +93,11 @@ public sealed class SignupTests : IDisposable
     {
         var scope = services.CreateScope();
         var users = scope.ServiceProvider.GetRequiredService<UserManager<User>>();
-        var tokens = Stub<ITokenGenerationService>.Create(("CreateUserTokensAsync", (_) => Task.FromResult<TokenResponse?>(new TokenResponse { AccessToken = "access" })));
+        var tokens = Stub<ITokenIssuer>.Create(("IssueUserTokensAsync", (_) => Task.FromResult<IssuedTokens?>(new IssuedTokens("access", "refresh", 3600, ""))));
         var service = new UserAccountService(
             users,
             Stub<IMFAService>.Create(),
-            Stub<IPersistedGrantStore>.Create(),
+            Stub<ISessionStore>.Create(),
             scope.ServiceProvider.GetRequiredService<RoleManager<MongoRole>>(),
             new EmailAddressValidator(new HttpClient(new FailingHandler()), NullLogger<EmailAddressValidator>.Instance),
             Stub<ITemplatedEmailSender>.Create(),

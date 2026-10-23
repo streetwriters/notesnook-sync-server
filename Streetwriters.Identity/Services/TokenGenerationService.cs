@@ -34,7 +34,7 @@ using Streetwriters.Identity.Interfaces;
 
 namespace Streetwriters.Identity.Helpers
 {
-    public class TokenGenerationService : ITokenGenerationService
+    public class TokenGenerationService : ITokenGenerationService, ITokenIssuer
     {
         private IPersistedGrantStore PersistedGrantStore { get; set; }
         private ITokenService TokenService { get; set; }
@@ -60,7 +60,7 @@ namespace Streetwriters.Identity.Helpers
             refreshTokenService = _refreshTokenService;
         }
 
-        public async Task<string> CreateAccessTokenAsync(User user, string clientId, int lifetime = 1800, string[]? authenticationMethods = null)
+        public async Task<string> IssueAccessTokenAsync(User user, string clientId, int lifetime, string[] authenticationMethods)
         {
             var client = Config.Clients.FirstOrDefault((c) => c.ClientId == clientId);
             if (client == null)
@@ -74,7 +74,7 @@ namespace Streetwriters.Identity.Helpers
                 AdditionalClaims = [.. IdentityPricipal.Claims],
                 DisplayName = user.UserName,
                 AuthenticationTime = System.DateTime.UtcNow,
-                AuthenticationMethods = authenticationMethods ?? [],
+                AuthenticationMethods = authenticationMethods,
                 IdentityProvider = IdentityServerConstants.LocalIdentityProvider
             };
             var Request = new TokenCreationRequest
@@ -98,7 +98,7 @@ namespace Streetwriters.Identity.Helpers
             return await TokenService.CreateSecurityTokenAsync(accessToken);
         }
 
-        public async Task<TokenResponse?> CreateUserTokensAsync(User user, string clientId, int lifetime = 1800)
+        public async Task<IssuedTokens?> IssueUserTokensAsync(User user, string clientId, int lifetime)
         {
             var client = Config.Clients.FirstOrDefault((c) => c.ClientId == clientId);
             var principal = await PrincipalFactory.CreateAsync(user);
@@ -130,13 +130,7 @@ namespace Streetwriters.Identity.Helpers
             var accessToken = await TokenService.CreateAccessTokenAsync(Request);
             var refreshToken = await refreshTokenService.CreateRefreshTokenAsync(principal, accessToken, client);
 
-            return new TokenResponse
-            {
-                AccessToken = await TokenService.CreateSecurityTokenAsync(accessToken),
-                AccessTokenLifetime = lifetime,
-                RefreshToken = refreshToken,
-                Scope = string.Join(" ", accessToken.Scopes)
-            };
+            return new IssuedTokens(await TokenService.CreateSecurityTokenAsync(accessToken), refreshToken, lifetime, string.Join(" ", accessToken.Scopes));
         }
 
         public async Task<ClaimsPrincipal> TransformTokenRequestAsync(ValidatedTokenRequest request, User user, string grantType, string[] scopes, int lifetime = 20 * 60)

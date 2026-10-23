@@ -17,90 +17,21 @@ You should have received a copy of the Affero GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Security.Claims;
-using System.Text.Json;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using IdentityServer4;
-using IdentityServer4.Models;
-using IdentityServer4.Stores;
 using IdentityServer4.Validation;
-using Microsoft.AspNetCore.Identity;
-using Streetwriters.Common.Enums;
-using Streetwriters.Common.Models;
 using Streetwriters.Identity.Interfaces;
-using Streetwriters.Identity.Models;
-using static IdentityModel.OidcConstants;
+using Streetwriters.Identity.Services;
 
 namespace Streetwriters.Identity.Validation
 {
-    public class EmailGrantValidator : IExtensionGrantValidator
+    public class EmailGrantValidator(GrantService grants, ITokenGenerationService tokenGenerationService) : IExtensionGrantValidator
     {
-        private UserManager<User> UserManager { get; set; }
-        private SignInManager<User> SignInManager { get; set; }
-        private IMFAService MFAService { get; set; }
-        private ITokenGenerationService TokenGenerationService { get; set; }
-        private JwtRequestValidator JWTRequestValidator { get; set; }
-        private IResourceStore ResourceStore { get; set; }
-        private IUserClaimsPrincipalFactory<User> PrincipalFactory { get; set; }
-        public EmailGrantValidator(UserManager<User> userManager, SignInManager<User> signInManager, IMFAService mfaService, ITokenGenerationService tokenGenerationService,
-        IResourceStore resourceStore, IUserClaimsPrincipalFactory<User> principalFactory)
-        {
-            UserManager = userManager;
-            SignInManager = signInManager;
-            MFAService = mfaService;
-            TokenGenerationService = tokenGenerationService;
-            ResourceStore = resourceStore;
-            PrincipalFactory = principalFactory;
-        }
-
         public string GrantType => Config.EMAIL_GRANT_TYPE;
 
         public async Task ValidateAsync(ExtensionGrantValidationContext context)
         {
-            var email = context.Request.Raw["email"];
-            var clientId = context.Request.ClientId;
-            var registeredUser = await UserManager.FindRegisteredUserAsync(email, clientId);
-            var user = registeredUser ?? new User
-            {
-                Id = MongoDB.Bson.ObjectId.GenerateNewId(),
-                Email = email,
-                UserName = email,
-                NormalizedEmail = email,
-                NormalizedUserName = email,
-                EmailConfirmed = false,
-                SecurityStamp = ""
-            };
-
-            var isMultiFactor = await UserManager.GetTwoFactorEnabledAsync(user);
-            // Old clients always expect the MFA step so only skip it for clients that support optional 2FA.
-            // Unregistered users must always go through the MFA step so we don't expose whether an account exists.
-            var supportsOptionalMFA = context.Request.Raw["mfa:optional"] == "true";
-            if (registeredUser != null && !isMultiFactor && supportsOptionalMFA)
-            {
-                context.Result.IsError = false;
-                context.Result.Subject = await TokenGenerationService.TransformTokenRequestAsync(context.Request, user, GrantType, [Config.MFA_PASSWORD_GRANT_TYPE_SCOPE]);
-                return;
-            }
-
-            var primaryMethod = MFAService.GetPrimaryMethod(user);
-            var secondaryMethod = MFAService.GetSecondaryMethod(user);
-            var sendPhoneNumber = primaryMethod == MFAMethods.SMS || secondaryMethod == MFAMethods.SMS;
-
-            context.Result.CustomResponse = new Dictionary<string, object>
-            {
-                ["additional_data"] = new MFARequiredResponse
-                {
-                    PhoneNumber = sendPhoneNumber && user.PhoneNumber != null ? Regex.Replace(user.PhoneNumber, @"\d(?!\d{0,3}$)", "*") : null,
-                    PrimaryMethod = primaryMethod,
-                    SecondaryMethod = secondaryMethod,
-                }
-            };
-            context.Result.IsError = false;
-            context.Result.Subject = await TokenGenerationService.TransformTokenRequestAsync(context.Request, user, GrantType, [Config.MFA_GRANT_TYPE_SCOPE]);
+            var result = await grants.EmailAsync(context.Request.Raw["email"], context.Request.ClientId, context.Request.Raw["mfa:optional"] == "true");
+            await result.ApplyAsync(context, tokenGenerationService);
         }
     }
 }

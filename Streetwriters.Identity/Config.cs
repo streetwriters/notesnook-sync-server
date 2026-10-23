@@ -33,6 +33,9 @@ namespace Streetwriters.Identity
         public const string MFA_GRANT_TYPE_SCOPE = "auth:grant_types:mfa";
         public const string MFA_PASSWORD_GRANT_TYPE_SCOPE = "auth:grant_types:mfa_password";
 
+        // the policy of the account and MFA APIs, which accept this server's own access tokens
+        public const string ACCOUNT_API_POLICY = IdentityServerConstants.LocalApi.PolicyName;
+
         public static IEnumerable<IdentityResource> IdentityResources =>
             new List<IdentityResource> {
                 new IdentityResources.OpenId(),

@@ -1,0 +1,36 @@
+{
+  "status": 200,
+  "headers": {
+    "Content-Type": "application/json; charset=UTF-8",
+    "Cache-Control": "no-store, no-cache, max-age=0",
+    "Pragma": "no-cache"
+  },
+  "body": {
+    "access_token": {
+      "<jwt>": {
+        "header": {
+          "alg": "RS<n>",
+          "kid": "<id>",
+          "typ": "at+jwt"
+        },
+        "payload": {
+          "auth_time": "<time>",
+          "client_id": "notesnook",
+          "exp": "<time>",
+          "iat": "<time>",
+          "idp": "local",
+          "iss": "http://localhost",
+          "jti": "<id>",
+          "nbf": "<time>",
+          "scope": [
+            "auth:grant_types:mfa_password"
+          ],
+          "sub": "<objectid>"
+        }
+      }
+    },
+    "expires_in": 1200,
+    "scope": "auth:grant_types:mfa_password",
+    "token_type": "Bearer"
+  }
+}

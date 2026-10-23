@@ -200,11 +200,13 @@ namespace Streetwriters.Identity
             services.AddHttpClient<EmailAddressValidator>();
             services.AddScoped<IUserAccountService, UserAccountService>();
             services.AddTransient<IMFAService, MFAService>();
+            services.AddTransient<GrantService>();
             services.AddControllers();
             services.AddApiExceptionHandler();
             services.AddTransient<IIntrospectionResponseGenerator, CustomIntrospectionResponseGenerator>();
             services.AddTransient<IProfileService, ProfileService>();
             services.AddTransient<ITokenGenerationService, TokenGenerationService>();
+            services.AddTransient<ITokenIssuer, TokenGenerationService>();
             services.AddTransient<ITokenResponseGenerator, TokenResponseHandler>();
             services.AddTransient<IRefreshTokenService, CustomRefreshTokenService>();
             services.AddTransient<IResourceOwnerPasswordValidator, CustomResourceOwnerValidator>();
@@ -272,6 +274,7 @@ namespace Streetwriters.Identity
             services.AddSingleton<CustomPersistedGrantDbContext>();
             services.AddSingleton<IPersistedGrantDbContext>((sp) => sp.GetRequiredService<CustomPersistedGrantDbContext>());
             services.AddTransient<IPersistedGrantStore, PersistedGrantStore>();
+            services.AddTransient<ISessionStore, PersistedGrantSessionStore>();
             services.AddTransient<TokenCleanup>();
 
             services.AddQuartz(q =>

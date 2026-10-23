@@ -19,7 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using System.Security.Claims;
 using System.Threading.Tasks;
-using IdentityServer4.ResponseHandling;
 using IdentityServer4.Validation;
 using Streetwriters.Common.Models;
 
@@ -27,9 +26,7 @@ namespace Streetwriters.Identity.Interfaces
 {
     public interface ITokenGenerationService
     {
-        Task<string> CreateAccessTokenAsync(User user, string clientId, int lifetime = 1800, string[]? authenticationMethods = null);
         Task<string> CreateAccessTokenFromValidatedRequestAsync(ValidatedTokenRequest validatedRequest, User user, string[] scopes, int lifetime = 1200);
         Task<ClaimsPrincipal> TransformTokenRequestAsync(ValidatedTokenRequest request, User user, string grantType, string[] scopes, int lifetime = 1200);
-        Task<TokenResponse?> CreateUserTokensAsync(User user, string clientId, int lifetime = 1800);
     }
 }

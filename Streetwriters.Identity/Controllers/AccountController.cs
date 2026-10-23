@@ -25,8 +25,6 @@ using System.Security.Claims;
 using System.Text.Json;
 using System.Threading.Tasks;
 using AspNetCore.Identity.Mongo.Model;
-using IdentityServer4.Extensions;
-using IdentityServer4.Stores;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -44,21 +42,20 @@ using Streetwriters.Identity.Extensions;
 using Streetwriters.Identity.Interfaces;
 using Streetwriters.Identity.Models;
 using Streetwriters.Identity.Services;
-using static IdentityServer4.IdentityServerConstants;
 
 namespace Streetwriters.Identity.Controllers
 {
     [ApiController]
     [DisplayName("Account")]
     [Route("account")]
-    [Authorize(LocalApi.PolicyName)]
+    [Authorize(Config.ACCOUNT_API_POLICY)]
     public class AccountController : IdentityControllerBase
     {
         private static readonly string emailConfirmedPageHtml = HtmlHelper.ReadMinifiedHtmlFile("Templates/EmailConfirmedPage.html");
         private static readonly string emailConfirmErrorPageHtml = HtmlHelper.ReadMinifiedHtmlFile("Templates/EmailConfirmErrorPage.html");
 
-        private IPersistedGrantStore PersistedGrantStore { get; set; }
-        private ITokenGenerationService TokenGenerationService { get; set; }
+        private ISessionStore SessionStore { get; set; }
+        private ITokenIssuer TokenIssuer { get; set; }
         private IUserAccountService UserAccountService { get; set; }
         private EmailAddressValidator EmailValidator { get; set; }
         private readonly ILogger<AccountController> logger;
@@ -68,16 +65,16 @@ namespace Streetwriters.Identity.Controllers
             ITemplatedEmailSender _emailSender,
             SignInManager<User> _signInManager,
             RoleManager<MongoRole> _roleManager,
-            IPersistedGrantStore store,
-            ITokenGenerationService tokenGenerationService,
+            ISessionStore sessionStore,
+            ITokenIssuer tokenIssuer,
             IMFAService _mfaService,
             IUserAccountService userAccountService,
             ILogger<AccountController> logger,
             EmailAddressValidator emailValidator
         ) : base(_userManager, _emailSender, _signInManager, _roleManager, _mfaService)
         {
-            PersistedGrantStore = store;
-            TokenGenerationService = tokenGenerationService;
+            SessionStore = sessionStore;
+            TokenIssuer = tokenIssuer;
             UserAccountService = userAccountService;
             EmailValidator = emailValidator;
             this.logger = logger;
@@ -215,19 +212,7 @@ namespace Streetwriters.Identity.Controllers
             var subjectId = User.FindFirstValue("sub");
             var jti = User.FindFirstValue("jti");
 
-            var grants = await PersistedGrantStore.GetAllAsync(new PersistedGrantFilter
-            {
-                ClientId = client.Id,
-                SubjectId = subjectId
-            });
-            grants = jti == null ? [] : grants.Where((grant) => grant.Data.Contains(jti));
-            if (grants.Any())
-            {
-                foreach (var grant in grants)
-                {
-                    await PersistedGrantStore.RemoveAsync(grant.Key);
-                }
-            }
+            if (subjectId != null && jti != null) await SessionStore.EndSessionAsync(client.Id, subjectId, jti);
             return Ok();
         }
 
@@ -242,7 +227,7 @@ namespace Streetwriters.Identity.Controllers
 
             if (!await UserManager.VerifyUserTokenAsync(user, TokenOptions.DefaultProvider, "PasswordResetAuthorizationCode", form.Code))
                 return BadRequest("Invalid authorization_code.");
-            var token = await TokenGenerationService.CreateAccessTokenAsync(user, form.ClientId, authenticationMethods: [Constants.PASSWORD_RESET_AUTHENTICATION_METHOD]);
+            var token = await TokenIssuer.IssueAccessTokenAsync(user, form.ClientId, 1800, [Constants.PASSWORD_RESET_AUTHENTICATION_METHOD]);
             return Ok(new
             {
                 access_token = token,
@@ -304,7 +289,7 @@ namespace Streetwriters.Identity.Controllers
         public async Task<IActionResult> ClearUserSessions([FromQuery] bool all, [FromForm] string? refresh_token)
         {
             var jti = User.FindFirstValue("jti");
-            var userId = User.GetSubjectId();
+            var userId = User.FindFirstValue("sub") ?? throw new InvalidOperationException("sub claim is missing");
             var clientId = User.FindFirstValue("client_id");
             if (await UserAccountService.ClearSessionsAsync(userId, clientId, all, jti, refresh_token))
                 await SendLogoutMessageAsync(userId, "Session revoked.");
