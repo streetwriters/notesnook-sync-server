@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
 using Notesnook.API.Authorization;
 using Notesnook.API.Interfaces;
@@ -12,7 +13,7 @@ using Notesnook.API.Interfaces;
 namespace Notesnook.API.Hubs
 {
     // hub connections outlive their token, so a deleted or reset user's open connection is cut off here instead
-    public class SyncAuthorizationHubFilter : IHubFilter
+    public class SyncAuthorizationHubFilter(ILogger<SyncAuthorizationHubFilter> logger) : IHubFilter
     {
         private const string GenerationKey = "generation";
 
@@ -22,16 +23,32 @@ namespace Notesnook.API.Hubs
             return await next(invocationContext);
         }
 
+        // HubConnectionHandler's own logging is turned off in appsettings.json: it logs every rejection below
+        // (e.g. unconfirmed emails) as an error, so connection failures are logged here instead.
         public async Task OnConnectedAsync(HubLifetimeContext context, Func<HubLifetimeContext, Task> next)
         {
-            var result = new SyncRequirement().IsAuthorized(context.Context.User, new PathString("/hubs/sync/v2"));
-            if (!result.Succeeded)
+            try
             {
-                var reason = result.AuthorizationFailure?.FailureReasons.FirstOrDefault();
-                throw new HubException(reason?.Message ?? "Unauthorized");
+                var result = new SyncRequirement().IsAuthorized(context.Context.User, new PathString("/hubs/sync/v2"));
+                if (!result.Succeeded)
+                {
+                    var reason = result.AuthorizationFailure?.FailureReasons.FirstOrDefault();
+                    // clients read this message from the close error, so it must stay a HubException
+                    throw new HubException(reason?.Message ?? "Unauthorized");
+                }
+                await EnsureCurrentAsync(context.Context, context.ServiceProvider);
+                await next(context);
             }
-            await EnsureCurrentAsync(context.Context, context.ServiceProvider);
-            await next(context);
+            catch (HubException ex)
+            {
+                logger.LogInformation("Connection {ConnectionId} rejected: {Reason}", context.Context.ConnectionId, ex.Message);
+                throw;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "OnConnectedAsync failed for connection {ConnectionId}", context.Context.ConnectionId);
+                throw;
+            }
         }
 
         // uncached, since a connection must not write under its generation once a reset has ended it

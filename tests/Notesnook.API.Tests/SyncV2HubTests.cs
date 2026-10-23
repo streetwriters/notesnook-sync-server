@@ -53,7 +53,7 @@ public class SyncV2HubTests(TestDatabase db) : IClassFixture<TestDatabase>
     public async Task Connecting_requires_sync_access()
     {
         var userId = Guid.NewGuid().ToString("N");
-        var filter = new SyncAuthorizationHubFilter();
+        var filter = new SyncAuthorizationHubFilter(NullLogger<SyncAuthorizationHubFilter>.Instance);
         var services = new ServiceCollection().BuildServiceProvider();
 
         var error = await Assert.ThrowsAsync<HubException>(() => filter.OnConnectedAsync(
@@ -72,7 +72,7 @@ public class SyncV2HubTests(TestDatabase db) : IClassFixture<TestDatabase>
             new UserSettings { UserId = deleted, Salt = "salt", DeletedAt = 1 },
             new UserSettings { UserId = live, Salt = "salt" }]);
         var services = new ServiceCollection().AddSingleton<ISyncItemsRepositoryAccessor>(scope.Repositories).BuildServiceProvider();
-        var filter = new SyncAuthorizationHubFilter();
+        var filter = new SyncAuthorizationHubFilter(NullLogger<SyncAuthorizationHubFilter>.Instance);
         var connected = new List<string>();
         Task Connect(string userId) => filter.OnConnectedAsync(new HubLifetimeContext(SyncCaller(userId), services, Hub(userId)), (_) => { connected.Add(userId); return Task.CompletedTask; });
 
@@ -90,7 +90,7 @@ public class SyncV2HubTests(TestDatabase db) : IClassFixture<TestDatabase>
         var scope = db.CreateScope();
         await scope.Repositories.UsersSettings.Collection.InsertOneAsync(new UserSettings { UserId = userId, Salt = "salt" });
         var services = new ServiceCollection().AddSingleton<ISyncItemsRepositoryAccessor>(scope.Repositories).BuildServiceProvider();
-        var filter = new SyncAuthorizationHubFilter();
+        var filter = new SyncAuthorizationHubFilter(NullLogger<SyncAuthorizationHubFilter>.Instance);
         var caller = SyncCaller(userId);
         var invoked = 0;
         ValueTask<object?> Invoke() => filter.InvokeMethodAsync(

@@ -149,7 +149,7 @@ public class UserResetTests(TestDatabase db) : IClassFixture<TestDatabase>
         var userId = await CreateUserAsync();
         var scope = db.CreateScope();
         var services = new ServiceCollection().AddSingleton<ISyncItemsRepositoryAccessor>(scope.Repositories).BuildServiceProvider();
-        var filter = new SyncAuthorizationHubFilter();
+        var filter = new SyncAuthorizationHubFilter(NullLogger<SyncAuthorizationHubFilter>.Instance);
         var caller = new HubCaller(userId);
         await filter.OnConnectedAsync(new HubLifetimeContext(caller, services, Hub(scope, caller)), (_) => Task.CompletedTask);
 

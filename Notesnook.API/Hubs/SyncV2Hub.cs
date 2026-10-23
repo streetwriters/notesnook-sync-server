@@ -21,6 +21,7 @@ using System;
 using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Security.Claims;
@@ -91,7 +92,16 @@ namespace Notesnook.API.Hubs
             {
                 Logger.LogInformation("Connection {ConnectionId} disconnected cleanly (client-initiated)", Context.ConnectionId);
             }
-            await base.OnDisconnectedAsync(exception);
+            // HubConnectionHandler's own logging is turned off in appsettings.json (see SyncAuthorizationHubFilter)
+            try
+            {
+                await base.OnDisconnectedAsync(exception);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "OnDisconnectedAsync failed for connection {ConnectionId}", Context.ConnectionId);
+                throw;
+            }
         }
 
 
@@ -334,9 +344,17 @@ namespace Notesnook.API.Hubs
                     Synced = true,
                 };
             }
-            catch
+            catch (Exception ex)
             {
-                SyncEventCounterSource.Log.FetchV2Failed();
+                SyncEventCounterSource.Log.FetchV2Failed(ex switch
+                {
+                    _ when Context.ConnectionAborted.IsCancellationRequested => "disconnected",
+                    IOException or OperationCanceledException => "disconnected",
+                    TimeoutException => "timeout",
+                    // the client threw while handling what we sent, or acked it with false
+                    HubException => "client_error",
+                    _ => "server_error",
+                });
                 throw;
             }
             finally

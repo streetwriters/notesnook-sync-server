@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 using System.Diagnostics.Tracing;
 
@@ -22,7 +23,7 @@ public sealed class SyncEventCounterSource : EventSource
         pushCounter = meter.CreateCounter<int>("sync.pushes", "pushes", "Total pushes");
         fetchV2Counter = meter.CreateCounter<int>("sync.v2.fetches", "fetches", "Total v2 fetches");
         pushV2Counter = meter.CreateCounter<int>("sync.v2.pushes", "pushes", "Total v2 pushes");
-        fetchV2Failures = meter.CreateCounter<int>("sync.v2.fetch_failures", "fetches", "Fetches that threw, including chunks the client rejected");
+        fetchV2Failures = meter.CreateCounter<int>("sync.v2.fetch_failures", "fetches", "Fetches that threw, by reason: disconnected, timeout, client_error or server_error");
         fetchV2Duration = meter.CreateHistogram<long>("sync.v2.fetch_duration");
         pushV2Duration = meter.CreateHistogram<long>("sync.v2.push_duration");
         // no unit, which the Prometheus exporter would append to the name the alert rule uses
@@ -31,7 +32,7 @@ public sealed class SyncEventCounterSource : EventSource
 
     public void Fetch() => fetchCounter.Add(1);
     public void FetchV2() => fetchV2Counter.Add(1);
-    public void FetchV2Failed() => fetchV2Failures.Add(1);
+    public void FetchV2Failed(string reason) => fetchV2Failures.Add(1, new KeyValuePair<string, object?>("reason", reason));
     public void PushV2() => pushV2Counter.Add(1);
     public void Push() => pushCounter.Add(1);
     public void RecordFetchDuration(long durationMs) => fetchV2Duration.Record(durationMs);
