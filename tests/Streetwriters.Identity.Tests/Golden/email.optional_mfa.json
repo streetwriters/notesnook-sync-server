@@ -22,8 +22,6 @@
           "iss": "http://localhost",
           "jti": "<id>",
           "nbf": "<time>",
-          "notesnook:status": "believer",
-          "role": "notesnook",
           "scope": [
             "auth:grant_types:mfa_password"
           ],

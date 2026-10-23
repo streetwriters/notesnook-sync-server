@@ -23,6 +23,7 @@ using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using IdentityModel;
+using IdentityServer4;
 using IdentityServer4.Models;
 using IdentityServer4.Services;
 using Microsoft.AspNetCore.Identity;
@@ -43,6 +44,9 @@ namespace Streetwriters.Identity.Services
 
         public async Task GetProfileDataAsync(ProfileDataRequestContext context)
         {
+            // step tokens are readable by anyone signing in, and must not tell registered and unregistered users apart
+            if (IsStep(context.RequestedResources?.RawScopeValues)) return;
+
             User? user = await UserManager.GetUserAsync(context.Subject);
             if (user == null) return;
 
@@ -56,7 +60,15 @@ namespace Streetwriters.Identity.Services
         public async Task IsActiveAsync(IsActiveContext context)
         {
             // deleted users must not be able to refresh or introspect their tokens
-            context.IsActive = await UserManager.GetUserAsync(context.Subject) != null;
+            context.IsActive = await UserManager.GetUserAsync(context.Subject) != null
+                // unregistered users go through the email and mfa steps like registered ones (see GrantService)
+                || context.Caller == IdentityServerConstants.ProfileIsActiveCallers.ExtensionGrantValidation
+                || IsStep(context.Subject.FindAll(JwtClaimTypes.Scope).Select((c) => c.Value));
+        }
+
+        private static bool IsStep(IEnumerable<string>? scopes)
+        {
+            return scopes != null && scopes.Any() && scopes.All((scope) => scope == Config.MFA_GRANT_TYPE_SCOPE || scope == Config.MFA_PASSWORD_GRANT_TYPE_SCOPE);
         }
     }
 }

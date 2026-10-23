@@ -5,8 +5,6 @@ using System.Security.Claims;
 using System.Text.Json;
 using System.Threading.Tasks;
 using AspNetCore.Identity.Mongo.Model;
-using IdentityServer4;
-using IdentityServer4.Stores;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -24,7 +22,7 @@ using Streetwriters.Identity.Models;
 
 namespace Streetwriters.Identity.Services
 {
-    public class UserAccountService(UserManager<User> userManager, IMFAService mfaService, IPersistedGrantStore persistedGrantStore, RoleManager<MongoRole> roleManager, EmailAddressValidator emailValidator, ITemplatedEmailSender emailSender, ITokenGenerationService tokenGenerationService, ILogger<UserAccountService> logger) : IUserAccountService
+    public class UserAccountService(UserManager<User> userManager, IMFAService mfaService, ISessionStore sessionStore, RoleManager<MongoRole> roleManager, EmailAddressValidator emailValidator, ITemplatedEmailSender emailSender, ITokenIssuer tokenIssuer, ILogger<UserAccountService> logger) : IUserAccountService
     {
         public async Task<UserModel?> GetUserAsync(string clientId, string userId)
         {
@@ -61,7 +59,7 @@ namespace Streetwriters.Identity.Services
             if (!await userManager.CheckPasswordAsync(user, password)) throw new Exception("Wrong password.");
 
             await userManager.DeleteAsync(user);
-            await persistedGrantStore.RemoveAllAsync(new PersistedGrantFilter { SubjectId = userId });
+            await sessionStore.EndAllSessionsAsync(userId);
         }
 
         public async Task<bool> ChangePasswordAsync(string userId, string oldPassword, string newPassword)
@@ -109,19 +107,9 @@ namespace Streetwriters.Identity.Services
             var user = await userManager.FindByIdAsync(userId) ?? throw new Exception("User not found.");
             if (!await UserService.IsUserValidAsync(userManager, user, client.Id)) throw new Exception($"Unable to find user with ID '{user.Id}'.");
 
-            var grants = await persistedGrantStore.GetAllAsync(new PersistedGrantFilter
-            {
-                ClientId = client.Id,
-                SubjectId = user.Id.ToString()
-            });
-            string? refreshTokenKey = refreshToken != null ? GetHashedKey(refreshToken, IdentityServerConstants.PersistedGrantTypes.RefreshToken) : null;
-            List<string> removedKeys = [];
-            foreach (var grant in grants)
-            {
-                if (!all && (grant.Data.Contains(jti) || grant.Key == refreshTokenKey)) continue;
-                await persistedGrantStore.RemoveAsync(grant.Key);
-                removedKeys.Add(grant.Key);
-            }
+            var removedKeys = all
+                ? await sessionStore.EndSessionsAsync(client.Id, user.Id.ToString(), null, null)
+                : await sessionStore.EndSessionsAsync(client.Id, user.Id.ToString(), jti, refreshToken);
 
             await WampServers.NotesnookServer.PublishMessageAsync(IdentityServerTopics.ClearCacheTopic, new ClearCacheMessage(removedKeys));
             await WampServers.MessengerServer.PublishMessageAsync(IdentityServerTopics.ClearCacheTopic, new ClearCacheMessage(removedKeys));
@@ -197,13 +185,13 @@ namespace Streetwriters.Identity.Services
                     }
                 }
 
-                var response = await tokenGenerationService.CreateUserTokensAsync(user, client.Id, 3600);
+                var response = await tokenIssuer.IssueUserTokensAsync(user, client.Id, 3600);
                 if (response == null) return SignupResponse.Error(["Failed  to generate access token."]);
 
                 return new SignupResponse
                 {
                     AccessToken = response.AccessToken,
-                    AccessTokenLifetime = response.AccessTokenLifetime,
+                    AccessTokenLifetime = response.ExpiresIn,
                     RefreshToken = response.RefreshToken,
                     Scope = response.Scope,
                     UserId = user.Id.ToString()
@@ -224,10 +212,6 @@ namespace Streetwriters.Identity.Services
         {
             if (string.IsNullOrEmpty(userAgent)) return "unknown";
             return userAgent.Contains("okhttp/") ? "android" : userAgent.Contains("Darwin/") || userAgent.Contains("CFNetwork/") ? "ios" : "web";
-        }
-        private static string GetHashedKey(string value, string grantType)
-        {
-            return (value + ":" + grantType).Sha256();
         }
     }
 }

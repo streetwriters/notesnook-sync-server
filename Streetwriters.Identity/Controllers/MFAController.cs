@@ -35,13 +35,12 @@ using Streetwriters.Common.Models;
 using Streetwriters.Identity.Interfaces;
 using Streetwriters.Identity.Models;
 using Streetwriters.Identity.Services;
-using static IdentityServer4.IdentityServerConstants;
 
 namespace Streetwriters.Identity.Controllers
 {
     [ApiController]
     [Route("mfa")]
-    [Authorize(LocalApi.PolicyName)]
+    [Authorize(Config.ACCOUNT_API_POLICY)]
     public class MFAController : IdentityControllerBase
     {
         public MFAController(UserManager<User> _userManager, ITemplatedEmailSender _emailSender,
@@ -96,7 +95,7 @@ namespace Streetwriters.Identity.Controllers
 
         [HttpPost("send")]
         [Authorize("mfa")]
-        [Authorize(LocalApi.PolicyName)]
+        [Authorize(Config.ACCOUNT_API_POLICY)]
         [EnableRateLimiting("super_strict")]
         public async Task<IActionResult> RequestCode([FromForm] string type)
         {

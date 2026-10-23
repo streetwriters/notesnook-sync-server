@@ -17,62 +17,32 @@ You should have received a copy of the Affero GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Text.Json;
 using System.Threading.Tasks;
-using IdentityModel;
 using IdentityServer4.Models;
-using IdentityServer4.Stores;
 using IdentityServer4.Validation;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Identity;
-using Ng.Services;
 using Streetwriters.Common;
-using Streetwriters.Common.Enums;
-using Streetwriters.Common.Models;
 using Streetwriters.Identity.Interfaces;
-using Streetwriters.Identity.Models;
-using static IdentityModel.OidcConstants;
+using Streetwriters.Identity.Services;
 
 namespace Streetwriters.Identity.Validation
 {
-    public class MFAGrantValidator : IExtensionGrantValidator
+    public class MFAGrantValidator(GrantService grants, IHttpContextAccessor httpContextAccessor, ITokenValidator tokenValidator, ITokenGenerationService tokenGenerationService) : IExtensionGrantValidator
     {
-        private UserManager<User> UserManager { get; set; }
-        private SignInManager<User> SignInManager { get; set; }
-        private IMFAService MFAService { get; set; }
-        private IHttpContextAccessor HttpContextAccessor { get; set; }
-        private ITokenValidator TokenValidator { get; set; }
-        private ITokenGenerationService TokenGenerationService { get; set; }
-        private ITemplatedEmailSender EmailSender { get; set; }
-        public MFAGrantValidator(UserManager<User> userManager, SignInManager<User> signInManager, IMFAService mfaService, IHttpContextAccessor httpContextAccessor, ITokenValidator tokenValidator, ITokenGenerationService tokenGenerationService, ITemplatedEmailSender emailSender)
-        {
-            UserManager = userManager;
-            SignInManager = signInManager;
-            MFAService = mfaService;
-            HttpContextAccessor = httpContextAccessor;
-            TokenValidator = tokenValidator;
-            TokenGenerationService = tokenGenerationService;
-            EmailSender = emailSender;
-        }
-
         public string GrantType => Config.MFA_GRANT_TYPE;
 
         public async Task ValidateAsync(ExtensionGrantValidationContext context)
         {
             context.Result = new GrantValidationResult(TokenRequestErrors.InvalidGrant);
 
-            var httpContext = HttpContextAccessor.HttpContext;
+            var httpContext = httpContextAccessor.HttpContext;
             if (httpContext == null) return;
 
             var tokenResult = BearerTokenValidator.ValidateAuthorizationHeader(httpContext);
             if (!tokenResult.TokenFound) return;
 
-            var tokenValidationResult = await TokenValidator.ValidateAccessTokenAsync(tokenResult.Token, Config.MFA_GRANT_TYPE_SCOPE);
+            var tokenValidationResult = await tokenValidator.ValidateAccessTokenAsync(tokenResult.Token, Config.MFA_GRANT_TYPE_SCOPE);
             if (tokenValidationResult.IsError) return;
 
             var client = Clients.FindClientById(context.Request.ClientId);
@@ -83,65 +53,10 @@ namespace Streetwriters.Identity.Validation
             }
 
             var userId = tokenValidationResult.Claims.GetClaimValue("sub");
-            var mfaCode = context.Request.Raw["mfa:code"];
-            var mfaMethod = context.Request.Raw["mfa:method"];
-
             if (string.IsNullOrEmpty(userId)) return;
 
-            var user = await UserManager.FindByIdAsync(userId);
-            if (user == null) return;
-
-            var isLockedOut = await UserManager.IsLockedOutAsync(user);
-            if (isLockedOut)
-            {
-                var timeLeft = user.LockoutEnd - DateTimeOffset.Now;
-                context.Result = new LockedOutValidationResult(timeLeft);
-                return;
-            }
-
-            context.Result.Error = "invalid_mfa";
-            context.Result.ErrorDescription = "Please provide a valid multi-factor authentication code.";
-
-            if (string.IsNullOrEmpty(mfaCode)) return;
-            if (string.IsNullOrEmpty(mfaMethod) || (!MFAService.IsValidMFAMethod(mfaMethod, user) && mfaMethod != MFAMethods.RecoveryCode))
-            {
-                context.Result.ErrorDescription = "Please provide a valid multi-factor authentication method.";
-                return;
-            }
-
-            if (mfaMethod == MFAMethods.RecoveryCode)
-            {
-                context.Result.ErrorDescription = "Please provide a valid multi-factor authentication recovery code.";
-
-                var result = await UserManager.RedeemTwoFactorRecoveryCodeAsync(user, mfaCode);
-                if (!result.Succeeded)
-                {
-                    await UserManager.AccessFailedAsync(user);
-                    await EmailSender.SendFailedLoginAlertAsync(user.Email, httpContext.GetClientInfo(), client).ConfigureAwait(false);
-                    return;
-                }
-            }
-            else
-            {
-                if (!await MFAService.VerifyOTPAsync(user, mfaCode, mfaMethod))
-                {
-                    await UserManager.AccessFailedAsync(user);
-                    await EmailSender.SendFailedLoginAlertAsync(user.Email, httpContext.GetClientInfo(), client).ConfigureAwait(false);
-                    return;
-                }
-            }
-
-            // This must be done after the MFA code is verified
-            // otherwise the security stamp will be updated
-            // making all the 2FA code invalid.
-            // Old clients don't support optional 2FA so we keep enforcing it for them.
-            var supportsOptionalMFA = context.Request.Raw["mfa:optional"] == "true";
-            if (!supportsOptionalMFA && !await UserManager.GetTwoFactorEnabledAsync(user))
-                await MFAService.EnableMFAAsync(user, MFAMethods.Email);
-
-            await UserManager.ResetAccessFailedCountAsync(user);
-            context.Result.IsError = false;
-            context.Result.Subject = await TokenGenerationService.TransformTokenRequestAsync(context.Request, user, GrantType, [Config.MFA_PASSWORD_GRANT_TYPE_SCOPE]);
+            var result = await grants.MFAAsync(userId, client, context.Request.Raw["mfa:code"], context.Request.Raw["mfa:method"], context.Request.Raw["mfa:optional"] == "true", httpContext);
+            await result.ApplyAsync(context, tokenGenerationService);
         }
     }
 }
