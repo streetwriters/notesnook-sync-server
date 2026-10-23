@@ -31,6 +31,9 @@ namespace Streetwriters.Identity
 {
     public class Program
     {
+        // metrics for Prometheus on the internal network; Traefik only routes to the server port
+        public const int MetricsPort = 5068;
+
         public static async Task Main(string[] args)
         {
 #if (DEBUG || STAGING)
@@ -58,6 +61,7 @@ namespace Streetwriters.Identity
                         options.Limits.MaxRequestBodySize = long.MaxValue;
                         options.ListenAnyIP(Servers.IdentityServer.Port);
                         options.ListenAnyIP(WampServers.IdentityServer.Port);
+                        options.ListenAnyIP(MetricsPort);
                         if (Servers.IdentityServer.IsSecure && Servers.IdentityServer.SSLCertificate != null)
                         {
                             options.ListenAnyIP(443, listenerOptions =>
