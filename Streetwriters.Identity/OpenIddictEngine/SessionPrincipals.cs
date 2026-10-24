@@ -52,10 +52,13 @@ namespace Streetwriters.Identity.OpenIddictEngine
         }
 
         /// <summary>The identity for a refreshed session: the user's current roles and claims, with how and when they signed in.</summary>
-        public Task<ClaimsPrincipal> RefreshAsync(User user, ClaimsPrincipal session)
+        public async Task<ClaimsPrincipal> RefreshAsync(User user, ClaimsPrincipal session)
         {
             var authenticationTime = long.TryParse(session.GetClaim(AuthenticationTimeClaim), out var time) ? time : (long?)null;
-            return CreateAsync(user, session.GetScopes(), session.GetClaims(AuthenticationMethodClaim), authenticationTime);
+            var principal = await CreateAsync(user, session.GetScopes(), session.GetClaims(AuthenticationMethodClaim), authenticationTime);
+            // OpenIddict would carry over a session's own lifetime (signup's is an hour); IdentityServer4 gave refreshes the client's
+            principal.SetAccessTokenLifetime(OpenIddictEngineExtensions.AccessTokenLifetime);
+            return principal;
         }
     }
 }

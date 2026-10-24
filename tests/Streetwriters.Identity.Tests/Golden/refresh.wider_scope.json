@@ -1,0 +1,15 @@
+{
+  "status": 200,
+  "headers": {
+    "Content-Type": "application/json; charset=UTF-8",
+    "Cache-Control": "no-store, no-cache, max-age=0",
+    "Pragma": "no-cache"
+  },
+  "body": {
+    "access_token": "<opaque>",
+    "expires_in": 21600,
+    "refresh_token": "<opaque>",
+    "scope": "IdentityServerApi notesnook.sync offline_access",
+    "token_type": "Bearer"
+  }
+}

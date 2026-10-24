@@ -382,6 +382,40 @@ public abstract class TokenContractTests(IdentityHost host) : IdentityTestBase(h
     }
 
     [Fact]
+    public async Task Refresh_with_the_scope_the_apps_send()
+    {
+        // packages/core's TokenManager refreshes with the scope of the token it has, and keeps the one it gets back
+        var email = NewEmail();
+        var signup = await SignupAsync(email);
+        var response = await RefreshAsync(signup.RefreshToken, signup.Scope);
+        Golden.AssertMatches("refresh.signup", await Golden.SnapshotAsync(response));
+        var body = await ReadAsync(response);
+        await TokensAsync(await RefreshAsync(Token(body, "refresh_token"), Token(body, "scope")));
+
+        foreach (var (name, login) in new[] { ("refresh.client_scope", await PasswordGrantAsync(email, Password)), ("refresh.client_scope.no_scope", await TokenAsync(new() { ["grant_type"] = "password", ["client_id"] = ClientId, ["username"] = email, ["password"] = Password })) })
+        {
+            body = await ReadAsync(login);
+            response = await RefreshAsync(Token(body, "refresh_token"), Token(body, "scope"));
+            Golden.AssertMatches(name, await Golden.SnapshotAsync(response));
+            body = await ReadAsync(response);
+            await TokensAsync(await RefreshAsync(Token(body, "refresh_token"), Token(body, "scope")));
+        }
+    }
+
+    [Fact]
+    public async Task Refresh_with_other_scopes()
+    {
+        var email = NewEmail();
+        await SignupAsync(email);
+        var (_, refresh) = await LoginAsync(email);
+        await Golden.AssertMatchesAsync("refresh.narrower_scope", await RefreshAsync(refresh, "notesnook.sync offline_access"));
+        (_, refresh) = await LoginAsync(email);
+        await Golden.AssertMatchesAsync("refresh.wider_scope", await RefreshAsync(refresh, "notesnook.sync offline_access IdentityServerApi openid mfa"));
+        (_, refresh) = await LoginAsync(email);
+        await Golden.AssertMatchesAsync("refresh.unknown_scope", await RefreshAsync(refresh, "notesnook.sync offline_access admin"));
+    }
+
+    [Fact]
     public async Task Refresh_rejects_unknown_token()
     {
         await Golden.AssertMatchesAsync("refresh.unknown", await RefreshAsync("ABCDEF"));

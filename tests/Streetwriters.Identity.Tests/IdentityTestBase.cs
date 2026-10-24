@@ -59,8 +59,13 @@ public abstract class IdentityTestBase
             ["password"] = password,
         }.Concat(extra.Select((e) => KeyValuePair.Create(e.Key, e.Value))).ToDictionary());
 
-    protected Task<HttpResponseMessage> RefreshAsync(string refreshToken) =>
-        TokenAsync(new() { ["grant_type"] = "refresh_token", ["client_id"] = ClientId, ["refresh_token"] = refreshToken });
+    /// <param name="scope">The scope to request; the apps send the scope of the token they're refreshing.</param>
+    protected Task<HttpResponseMessage> RefreshAsync(string refreshToken, string? scope = null)
+    {
+        var form = new Dictionary<string, string> { ["grant_type"] = "refresh_token", ["client_id"] = ClientId, ["refresh_token"] = refreshToken };
+        if (scope != null) form["scope"] = scope;
+        return TokenAsync(form);
+    }
 
     protected Task<HttpResponseMessage> EmailGrantAsync(string email, bool optionalMFA = false)
     {

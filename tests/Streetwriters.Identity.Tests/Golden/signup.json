@@ -3,6 +3,6 @@
   "access_token": "<opaque>",
   "expires_in": 3600,
   "refresh_token": "<opaque>",
-  "scope": "notesnook.sync openid IdentityServerApi mfa offline_access",
+  "scope": "IdentityServerApi mfa notesnook.sync offline_access openid",
   "user_id": "<objectid>"
 }
