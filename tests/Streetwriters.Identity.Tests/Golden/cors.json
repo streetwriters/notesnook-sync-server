@@ -1,0 +1,51 @@
+{
+  "token.preflight": {
+    "status": 204,
+    "Access-Control-Allow-Headers": "content-type",
+    "Access-Control-Allow-Methods": "POST",
+    "Access-Control-Allow-Origin": "*"
+  },
+  "token.preflight.bearer": {
+    "status": 204,
+    "Access-Control-Allow-Headers": "authorization,content-type",
+    "Access-Control-Allow-Methods": "POST",
+    "Access-Control-Allow-Origin": "*"
+  },
+  "token": {
+    "status": 200,
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Expose-Headers": "X-Object-Size,Content-Length,Retry-After"
+  },
+  "token.error": {
+    "status": 400,
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Expose-Headers": "X-Object-Size,Content-Length,Retry-After"
+  },
+  "token.mfa_required": {
+    "status": 400,
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Expose-Headers": "X-Object-Size,Content-Length,Retry-After"
+  },
+  "introspect.preflight": {
+    "status": 204,
+    "Access-Control-Allow-Headers": "authorization,content-type",
+    "Access-Control-Allow-Methods": "POST",
+    "Access-Control-Allow-Origin": "*"
+  },
+  "account.preflight": {
+    "status": 204,
+    "Access-Control-Allow-Headers": "authorization",
+    "Access-Control-Allow-Methods": "GET",
+    "Access-Control-Allow-Origin": "*"
+  },
+  "account": {
+    "status": 200,
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Expose-Headers": "X-Object-Size,Content-Length,Retry-After"
+  },
+  "account.unauthorized": {
+    "status": 401,
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Expose-Headers": "X-Object-Size,Content-Length,Retry-After"
+  }
+}

@@ -503,6 +503,22 @@ public abstract class TokenContractTests(IdentityHost host) : IdentityTestBase(h
     }
 
     [Fact]
+    public async Task Account_api_reads_the_scheme_in_any_case()
+    {
+        var email = NewEmail();
+        await SignupAsync(email);
+        var (access, _) = await LoginAsync(email);
+        var statuses = new JsonObject();
+        foreach (var scheme in new[] { "Bearer", "bearer", "BEARER" })
+        {
+            var request = new HttpRequestMessage(HttpMethod.Get, "/account");
+            request.Headers.TryAddWithoutValidation("Authorization", $"{scheme} {access}");
+            statuses[scheme] = (int)(await client.SendAsync(request)).StatusCode;
+        }
+        Golden.AssertMatches("account.scheme_case", statuses);
+    }
+
+    [Fact]
     public async Task Logout_revokes_the_session()
     {
         var email = NewEmail();

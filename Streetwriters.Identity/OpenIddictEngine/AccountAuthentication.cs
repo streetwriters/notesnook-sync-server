@@ -17,6 +17,7 @@ You should have received a copy of the Affero GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+using System;
 using System.Linq;
 using System.Text.Encodings.Web;
 using System.Threading.Tasks;
@@ -40,7 +41,8 @@ namespace Streetwriters.Identity.OpenIddictEngine
         protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
         {
             var header = Request.Headers.Authorization.FirstOrDefault();
-            if (header == null || !header.StartsWith("Bearer ")) return AuthenticateResult.NoResult();
+            // in any case, as IdentityServer4 read it
+            if (header == null || !header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)) return AuthenticateResult.NoResult();
 
             var principal = await accessTokens.ValidateAsync(header["Bearer ".Length..].Trim());
             if (principal == null || !principal.HasScope(Scope)) return AuthenticateResult.Fail("Invalid access token.");
