@@ -128,10 +128,16 @@ public abstract class AppRequestTests(IdentityHost host) : IdentityTestBase(host
             ["password"] = Password,
             ["verification_code"] = "000000"
         }, access));
-        // debug builds answer with the reset link, whose code is new each time
-        var recover = await Golden.SnapshotAsync(await AppAsync(HttpMethod.Post, "/account/recover", new() { ["email"] = email, ["client_id"] = "notesnook" }));
-        recover["body"] = System.Text.RegularExpressions.Regex.Replace(recover["body"]!.ToString(), "code=[^&\"]+", "code=<code>");
-        Golden.AssertMatches("app.recover", recover);
+        // debug and staging builds answer with the reset link, release builds email it
+        var recover = await AppAsync(HttpMethod.Post, "/account/recover", new() { ["email"] = email, ["client_id"] = "notesnook" });
+        Assert.Equal(HttpStatusCode.OK, recover.StatusCode);
+        var link = await recover.Content.ReadAsStringAsync();
+#if DEBUG
+        Assert.Matches(@"/account/confirm\?userId=[0-9a-f]{24}&code=[^&]+&clientId=notesnook&type=RESET_PASSWORD$", link);
+#else
+        Assert.Empty(link);
+        Assert.Contains(host.Emails.Calls, (c) => c.Method == nameof(Interfaces.ITemplatedEmailSender.SendPasswordResetEmailAsync) && ((string)c.Args[1]!).StartsWith("https://auth.example.com/account/confirm?"));
+#endif
     }
 
     [Fact]

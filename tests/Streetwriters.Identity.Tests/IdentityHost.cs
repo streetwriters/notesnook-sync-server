@@ -43,6 +43,8 @@ static class TestEnvironment
         Environment.SetEnvironmentVariable("SELF_HOSTED", "1");
         Environment.SetEnvironmentVariable("IDENTITY_SERVER_HOST", "localhost");
         Environment.SetEnvironmentVariable("IDENTITY_SERVER_PORT", "80");
+        // release builds put it in the links they email
+        Environment.SetEnvironmentVariable("IDENTITY_SERVER_URL", "https://auth.example.com");
         Environment.SetEnvironmentVariable("NOTESNOOK_SERVER_HOST", "127.0.0.1");
         Environment.SetEnvironmentVariable("NOTESNOOK_WAMP_PORT", NotesnookWampPort.ToString());
         Environment.SetEnvironmentVariable("SSE_SERVER_HOST", "127.0.0.1");
