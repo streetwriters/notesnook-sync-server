@@ -17,11 +17,13 @@ You should have received a copy of the Affero GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using MongoDB.Driver;
 using OpenIddict.Abstractions;
 using static OpenIddict.Abstractions.OpenIddictConstants;
 
@@ -56,11 +58,38 @@ namespace Streetwriters.Identity.OpenIddictEngine
 
         public async Task StartAsync(CancellationToken cancellationToken)
         {
+            // instances start together on deploys: one creates or updates the client, and the others find it done
+            for (var attempt = 1; ; attempt++)
+            {
+                try
+                {
+                    await RegisterAsync(cancellationToken);
+                    return;
+                }
+                catch (Exception e) when (attempt < 5 && e is OpenIddictExceptions.ConcurrencyException or OpenIddictExceptions.ValidationException
+                    or MongoWriteException { WriteError.Category: ServerErrorCategory.DuplicateKey })
+                {
+                    await Task.Delay(TimeSpan.FromMilliseconds(100 * attempt), cancellationToken);
+                }
+            }
+        }
+
+        private async Task RegisterAsync(CancellationToken cancellationToken)
+        {
             await using var scope = services.CreateAsyncScope();
             var applications = scope.ServiceProvider.GetRequiredService<IOpenIddictApplicationManager>();
             var application = await applications.FindByClientIdAsync(Notesnook.ClientId!, cancellationToken);
-            if (application == null) await applications.CreateAsync(Notesnook, cancellationToken);
-            else await applications.UpdateAsync(application, Notesnook, cancellationToken);
+            if (application == null)
+            {
+                await applications.CreateAsync(Notesnook, cancellationToken);
+                return;
+            }
+
+            var current = new OpenIddictApplicationDescriptor();
+            await applications.PopulateAsync(current, application, cancellationToken);
+            var expected = Notesnook;
+            if (current.ClientType == expected.ClientType && current.DisplayName == expected.DisplayName && current.Permissions.SetEquals(expected.Permissions)) return;
+            await applications.UpdateAsync(application, expected, cancellationToken);
         }
 
         public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
