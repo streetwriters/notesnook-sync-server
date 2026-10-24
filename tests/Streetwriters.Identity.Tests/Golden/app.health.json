@@ -1,0 +1,9 @@
+{
+  "status": 200,
+  "headers": {
+    "Content-Type": "text/plain",
+    "Cache-Control": "no-store, no-cache",
+    "Pragma": "no-cache"
+  },
+  "body": "Healthy"
+}
