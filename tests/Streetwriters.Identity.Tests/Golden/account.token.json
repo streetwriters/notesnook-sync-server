@@ -6,6 +6,6 @@
   "body": {
     "access_token": "<opaque>",
     "expires_in": 1800,
-    "scope": "notesnook.sync IdentityServerApi auth:grant_types:mfa auth:grant_types:mfa_password"
+    "scope": "IdentityServerApi auth:grant_types:mfa auth:grant_types:mfa_password notesnook.sync"
   }
 }

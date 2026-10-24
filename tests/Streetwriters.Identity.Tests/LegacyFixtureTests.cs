@@ -121,7 +121,7 @@ public abstract class LegacyFixtureTests(IdentityHost host) : IdentityTestBase(h
         await File.WriteAllTextAsync(FixturePath(), fixture.ToJson(new JsonWriterSettings { OutputMode = JsonOutputMode.CanonicalExtendedJson, Indent = true }) + "\n");
     }
 
-    private sealed record Fixture(DateTime ExportedAt, Dictionary<string, BsonDocument> Sessions);
+    private sealed record Fixture(DateTime ExportedAt, Dictionary<string, BsonDocument> Sessions, List<BsonDocument> Grants);
 
     /// <summary>Puts the fixture's users and grants back as they were exported, and the clock just after the export.</summary>
     private async Task<Fixture> RestoreAsync(TimeSpan after)
@@ -150,7 +150,7 @@ public abstract class LegacyFixtureTests(IdentityHost host) : IdentityTestBase(h
 
         var exportedAt = fixture["exported_at"].ToUniversalTime();
         host.Clock.Set(exportedAt + after);
-        return new Fixture(exportedAt, fixture["sessions"].AsBsonDocument.ToDictionary((e) => e.Name, (e) => e.Value.AsBsonDocument));
+        return new Fixture(exportedAt, fixture["sessions"].AsBsonDocument.ToDictionary((e) => e.Name, (e) => e.Value.AsBsonDocument), [.. fixture["grants"].AsBsonArray.Select((g) => g.AsBsonDocument)]);
     }
 
     private static string Get(Fixture fixture, string session, string token) => fixture.Sessions[session][token].AsString;
@@ -172,6 +172,29 @@ public abstract class LegacyFixtureTests(IdentityHost host) : IdentityTestBase(h
         var fixture = await RestoreAsync(TimeSpan.FromMinutes(1));
         Assert.Equal(HttpStatusCode.OK, (await AccountAsync(HttpMethod.Get, "/account", Get(fixture, "fresh", "access_token"))).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await AccountAsync(HttpMethod.Get, "/account", Get(fixture, "password_reset", "access_token"))).StatusCode);
+    }
+
+    /// <summary>The scope the apps hold for the session: that of the last token they were given, in its order.</summary>
+    private static string ClientScope(Fixture fixture, string session)
+    {
+        var key = (Get(fixture, session, "refresh_token") + ":refresh_token").Sha256();
+        var grant = fixture.Grants.First((g) => g["Key"].AsString == key);
+        var data = System.Text.Json.Nodes.JsonNode.Parse(grant["Data"].AsString)!;
+        return string.Join(" ", data["AccessToken"]!["Claims"]!.AsArray().Where((c) => c!["Type"]!.GetValue<string>() == "scope").Select((c) => c!["Value"]!.GetValue<string>()));
+    }
+
+    [Fact]
+    public async Task Restored_refresh_tokens_refresh_with_the_scope_the_apps_send()
+    {
+        var fixture = await RestoreAsync(TimeSpan.FromMinutes(1));
+        foreach (var session in new[] { "fresh", "mfa", "signup", "rotated", "lost_response" })
+        {
+            var response = await RefreshAsync(Get(fixture, session, "refresh_token"), ClientScope(fixture, session));
+            Golden.AssertMatches($"legacy.{session}.refresh", await Golden.SnapshotAsync(response));
+            var body = await ReadAsync(response);
+            Assert.True(await IsActiveAsync(Token(body, "access_token")), session);
+            await TokensAsync(await RefreshAsync(Token(body, "refresh_token"), Token(body, "scope")));
+        }
     }
 
     [Fact]

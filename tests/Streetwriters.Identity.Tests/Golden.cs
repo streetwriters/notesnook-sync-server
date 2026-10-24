@@ -99,6 +99,9 @@ public static partial class Golden
 
     private static JsonNode NormalizeString(string s, string? key)
     {
+        // IdentityServer4 ordered the same scopes differently in different responses, and the apps only
+        // split them and test membership, so they compare as a set
+        if (key == "scope" && s.Contains(' ')) return string.Join(" ", s.Split(' ').Order(StringComparer.Ordinal));
         if (key != null && TokenKeys.Contains(key)) return DescribeToken(s);
         if (key != null && IdKeys.Contains(key)) return ObjectId().Replace(s, "") == "" ? "<objectid>" : "<id>";
         if (key != null && TimeKeys.Contains(key)) return "<time>";

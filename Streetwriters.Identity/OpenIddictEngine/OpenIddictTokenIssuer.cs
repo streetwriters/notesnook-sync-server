@@ -32,15 +32,15 @@ namespace Streetwriters.Identity.OpenIddictEngine
     /// <summary>Issues tokens outside the token endpoint (e.g. on signup, which comes over WAMP) by running OpenIddict's sign-in directly.</summary>
     public class OpenIddictTokenIssuer(IOpenIddictServerFactory factory, IOpenIddictServerDispatcher dispatcher, SessionPrincipals principals) : ITokenIssuer
     {
-        // the scope IdentityServer4 reported for these tokens: all of the client's allowed scopes, in their order
-        private const string ClientScopes = "notesnook.sync openid IdentityServerApi mfa offline_access";
+        // IdentityServer4 gave these sessions all of the client's allowed scopes, in their order; the apps send them back on refresh
+        private static readonly string[] ClientScopes = [OpenIddictEngineExtensions.SyncScope, Scopes.OpenId, AccountAuthenticationHandler.Scope, "mfa", Scopes.OfflineAccess];
 
         public async Task<IssuedTokens?> IssueUserTokensAsync(User user, string clientId, int lifetime)
         {
-            var principal = await principals.CreateAsync(user, [OpenIddictEngineExtensions.SyncScope, AccountAuthenticationHandler.Scope, Scopes.OfflineAccess], []);
+            var principal = await principals.CreateAsync(user, ClientScopes, []);
             principal.SetAccessTokenLifetime(TimeSpan.FromSeconds(lifetime));
             var response = await SignInAsync(principal, clientId);
-            return new IssuedTokens(response.AccessToken!, response.RefreshToken!, lifetime, ClientScopes);
+            return new IssuedTokens(response.AccessToken!, response.RefreshToken!, lifetime, string.Join(" ", ClientScopes));
         }
 
         public async Task<string> IssueAccessTokenAsync(User user, string clientId, int lifetime, string[] authenticationMethods)

@@ -38,6 +38,7 @@ namespace Streetwriters.Identity.OpenIddictEngine
     public static class OpenIddictEngineExtensions
     {
         public const string SyncScope = "notesnook.sync";
+        public static readonly TimeSpan AccessTokenLifetime = TimeSpan.FromHours(6);
 
         public static readonly string[] Scopes =
         [
@@ -68,7 +69,7 @@ namespace Streetwriters.Identity.OpenIddictEngine
                         .AllowCustomFlow(TokenController.LegacyRefreshGrantType);
                     options.RegisterScopes(Scopes);
 
-                    options.SetAccessTokenLifetime(TimeSpan.FromHours(6));
+                    options.SetAccessTokenLifetime(AccessTokenLifetime);
                     options.SetRefreshTokenLifetime(TimeSpan.FromDays(45));
                     // refresh tokens stay usable until their replacement is used, as with IdentityServer4 (see TokenController)
                     options.SetRefreshTokenReuseLeeway(TimeSpan.FromDays(45));
@@ -82,11 +83,17 @@ namespace Streetwriters.Identity.OpenIddictEngine
 
                     options.AddEventHandler(RecordIssuedTokens.Descriptor);
 
-                    // OpenIddict would reject refresh tokens IdentityServer4 issued, so they're refreshed by TokenController
                     options.AddEventHandler<ExtractTokenRequestContext>((builder) => builder
                         .UseInlineHandler((context) =>
                         {
-                            if (context.Request?.GrantType == GrantTypes.RefreshToken && LegacyGrants.IsLegacyHandle(context.Request.RefreshToken))
+                            if (context.Request?.GrantType != GrantTypes.RefreshToken) return default;
+
+                            // IdentityServer4 ignored the scope of refresh requests and kept the session's, and the apps
+                            // send whatever scope they were last given, which OpenIddict could reject (e.g. signup's "mfa")
+                            context.Request.Scope = null;
+
+                            // OpenIddict would reject refresh tokens IdentityServer4 issued, so they're refreshed by TokenController
+                            if (LegacyGrants.IsLegacyHandle(context.Request.RefreshToken))
                             {
                                 context.Request.GrantType = TokenController.LegacyRefreshGrantType;
                                 context.Request[TokenController.LegacyRefreshTokenParameter] = context.Request.RefreshToken;
