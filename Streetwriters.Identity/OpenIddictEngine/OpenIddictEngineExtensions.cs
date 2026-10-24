@@ -159,6 +159,7 @@ namespace Streetwriters.Identity.OpenIddictEngine
             services.TryAddSingleton(TimeProvider.System);
             services.AddHostedService<StoreIndexes>();
             services.AddHostedService<ClientRegistration>();
+            services.AddTransient<TokenPruner>();
             services.AddHostedService<TokenPruning>();
             services.AddSingleton((_) => new TokenRecords(database));
             services.AddSingleton((services) => new LegacyGrants(database, services.GetRequiredService<TimeProvider>()));
