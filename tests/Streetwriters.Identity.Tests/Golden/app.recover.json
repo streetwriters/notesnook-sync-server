@@ -1,0 +1,7 @@
+{
+  "status": 200,
+  "headers": {
+    "Content-Type": "text/plain; charset=utf-8"
+  },
+  "body": "http://localhost:<n>/account/confirm?userId=<objectid>&code=<code>&clientId=notesnook&type=RESET_PASSWORD"
+}
