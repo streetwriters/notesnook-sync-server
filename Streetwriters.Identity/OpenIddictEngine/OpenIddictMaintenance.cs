@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -28,6 +29,7 @@ using MongoDB.Driver;
 using OpenIddict.Abstractions;
 using OpenIddict.MongoDb;
 using OpenIddict.MongoDb.Models;
+using static OpenIddict.Abstractions.OpenIddictConstants;
 using Streetwriters.Identity.Legacy;
 
 namespace Streetwriters.Identity.OpenIddictEngine
@@ -72,12 +74,49 @@ namespace Streetwriters.Identity.OpenIddictEngine
         public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     }
 
-    /// <summary>Removes tokens and sessions that can no longer be used, as TokenCleanupJob did for IdentityServer4's grants.</summary>
+    /// <summary>
+    /// Removes tokens and sessions that can no longer be used, as TokenCleanupJob and IdentityServer4 did with its grants.
+    /// </summary>
+    /// <remarks>
+    /// OpenIddict's own pruning only removes tokens older than a threshold, which would have to be the
+    /// refresh tokens' 45 days, since a redeemed refresh token stays usable until its replacement is used
+    /// (see TokenController). That keeps every token of every refresh for 45 days.
+    /// </remarks>
+    public class TokenPruner(IOptionsMonitor<OpenIddictMongoDbOptions> options, IOpenIddictAuthorizationManager authorizations, TokenRecords records, LegacyGrants legacyGrants, TimeProvider timeProvider)
+    {
+        private const int BatchSize = 10_000;
+
+        // sessions are kept a day after their last token goes
+        private static readonly TimeSpan SessionGrace = TimeSpan.FromDays(1);
+
+        public async Task<(long Tokens, long Authorizations, long Grants)> PruneAsync(CancellationToken cancellationToken = default)
+        {
+            var tokens = options.CurrentValue.Database!.GetCollection<OpenIddictMongoDbToken>(options.CurrentValue.TokensCollectionName);
+            var filter = Builders<OpenIddictMongoDbToken>.Filter;
+            // expired, or ended (revoked when a session ends or a refresh token's replacement is used); redeemed
+            // tokens that haven't expired stay, being the replaced refresh tokens that still work
+            var unusable = filter.Or(
+                filter.Lt((t) => t.ExpirationDate, timeProvider.GetUtcNow().UtcDateTime),
+                filter.In((t) => t.Status, [Statuses.Revoked, Statuses.Rejected, Statuses.Inactive]));
+
+            long prunedTokens = 0;
+            while (true)
+            {
+                var ids = await tokens.Find(unusable).Project((t) => t.Id).Limit(BatchSize).ToListAsync(cancellationToken);
+                if (ids.Count == 0) break;
+                await records.RemoveAsync(ids.Select((id) => id.ToString()));
+                prunedTokens += (await tokens.DeleteManyAsync(filter.In((t) => t.Id, ids), cancellationToken)).DeletedCount;
+            }
+
+            var prunedAuthorizations = await authorizations.PruneAsync(timeProvider.GetUtcNow() - SessionGrace, cancellationToken);
+            // IdentityServer4's grants, and the copies of OpenIddict's, which TokenCleanupJob removed until the switch
+            var prunedGrants = await legacyGrants.RemoveExpiredAsync();
+            return (prunedTokens, prunedAuthorizations, prunedGrants);
+        }
+    }
+
     public class TokenPruning(IServiceProvider services, TimeProvider timeProvider, ILogger<TokenPruning> logger) : BackgroundService
     {
-        // past the longest lifetime (a refresh token's 45 days), so nothing that could still be used goes
-        private static readonly TimeSpan Age = TimeSpan.FromDays(46);
-
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             using var timer = new PeriodicTimer(TimeSpan.FromHours(12), timeProvider);
@@ -86,11 +125,7 @@ namespace Streetwriters.Identity.OpenIddictEngine
                 try
                 {
                     await using var scope = services.CreateAsyncScope();
-                    var threshold = timeProvider.GetUtcNow() - Age;
-                    var tokens = await scope.ServiceProvider.GetRequiredService<IOpenIddictTokenManager>().PruneAsync(threshold, stoppingToken);
-                    var authorizations = await scope.ServiceProvider.GetRequiredService<IOpenIddictAuthorizationManager>().PruneAsync(threshold, stoppingToken);
-                    // IdentityServer4's grants, and the copies of OpenIddict's, which TokenCleanupJob removed until the switch
-                    var grants = await scope.ServiceProvider.GetRequiredService<LegacyGrants>().RemoveExpiredAsync();
+                    var (tokens, authorizations, grants) = await scope.ServiceProvider.GetRequiredService<TokenPruner>().PruneAsync(stoppingToken);
                     logger.LogInformation("Pruned {Tokens} tokens, {Authorizations} authorizations and {Grants} IdentityServer4 grants", tokens, authorizations, grants);
                 }
                 catch (Exception e) when (e is not OperationCanceledException)

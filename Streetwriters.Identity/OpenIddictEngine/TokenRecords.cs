@@ -66,6 +66,8 @@ namespace Streetwriters.Identity.OpenIddictEngine
 
         public Task AddAsync(TokenRecord record) => records.ReplaceOneAsync((r) => r.TokenId == record.TokenId, record, new ReplaceOptions { IsUpsert = true });
 
+        public Task RemoveAsync(IEnumerable<string> tokenIds) => records.DeleteManyAsync(Builders<TokenRecord>.Filter.In((r) => r.TokenId, tokenIds));
+
         public async Task<TokenRecord?> FindAsync(string tokenId) => await records.Find((r) => r.TokenId == tokenId).FirstOrDefaultAsync();
 
         public async Task<TokenRecord?> FindByJtiAsync(string jti) => await records.Find((r) => r.Jti == jti).FirstOrDefaultAsync();
