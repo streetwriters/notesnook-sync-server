@@ -36,6 +36,7 @@ namespace Streetwriters.Identity.Services
 
         public Task<UserModel?> GetUserAsync(string clientId, string userId) => WithServiceAsync((s) => s.GetUserAsync(clientId, userId));
         public Task DeleteUserAsync(string clientId, string userId, string password) => WithServiceAsync(async (s) => { await s.DeleteUserAsync(clientId, userId, password); return true; });
+        public Task UnregisterUserAsync(string clientId, string userId) => WithServiceAsync(async (s) => { await s.UnregisterUserAsync(clientId, userId); return true; });
         public Task<bool> ChangePasswordAsync(string userId, string oldPassword, string newPassword) => WithServiceAsync((s) => s.ChangePasswordAsync(userId, oldPassword, newPassword));
         public Task<bool> ResetPasswordAsync(string userId, string newPassword) => WithServiceAsync((s) => s.ResetPasswordAsync(userId, newPassword));
         public Task<bool> VerifyPasswordAsync(string userId, string password) => WithServiceAsync((s) => s.VerifyPasswordAsync(userId, password));

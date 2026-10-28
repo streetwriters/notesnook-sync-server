@@ -435,6 +435,30 @@ public abstract class TokenContractTests(IdentityHost host) : IdentityTestBase(h
     }
 
     [Fact]
+    public async Task Users_are_unregistered_without_their_password()
+    {
+        var email = NewEmail();
+        var signup = await SignupAsync(email);
+        var (access, refresh) = await LoginAsync(email);
+
+        await host.WithServicesAsync(async (services) =>
+        {
+            var accounts = services.GetRequiredService<IUserAccountService>();
+            // another client's user, and one that doesn't exist, are left alone
+            await accounts.UnregisterUserAsync("another-client", signup.UserId);
+            Assert.NotNull(await services.GetRequiredService<UserManager<User>>().FindByIdAsync(signup.UserId));
+            await accounts.UnregisterUserAsync(ClientId, MongoDB.Bson.ObjectId.GenerateNewId().ToString());
+
+            await accounts.UnregisterUserAsync(ClientId, signup.UserId);
+            Assert.Null(await services.GetRequiredService<UserManager<User>>().FindByIdAsync(signup.UserId));
+            return 0;
+        });
+
+        await Golden.AssertMatchesAsync("deleted.introspection", await IntrospectAsync(access));
+        await Golden.AssertMatchesAsync("deleted.refresh", await RefreshAsync(refresh));
+    }
+
+    [Fact]
     public async Task Deleted_users_tokens_stop_working_even_if_grants_remain()
     {
         var email = NewEmail();

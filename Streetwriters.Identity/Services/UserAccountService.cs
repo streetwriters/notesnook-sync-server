@@ -62,6 +62,15 @@ namespace Streetwriters.Identity.Services
             await sessionStore.EndAllSessionsAsync(userId);
         }
 
+        public async Task UnregisterUserAsync(string clientId, string userId)
+        {
+            var user = await userManager.FindByIdAsync(userId);
+            if (user == null || !await UserService.IsUserValidAsync(userManager, user, clientId)) return;
+
+            await userManager.DeleteAsync(user);
+            await sessionStore.EndAllSessionsAsync(userId);
+        }
+
         public async Task<bool> ChangePasswordAsync(string userId, string oldPassword, string newPassword)
         {
             var user = await userManager.FindByIdAsync(userId) ?? throw new Exception("User not found.");
