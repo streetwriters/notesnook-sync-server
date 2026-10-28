@@ -8,7 +8,6 @@ using Streetwriters.Identity.Services;
 
 namespace Streetwriters.Identity.Jobs
 {
-    /// <summary>Removes expired grants every 12 hours, from a minute after startup.</summary>
     public class TokenCleanupJob(IServiceProvider services, ILogger<TokenCleanupJob> logger) : BackgroundService
     {
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)

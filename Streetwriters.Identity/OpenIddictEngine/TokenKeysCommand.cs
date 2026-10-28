@@ -25,10 +25,8 @@ using Streetwriters.Common;
 namespace Streetwriters.Identity.OpenIddictEngine
 {
     /// <summary>
-    /// <c>Streetwriters.Identity keys list|replace</c>, run inside the Identity container, for replacing the token
-    /// keys if they may have leaked (see TokenKeys). Identity must then be restarted with no overlap, every instance
-    /// stopped before any starts: a rolling restart briefly runs an instance on the old keys, which rejects the new
-    /// sessions, and the API servers cache those answers.
+    /// <c>Streetwriters.Identity keys list|replace</c>, for replacing leaked token keys (see TokenKeys). After a replace, stop
+    /// every instance before starting any: one still on the old keys rejects new tokens, and the API servers cache that.
     /// </summary>
     public static class TokenKeysCommand
     {

@@ -31,7 +31,7 @@ namespace Streetwriters.Identity
 {
     public class Program
     {
-        // metrics for Prometheus on the internal network; Traefik only routes to the server port
+        // Prometheus metrics, on a port the proxy doesn't route to
         public const int MetricsPort = 5068;
 
         public static async Task Main(string[] args)

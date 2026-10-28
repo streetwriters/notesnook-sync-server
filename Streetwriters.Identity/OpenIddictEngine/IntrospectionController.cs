@@ -48,6 +48,8 @@ namespace Streetwriters.Identity.OpenIddictEngine
         // claims the response states itself, or that are OpenIddict's own
         private static readonly HashSet<string> OwnClaims = [Claims.Scope, Claims.Audience, Claims.Issuer, Claims.ExpiresAt, Claims.IssuedAt, Claims.NotBefore];
 
+        private static readonly HashSet<string> OneShotClaims = ["verified", "hcli"];
+
         [HttpPost("~/connect/introspect")]
         [IgnoreAntiforgeryToken]
         public async Task<IActionResult> IntrospectAsync()
@@ -61,8 +63,8 @@ namespace Streetwriters.Identity.OpenIddictEngine
             }
 
             var token = form["token"].ToString();
-            var principal = string.IsNullOrEmpty(token) ? null : await accessTokens.ValidateAsync(token);
-            if (principal == null || !principal.HasScope(OpenIddictEngineExtensions.SyncScope))
+            var validated = string.IsNullOrEmpty(token) ? null : await accessTokens.ValidateAsync(token);
+            if (validated is not (var principal, var user) || !principal.HasScope(OpenIddictEngineExtensions.SyncScope))
                 return Json(new Dictionary<string, object> { ["active"] = false });
 
             var response = new Dictionary<string, object>
@@ -82,21 +84,17 @@ namespace Streetwriters.Identity.OpenIddictEngine
 
             // as CustomIntrospectionResponseGenerator: the user's current claims, with verified and hcli
             // reported once and then removed, and verified otherwise from the email's confirmation
-            var user = await userManager.FindByIdAsync(principal.GetClaim(Claims.Subject)!);
-            if (user != null)
+            foreach (var type in OneShotClaims)
             {
-                foreach (var type in new[] { "verified", "hcli" })
-                {
-                    var claim = user.Claims.Find((c) => c.ClaimType == type);
-                    if (claim != null) await userManager.RemoveClaimAsync(user, claim.ToClaim());
-                }
-                foreach (var claim in user.Claims)
-                {
-                    if (claim.ClaimType == null || claim.ClaimType == "verified" || claim.ClaimType == "hcli") continue;
-                    response.TryAdd(claim.ClaimType, claim.ClaimValue!);
-                }
-                response.TryAdd("verified", user.EmailConfirmed.ToString().ToLowerInvariant());
+                var claim = user.Claims.Find((c) => c.ClaimType == type);
+                if (claim != null) await userManager.RemoveClaimAsync(user, claim.ToClaim());
             }
+            foreach (var claim in user.Claims)
+            {
+                if (claim.ClaimType == null || OneShotClaims.Contains(claim.ClaimType)) continue;
+                response.TryAdd(claim.ClaimType, claim.ClaimValue!);
+            }
+            response.TryAdd("verified", user.EmailConfirmed.ToString().ToLowerInvariant());
             return Json(response);
         }
 

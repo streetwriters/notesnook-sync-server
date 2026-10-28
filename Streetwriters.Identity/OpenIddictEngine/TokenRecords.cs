@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Driver;
@@ -54,14 +55,18 @@ namespace Streetwriters.Identity.OpenIddictEngine
         public TokenRecords(IMongoDatabase database)
         {
             records = database.GetCollection<TokenRecord>("openiddict.token_records");
+        }
+
+        public Task CreateIndexesAsync(CancellationToken cancellationToken)
+        {
             var keys = Builders<TokenRecord>.IndexKeys;
-            records.Indexes.CreateMany([
+            return records.Indexes.CreateManyAsync([
                 new CreateIndexModel<TokenRecord>(keys.Ascending((r) => r.Jti), new CreateIndexOptions { Sparse = true }),
                 new CreateIndexModel<TokenRecord>(keys.Ascending((r) => r.AuthorizationId)),
                 new CreateIndexModel<TokenRecord>(keys.Ascending((r) => r.Replaced), new CreateIndexOptions { Sparse = true }),
                 // records outlive their tokens by a day, so they never go missing while a token can still be used
                 new CreateIndexModel<TokenRecord>(keys.Ascending((r) => r.ExpiresAt), new CreateIndexOptions { ExpireAfter = TimeSpan.FromDays(1) }),
-            ]);
+            ], cancellationToken);
         }
 
         public Task AddAsync(TokenRecord record) => records.ReplaceOneAsync((r) => r.TokenId == record.TokenId, record, new ReplaceOptions { IsUpsert = true });

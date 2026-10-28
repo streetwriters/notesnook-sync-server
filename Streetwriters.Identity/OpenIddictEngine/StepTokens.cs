@@ -29,9 +29,8 @@ using Streetwriters.Common;
 namespace Streetwriters.Identity.OpenIddictEngine
 {
     /// <summary>
-    /// The short-lived JWTs that carry users from one sign in step to the next (see GrantService). They hold no
-    /// session, so they're signed with the server's key and never stored, as IdentityServer4 issued them.
-    /// The Bearer+jwt scheme validates them.
+    /// Short-lived JWTs that carry users between sign in steps (see GrantService). Never stored, as with
+    /// IdentityServer4; the Bearer+jwt scheme validates them.
     /// </summary>
     public class StepTokens(IOptionsMonitor<OpenIddictServerOptions> options, TimeProvider timeProvider)
     {

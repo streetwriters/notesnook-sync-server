@@ -44,8 +44,8 @@ namespace Streetwriters.Identity.OpenIddictEngine
             // in any case, as IdentityServer4 read it
             if (header == null || !header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)) return AuthenticateResult.NoResult();
 
-            var principal = await accessTokens.ValidateAsync(header["Bearer ".Length..].Trim());
-            if (principal == null || !principal.HasScope(Scope)) return AuthenticateResult.Fail("Invalid access token.");
+            var validated = await accessTokens.ValidateAsync(header["Bearer ".Length..].Trim());
+            if (validated is not (var principal, _) || !principal.HasScope(Scope)) return AuthenticateResult.Fail("Invalid access token.");
             return AuthenticateResult.Success(new AuthenticationTicket(principal, Scheme));
         }
     }

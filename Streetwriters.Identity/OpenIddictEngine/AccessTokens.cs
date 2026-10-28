@@ -33,22 +33,23 @@ namespace Streetwriters.Identity.OpenIddictEngine
     /// <summary>Validates session access tokens, with the claims IdentityServer4 gave them.</summary>
     public class AccessTokens(OpenIddictValidationService validation, TokenRecords records, LegacyGrants legacyGrants, UserManager<User> userManager)
     {
-        /// <returns>The token's claims, or null if it isn't an active access token of a user that still exists.</returns>
-        public async Task<ClaimsPrincipal?> ValidateAsync(string token)
+        /// <returns>The token's claims and user, or null if it isn't an active access token of a user that still exists.</returns>
+        public async Task<(ClaimsPrincipal Principal, User User)?> ValidateAsync(string token)
         {
             var principal = LegacyGrants.IsLegacyHandle(token) ? await legacyGrants.ValidateAccessTokenAsync(token) : await ValidateOpenIddictTokenAsync(token);
             if (principal == null) return null;
 
             var subject = principal.GetClaim(Claims.Subject);
             // deleted users must not be able to use or introspect their tokens
-            if (subject == null || await userManager.FindByIdAsync(subject) == null) return null;
+            var user = subject == null ? null : await userManager.FindByIdAsync(subject);
+            if (user == null) return null;
 
             var record = principal.GetTokenId() is string tokenId ? await records.FindAsync(tokenId) : null;
             var identity = (ClaimsIdentity)principal.Identity!;
             if (record?.Jti != null) identity.SetClaim(Claims.JwtId, record.Jti);
             if (principal.GetPresenters().FirstOrDefault() is string clientId) identity.SetClaim(Claims.ClientId, clientId);
             foreach (var scope in principal.GetScopes()) identity.AddClaim(new Claim(Claims.Scope, scope));
-            return principal;
+            return (principal, user);
         }
 
         private async Task<ClaimsPrincipal?> ValidateOpenIddictTokenAsync(string token)

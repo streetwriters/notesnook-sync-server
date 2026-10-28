@@ -30,20 +30,11 @@ using Streetwriters.Common;
 namespace Streetwriters.Identity.OpenIddictEngine
 {
     /// <summary>
-    /// The keys tokens are signed and encrypted with, kept in the database so every instance and every
-    /// restart uses the same ones. Stored tokens are encrypted: losing the encryption key would end every session.
+    /// The token signing and encryption keys, in the database so every instance uses the same ones. Losing them ends every session.
     /// </summary>
     /// <remarks>
-    /// <para>
-    /// The keys are themselves encrypted, with a key derived from NOTESNOOK_API_SECRET, so the database and its
-    /// backups don't hold them: the signing key would let anyone mint the tokens of the sign in steps. When
-    /// NOTESNOOK_API_SECRET changes, NOTESNOOK_API_SECRET_PREVIOUS must hold the old one for a start.
-    /// </para>
-    /// <para>
-    /// If a key may have leaked, the keys command replaces both (see TokenKeysCommand): the next
-    /// start uses only the new ones, which ends every session. Each replacement is a new generation (signing:2,
-    /// encryption:2, ...); the old ones are kept, marked retired, and never loaded again.
-    /// </para>
+    /// Encrypted with NOTESNOOK_API_SECRET so backups can't mint step tokens; after changing it, start once with the old one in
+    /// NOTESNOOK_API_SECRET_PREVIOUS. TokenKeysCommand's replace adds a new generation (signing:2, ...) and retires the rest.
     /// </remarks>
     public static class TokenKeys
     {
@@ -72,13 +63,14 @@ namespace Streetwriters.Identity.OpenIddictEngine
         public static (string Signing, string Encryption) Replace(IMongoDatabase database, DateTime now)
         {
             var keys = database.GetCollection<BsonDocument>(CollectionName);
-            var replacements = new[] { Signing, Encryption }.Select((use) => (use, Create(keys, use, now))).ToList();
+            var signing = Create(keys, Signing, now);
+            var encryption = Create(keys, Encryption, now);
             keys.UpdateMany(
                 Builders<BsonDocument>.Filter.And(
-                    Builders<BsonDocument>.Filter.Nin("kid", replacements.Select((r) => r.Item2)),
+                    Builders<BsonDocument>.Filter.Nin("kid", [signing, encryption]),
                     Builders<BsonDocument>.Filter.Exists("retired_at", false)),
                 Builders<BsonDocument>.Update.Set("retired_at", now));
-            return (replacements[0].Item2, replacements[1].Item2);
+            return (signing, encryption);
         }
 
         /// <returns>Every key, newest first, without its material.</returns>
@@ -86,7 +78,7 @@ namespace Streetwriters.Identity.OpenIddictEngine
         {
             var keys = database.GetCollection<BsonDocument>(CollectionName);
             return new[] { Signing, Encryption }.SelectMany((use) => Find(keys, use).Select((g) => (use, g.Number, g.Document["kid"].AsString,
-                CreatedAt(g.Document), g.Document.TryGetValue("retired_at", out var retired) ? retired.ToUniversalTime() : (DateTime?)null))).ToList();
+                g.Document["created_at"].ToUniversalTime(), g.Document.TryGetValue("retired_at", out var retired) ? retired.ToUniversalTime() : (DateTime?)null))).ToList();
         }
 
         private static (string Id, byte[] Material) Load(IMongoDatabase database, string use)
@@ -132,7 +124,7 @@ namespace Streetwriters.Identity.OpenIddictEngine
             else material = RandomNumberGenerator.GetBytes(32);
 
             var kid = Guid.NewGuid().ToString("N");
-            var document = Seal(use, kid, material, Constants.NOTESNOOK_API_SECRET);
+            var document = Encrypt(use, kid, material, Constants.NOTESNOOK_API_SECRET);
             // the first generation is stored as "signing" or "encryption", as before keys could be replaced
             document["_id"] = generation == 1 ? use : use + ":" + generation;
             document["created_at"] = now;
@@ -145,21 +137,14 @@ namespace Streetwriters.Identity.OpenIddictEngine
             return kid;
         }
 
-        private static DateTime CreatedAt(BsonDocument document) =>
-            document.TryGetValue("created_at", out var created) ? created.ToUniversalTime() : DateTime.MinValue;
-
         private static (string Id, byte[] Material) Open(IMongoCollection<BsonDocument> keys, string use, BsonDocument document, string secret)
         {
             var kid = document["kid"].AsString;
-            // as the first builds stored them
-            if (document.TryGetValue("material", out var plain))
-                return Reseal(keys, use, document, kid, plain.AsByteArray, secret);
-
-            var material = Open(document, use, kid, secret);
+            var material = Decrypt(document, use, kid, secret);
             if (material != null) return (kid, material);
 
             var previous = Constants.ReadSecret("NOTESNOOK_API_SECRET_PREVIOUS");
-            material = previous != null ? Open(document, use, kid, previous) : null;
+            material = previous != null ? Decrypt(document, use, kid, previous) : null;
             if (material != null) return Reseal(keys, use, document, kid, material, secret);
 
             // making new keys would end every session
@@ -168,14 +153,15 @@ namespace Streetwriters.Identity.OpenIddictEngine
 
         private static (string Id, byte[] Material) Reseal(IMongoCollection<BsonDocument> keys, string use, BsonDocument document, string kid, byte[] material, string secret)
         {
-            var sealed_ = Seal(use, kid, material, secret);
-            sealed_["_id"] = document["_id"];
-            sealed_["created_at"] = document.GetValue("created_at", DateTime.UtcNow);
-            keys.ReplaceOne(new BsonDocument("_id", document["_id"]), sealed_);
+            var resealed = Encrypt(use, kid, material, secret);
+            resealed["_id"] = document["_id"];
+            resealed["created_at"] = document["created_at"];
+            keys.ReplaceOne(new BsonDocument("_id", document["_id"]), resealed);
             return (kid, material);
         }
 
-        private static BsonDocument Seal(string use, string kid, byte[] material, string secret)
+        /// <returns>The key's document, without its _id and created_at.</returns>
+        private static BsonDocument Encrypt(string use, string kid, byte[] material, string secret)
         {
             var nonce = RandomNumberGenerator.GetBytes(AesGcm.NonceByteSizes.MaxSize);
             var ciphertext = new byte[material.Length];
@@ -184,7 +170,6 @@ namespace Streetwriters.Identity.OpenIddictEngine
             aes.Encrypt(nonce, material, ciphertext, tag, Encoding.UTF8.GetBytes(use + ":" + kid));
             return new BsonDocument
             {
-                ["_id"] = use,
                 ["kid"] = kid,
                 ["scheme"] = Scheme,
                 ["nonce"] = new BsonBinaryData(nonce),
@@ -193,7 +178,7 @@ namespace Streetwriters.Identity.OpenIddictEngine
             };
         }
 
-        private static byte[]? Open(BsonDocument document, string use, string kid, string secret)
+        private static byte[]? Decrypt(BsonDocument document, string use, string kid, string secret)
         {
             if (document.GetValue("scheme", BsonNull.Value) != Scheme) return null;
             var ciphertext = document["ciphertext"].AsByteArray;

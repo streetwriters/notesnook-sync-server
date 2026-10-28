@@ -65,9 +65,7 @@ namespace Streetwriters.Identity.OpenIddictEngine
             if (context.RefreshToken != null && context.RefreshTokenPrincipal?.GetTokenId() is string refreshTokenId)
             {
                 var replaced = context.Properties.TryGetValue(ReplacedTokenProperty, out var value) ? value as string : null;
-                var replacedKey = replaced == null ? null
-                    : replaced.StartsWith(LegacyGrants.LineagePrefix) ? replaced[LegacyGrants.LineagePrefix.Length..]
-                    : (await records.FindAsync(replaced))?.BridgeKey;
+                var replacedKey = replaced == null ? null : LegacyGrants.LineageKey(replaced) ?? (await records.FindAsync(replaced))?.BridgeKey;
                 await records.AddAsync(new TokenRecord
                 {
                     TokenId = refreshTokenId,

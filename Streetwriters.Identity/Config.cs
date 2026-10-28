@@ -37,7 +37,6 @@ namespace Streetwriters.Identity
         public const string ENGINE_SETTING = "IDENTITY_ENGINE";
         public const string OPENIDDICT_ENGINE = "openiddict";
 
-        // the policy of the account and MFA APIs, which accept this server's own access tokens
         public const string ACCOUNT_API_POLICY = IdentityServerConstants.LocalApi.PolicyName;
 
         public static IEnumerable<IdentityResource> IdentityResources =>

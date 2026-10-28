@@ -32,28 +32,25 @@ namespace Streetwriters.Identity.OpenIddictEngine
     /// <summary>Registers the apps' client, as Config.Clients declares it for IdentityServer4.</summary>
     public class ClientRegistration(System.IServiceProvider services) : IHostedService
     {
-        public static OpenIddictApplicationDescriptor Notesnook
+        private static OpenIddictApplicationDescriptor CreateNotesnook()
         {
-            get
+            var descriptor = new OpenIddictApplicationDescriptor
             {
-                var descriptor = new OpenIddictApplicationDescriptor
-                {
-                    ClientId = "notesnook",
-                    DisplayName = "Notesnook",
-                    ClientType = ClientTypes.Public,
-                };
-                descriptor.Permissions.UnionWith([
-                    Permissions.Endpoints.Token,
-                    Permissions.GrantTypes.Password,
-                    Permissions.GrantTypes.RefreshToken,
-                    Permissions.Prefixes.GrantType + Config.EMAIL_GRANT_TYPE,
-                    Permissions.Prefixes.GrantType + Config.MFA_GRANT_TYPE,
-                    Permissions.Prefixes.GrantType + Config.MFA_PASSWORD_GRANT_TYPE,
-                    Permissions.Prefixes.GrantType + TokenController.LegacyRefreshGrantType,
-                    .. OpenIddictEngineExtensions.Scopes.Select((scope) => Permissions.Prefixes.Scope + scope),
-                ]);
-                return descriptor;
-            }
+                ClientId = "notesnook",
+                DisplayName = "Notesnook",
+                ClientType = ClientTypes.Public,
+            };
+            descriptor.Permissions.UnionWith([
+                Permissions.Endpoints.Token,
+                Permissions.GrantTypes.Password,
+                Permissions.GrantTypes.RefreshToken,
+                Permissions.Prefixes.GrantType + Config.EMAIL_GRANT_TYPE,
+                Permissions.Prefixes.GrantType + Config.MFA_GRANT_TYPE,
+                Permissions.Prefixes.GrantType + Config.MFA_PASSWORD_GRANT_TYPE,
+                Permissions.Prefixes.GrantType + TokenController.LegacyRefreshGrantType,
+                .. OpenIddictEngineExtensions.Scopes.Select((scope) => Permissions.Prefixes.Scope + scope),
+            ]);
+            return descriptor;
         }
 
         public async Task StartAsync(CancellationToken cancellationToken)
@@ -78,16 +75,16 @@ namespace Streetwriters.Identity.OpenIddictEngine
         {
             await using var scope = services.CreateAsyncScope();
             var applications = scope.ServiceProvider.GetRequiredService<IOpenIddictApplicationManager>();
-            var application = await applications.FindByClientIdAsync(Notesnook.ClientId!, cancellationToken);
+            var expected = CreateNotesnook();
+            var application = await applications.FindByClientIdAsync(expected.ClientId!, cancellationToken);
             if (application == null)
             {
-                await applications.CreateAsync(Notesnook, cancellationToken);
+                await applications.CreateAsync(expected, cancellationToken);
                 return;
             }
 
             var current = new OpenIddictApplicationDescriptor();
             await applications.PopulateAsync(current, application, cancellationToken);
-            var expected = Notesnook;
             if (current.ClientType == expected.ClientType && current.DisplayName == expected.DisplayName && current.Permissions.SetEquals(expected.Permissions)) return;
             await applications.UpdateAsync(application, expected, cancellationToken);
         }

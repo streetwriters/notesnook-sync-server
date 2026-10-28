@@ -45,14 +45,14 @@ namespace Streetwriters.Identity.OpenIddictEngine
     /// </summary>
     [ApiController]
     [ApiExplorerSettings(IgnoreApi = true)]
-    public class TokenController(GrantService grants, StepTokens stepTokens, SessionPrincipals principals, TokenRecords records, IOpenIddictTokenManager tokens, LegacyGrants legacyGrants, RollbackBridge bridge, UserManager<User> userManager) : ControllerBase
+    public class TokenController(GrantService grants, StepTokens stepTokens, SessionPrincipals principals, TokenRecords records, OpenIddictSessionStore sessions, LegacyGrants legacyGrants, UserManager<User> userManager) : ControllerBase
     {
         /// <summary>
         /// Refreshing with a refresh token IdentityServer4 issued, which OpenIddict can't read. Requests
-        /// to refresh with one are rewritten to this before OpenIddict validates them (see OpenIddictEngineExtensions).
+        /// to refresh with one are rewritten to this before OpenIddict validates them (see OpenIddictEngineExtensions),
+        /// with the token in the parameter of the same name.
         /// </summary>
         public const string LegacyRefreshGrantType = "legacy_refresh_token";
-        public const string LegacyRefreshTokenParameter = "legacy_refresh_token";
 
         // what IdentityServer4 granted when the request named no scopes: all of the client's valid ones
         private static readonly string[] DefaultScopes = [AccountAuthenticationHandler.Scope, OpenIddictEngineExtensions.SyncScope, Scopes.OfflineAccess, Scopes.OpenId];
@@ -157,15 +157,10 @@ namespace Streetwriters.Identity.OpenIddictEngine
             var user = subject != null ? await userManager.FindByIdAsync(subject) : null;
             if (session == null || user == null) return Error("invalid_grant");
 
-            // Using a refresh token proves the client received it, so the token it replaced, and any other
-            // tokens that replaced that one (from concurrent refreshes or lost responses), must stop working.
             var tokenId = session.GetTokenId()!;
             var record = await records.FindAsync(tokenId);
             if (record?.Replaced != null) await RevokeReplacedAsync(record.Replaced, tokenId);
-
-            var principal = await principals.RefreshAsync(user, session);
-            var properties = new AuthenticationProperties(new Dictionary<string, string?> { [RecordIssuedTokens.ReplacedTokenProperty] = tokenId });
-            return SignIn(principal, properties, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+            return await SignInRefreshedAsync(user, session, tokenId);
         }
 
         /// <summary>
@@ -174,17 +169,21 @@ namespace Streetwriters.Identity.OpenIddictEngine
         /// </summary>
         private async Task<IActionResult> LegacyRefreshAsync(OpenIddictRequest request)
         {
-            var grant = await legacyGrants.FindAsync((string?)request[LegacyRefreshTokenParameter] ?? "", LegacyGrants.RefreshTokenType);
+            var grant = await legacyGrants.FindAsync((string?)request[LegacyRefreshGrantType] ?? "", LegacyGrants.RefreshTokenType);
             if (grant == null || legacyGrants.IsExpired(grant) || grant.ClientId != request.ClientId) return Error("invalid_grant");
             var user = await userManager.FindByIdAsync(grant.SubjectId);
             if (user == null) return Error("invalid_grant");
 
             if (grant.ReplacedKey != null) await RevokeReplacedAsync(LegacyGrants.LineagePrefix + grant.ReplacedKey, LegacyGrants.LineagePrefix + grant.Key);
             await legacyGrants.MarkConsumedAsync(grant.Key);
+            return await SignInRefreshedAsync(user, LegacyGrants.ToPrincipal(grant), LegacyGrants.LineagePrefix + grant.Key);
+        }
 
-            var session = LegacyGrants.ToPrincipal(grant);
+        /// <param name="replaced">The refresh token used, in the form of <see cref="RevokeReplacedAsync"/>.</param>
+        private async Task<IActionResult> SignInRefreshedAsync(User user, System.Security.Claims.ClaimsPrincipal session, string replaced)
+        {
             var principal = await principals.RefreshAsync(user, session);
-            var properties = new AuthenticationProperties(new Dictionary<string, string?> { [RecordIssuedTokens.ReplacedTokenProperty] = LegacyGrants.LineagePrefix + grant.Key });
+            var properties = new AuthenticationProperties(new Dictionary<string, string?> { [RecordIssuedTokens.ReplacedTokenProperty] = replaced });
             return SignIn(principal, properties, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
         }
 
@@ -201,25 +200,17 @@ namespace Streetwriters.Identity.OpenIddictEngine
             {
                 if (sibling.TokenId != used) await RevokeAsync(sibling.TokenId);
             }
-            if (replaced.StartsWith(LegacyGrants.LineagePrefix))
+            if (LegacyGrants.LineageKey(replaced) is string replacedKey)
             {
-                foreach (var key in await legacyGrants.FindReplacementsAsync(replaced[LegacyGrants.LineagePrefix.Length..]))
+                foreach (var key in await legacyGrants.FindReplacementsAsync(replacedKey))
                 {
                     if (LegacyGrants.LineagePrefix + key != used) await legacyGrants.RemoveAsync(key);
                 }
             }
         }
 
-        private async Task RevokeAsync(string token)
-        {
-            if (token.StartsWith(LegacyGrants.LineagePrefix))
-            {
-                await legacyGrants.RemoveAsync(token[LegacyGrants.LineagePrefix.Length..]);
-                return;
-            }
-            if (await tokens.FindByIdAsync(token) is object entry) await tokens.TryRevokeAsync(entry);
-            await bridge.RemoveAsync([(await records.FindAsync(token))?.BridgeKey]);
-        }
+        private Task RevokeAsync(string token) =>
+            LegacyGrants.LineageKey(token) is string key ? legacyGrants.RemoveAsync(key) : sessions.RevokeTokenAsync(token);
 
         private static ContentResult Error(string error, string? description = null) => Json(400, (writer) =>
         {

@@ -50,6 +50,8 @@ namespace Streetwriters.Identity.Legacy
         /// <summary>Prefix of a token record's Replaced when the token it replaced is a legacy refresh token.</summary>
         public const string LineagePrefix = "legacy:";
 
+        public static string? LineageKey(string? replaced) => replaced?.StartsWith(LineagePrefix) == true ? replaced[LineagePrefix.Length..] : null;
+
         private static readonly Meter Meter = new("Streetwriters.Identity.Legacy");
         private static readonly Counter<long> Hits = Meter.CreateCounter<long>("identity_legacy_token_hits", description: "Legacy (IdentityServer4) tokens used, by type and outcome");
 
@@ -106,30 +108,21 @@ namespace Streetwriters.Identity.Legacy
         public Task RemoveByJtiAsync(string subjectId, string clientId, string jti) =>
             Grants.DeleteManyAsync(Builders<BsonDocument>.Filter.And(SubjectAndClient(subjectId, clientId), Builders<BsonDocument>.Filter.Regex("Data", new BsonRegularExpression(Regex.Escape(jti)))));
 
-        /// <summary>Removes the user's sessions on the client except the one holding <paramref name="exceptJti"/> or <paramref name="exceptRefreshToken"/>.</summary>
         /// <returns>The removed grants' keys, which for access tokens are also the keys the API servers cache their introspection under.</returns>
         public async Task<List<string>> RemoveSessionsAsync(string subjectId, string clientId, string? exceptJti, string? exceptRefreshToken)
         {
             var exceptKey = exceptRefreshToken != null ? KeyOf(exceptRefreshToken, RefreshTokenType) : null;
-            var removed = new List<string>();
-            foreach (var document in await Grants.Find(SubjectAndClient(subjectId, clientId)).ToListAsync())
-            {
-                var key = document["Key"].AsString;
-                if ((exceptJti != null && document["Data"].AsString.Contains(exceptJti)) || key == exceptKey) continue;
-                await RemoveAsync(key);
-                removed.Add(key);
-            }
+            var removed = (await Grants.Find(SubjectAndClient(subjectId, clientId)).ToListAsync())
+                .Where((d) => !(exceptJti != null && d["Data"].AsString.Contains(exceptJti)) && d["Key"].AsString != exceptKey)
+                .Select((d) => d["Key"].AsString)
+                .ToList();
+            if (removed.Count > 0) await Grants.DeleteManyAsync(Builders<BsonDocument>.Filter.In("Key", removed));
             return removed;
         }
 
         /// <summary>Removes the user's access tokens on the client, as IdentityServer4 did when a refresh token was revoked.</summary>
-        public async Task<List<string>> RemoveAccessTokensAsync(string subjectId, string clientId)
-        {
-            var filter = Builders<BsonDocument>.Filter.And(SubjectAndClient(subjectId, clientId), Builders<BsonDocument>.Filter.Eq("Type", ReferenceTokenType));
-            var keys = (await Grants.Find(filter).Project(Builders<BsonDocument>.Projection.Include("Key")).ToListAsync()).Select((d) => d["Key"].AsString).ToList();
-            await Grants.DeleteManyAsync(filter);
-            return keys;
-        }
+        public Task RemoveAccessTokensAsync(string subjectId, string clientId) =>
+            Grants.DeleteManyAsync(Builders<BsonDocument>.Filter.And(SubjectAndClient(subjectId, clientId), Builders<BsonDocument>.Filter.Eq("Type", ReferenceTokenType)));
 
         public Task RemoveAllAsync(string subjectId) => Grants.DeleteManyAsync(new BsonDocument("SubjectId", subjectId));
 
