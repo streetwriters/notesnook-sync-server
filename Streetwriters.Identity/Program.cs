@@ -41,6 +41,12 @@ namespace Streetwriters.Identity
 #else
             DotNetEnv.Env.TraversePath().Load(".env");
 #endif
+            if (args is [OpenIddictEngine.TokenKeysCommand.Name, .. var keyArgs])
+            {
+                Environment.ExitCode = OpenIddictEngine.TokenKeysCommand.Run(keyArgs);
+                return;
+            }
+
             IHost host = CreateHostBuilder(args).Build();
             await host.RunAsync();
         }
