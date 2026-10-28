@@ -605,6 +605,20 @@ public abstract class TokenContractTests(IdentityHost host) : IdentityTestBase(h
         Assert.Equal(HttpStatusCode.OK, (await AccountAsync(HttpMethod.Get, "/account", access)).StatusCode);
     }
 
+    [Fact]
+    public async Task Logout_ends_a_password_reset_token()
+    {
+        var email = NewEmail();
+        var signup = await SignupAsync(email);
+        var user = await UserAsync(email);
+        var code = await host.WithServicesAsync((services) => services.GetRequiredService<UserManager<User>>().GenerateUserTokenAsync(user, TokenOptions.DefaultProvider, "PasswordResetAuthorizationCode"));
+        var response = await AccountAsync(HttpMethod.Post, "/account/token", null, new() { ["authorization_code"] = code, ["user_id"] = signup.UserId, ["client_id"] = ClientId });
+        var access = Token(await ReadAsync(response), "access_token");
+
+        Assert.Equal(HttpStatusCode.OK, (await AccountAsync(HttpMethod.Post, "/account/logout", access)).StatusCode);
+        Assert.False(await IsActiveAsync(access));
+    }
+
     // Protocol edges
 
     [Fact]
