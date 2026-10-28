@@ -38,8 +38,15 @@ namespace Streetwriters.Identity.OpenIddictEngine
                 await legacyGrants.RemoveByJtiAsync(subjectId, clientId, jti);
                 return;
             }
-            if (record.AuthorizationId == null || record.Subject != subjectId) return;
-            await EndAsync([record.AuthorizationId]);
+            if (record.Subject != subjectId) return;
+            if (record.AuthorizationId != null)
+            {
+                await EndAsync([record.AuthorizationId]);
+                return;
+            }
+            // tokens issued without a refresh token, such as the password reset's, belong to no session
+            if (await tokens.FindByIdAsync(record.TokenId) is object token) await tokens.TryRevokeAsync(token);
+            await bridge.RemoveAsync([record.BridgeKey]);
         }
 
         public async Task<List<string>> EndSessionsAsync(string clientId, string subjectId, string? exceptJti, string? exceptRefreshToken)
