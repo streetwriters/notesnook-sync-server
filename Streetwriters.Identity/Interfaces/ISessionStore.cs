@@ -25,7 +25,6 @@ namespace Streetwriters.Identity.Interfaces
     /// <summary>The tokens issued to users, grouped into the sessions they belong to.</summary>
     public interface ISessionStore
     {
-        /// <summary>Ends the session of the access token with this jti.</summary>
         Task EndSessionAsync(string clientId, string subjectId, string jti);
 
         /// <summary>
@@ -35,7 +34,6 @@ namespace Streetwriters.Identity.Interfaces
         /// <returns>The keys under which introspection results of the ended sessions' tokens are cached.</returns>
         Task<List<string>> EndSessionsAsync(string clientId, string subjectId, string? exceptJti, string? exceptRefreshToken);
 
-        /// <summary>Ends all of the user's sessions on all clients.</summary>
         Task EndAllSessionsAsync(string subjectId);
     }
 }

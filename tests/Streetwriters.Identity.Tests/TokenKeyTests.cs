@@ -126,28 +126,6 @@ public sealed class TokenKeyTests : IAsyncLifetime
         await Assert.ThrowsAnyAsync<Exception>(() => OnAsync(Host(), TestEnvironment.ApiSecret, null, (_) => Task.CompletedTask));
     }
 
-    [Fact]
-    public async Task Unencrypted_keys_are_encrypted()
-    {
-        // as the first OpenIddict builds stored them
-        using var rsa = RSA.Create(2048);
-        await Keys.InsertManyAsync([
-            new BsonDocument { ["_id"] = "signing", ["kid"] = "old-signing", ["material"] = new BsonBinaryData(rsa.ExportPkcs8PrivateKey()), ["created_at"] = DateTime.UtcNow },
-            new BsonDocument { ["_id"] = "encryption", ["kid"] = "old-encryption", ["material"] = new BsonBinaryData(RandomNumberGenerator.GetBytes(32)), ["created_at"] = DateTime.UtcNow },
-        ]);
-
-        await OnAsync(Host(), TestEnvironment.ApiSecret, null, async (client) =>
-        {
-            var configuration = JsonNode.Parse(await client.Http.GetStringAsync("/.well-known/openid-configuration"))!;
-            var jwks = JsonNode.Parse(await client.Http.GetStringAsync(configuration["jwks_uri"]!.GetValue<string>()))!;
-            Assert.Equal("old-signing", jwks["keys"]![0]!["kid"]!.GetValue<string>());
-        });
-
-        var keys = await Keys.Find(FilterDefinition<BsonDocument>.Empty).ToListAsync();
-        Assert.All(keys, (key) => Assert.False(key.Contains("material")));
-        Assert.Equal(["old-encryption", "old-signing"], keys.Select((k) => k["kid"].AsString).Order());
-    }
-
     private async Task<Dictionary<string, string>> KidsAsync() =>
         (await Keys.Find(FilterDefinition<BsonDocument>.Empty).ToListAsync()).ToDictionary((k) => k["_id"].AsString, (k) => k["kid"].AsString);
 

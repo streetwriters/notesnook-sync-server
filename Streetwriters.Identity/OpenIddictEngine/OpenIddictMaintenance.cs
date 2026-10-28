@@ -34,8 +34,8 @@ using Streetwriters.Identity.Legacy;
 
 namespace Streetwriters.Identity.OpenIddictEngine
 {
-    /// <summary>The indexes OpenIddict's MongoDB stores need, which they don't create themselves.</summary>
-    public class StoreIndexes(IOptionsMonitor<OpenIddictMongoDbOptions> options) : IHostedService
+    /// <summary>The indexes OpenIddict's MongoDB stores need, which they don't create themselves, and the token records'.</summary>
+    public class StoreIndexes(IOptionsMonitor<OpenIddictMongoDbOptions> options, TokenRecords records) : IHostedService
     {
         public async Task StartAsync(CancellationToken cancellationToken)
         {
@@ -69,6 +69,8 @@ namespace Streetwriters.Identity.OpenIddictEngine
                 new(tokenKeys.Ascending((t) => t.AuthorizationId)),
                 new(tokenKeys.Ascending((t) => t.Subject)),
             ], cancellationToken);
+
+            await records.CreateIndexesAsync(cancellationToken);
         }
 
         public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
@@ -77,11 +79,7 @@ namespace Streetwriters.Identity.OpenIddictEngine
     /// <summary>
     /// Removes tokens and sessions that can no longer be used, as TokenCleanupJob and IdentityServer4 did with its grants.
     /// </summary>
-    /// <remarks>
-    /// OpenIddict's own pruning only removes tokens older than a threshold, which would have to be the
-    /// refresh tokens' 45 days, since a redeemed refresh token stays usable until its replacement is used
-    /// (see TokenController). That keeps every token of every refresh for 45 days.
-    /// </remarks>
+    /// <remarks>OpenIddict's own pruning goes by age, which would keep every redeemed refresh token for 45 days.</remarks>
     public class TokenPruner(IOptionsMonitor<OpenIddictMongoDbOptions> options, IOpenIddictAuthorizationManager authorizations, TokenRecords records, LegacyGrants legacyGrants, TimeProvider timeProvider)
     {
         private const int BatchSize = 10_000;
@@ -93,8 +91,7 @@ namespace Streetwriters.Identity.OpenIddictEngine
         {
             var tokens = options.CurrentValue.Database!.GetCollection<OpenIddictMongoDbToken>(options.CurrentValue.TokensCollectionName);
             var filter = Builders<OpenIddictMongoDbToken>.Filter;
-            // expired, or ended (revoked when a session ends or a refresh token's replacement is used); redeemed
-            // tokens that haven't expired stay, being the replaced refresh tokens that still work
+            // redeemed tokens stay until they expire: they're replaced refresh tokens that still work
             var unusable = filter.Or(
                 filter.Lt((t) => t.ExpirationDate, timeProvider.GetUtcNow().UtcDateTime),
                 filter.In((t) => t.Status, [Statuses.Revoked, Statuses.Rejected, Statuses.Inactive]));

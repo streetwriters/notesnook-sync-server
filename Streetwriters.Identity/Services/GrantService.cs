@@ -50,7 +50,7 @@ namespace Streetwriters.Identity.Services
             if (result.IsLockedOut)
             {
                 var timeLeft = user.LockoutEnd - DateTimeOffset.Now;
-                return new GrantResult.Failed("user_locked_out", $"You have been locked out. Please try again in {Pluralize(timeLeft?.Minutes, "minute", "minutes")} and {Pluralize(timeLeft?.Seconds, "second", "seconds")}.");
+                return new GrantResult.Failed("user_locked_out", $"You have been locked out. Please try again in {(timeLeft?.Minutes ?? 0).Pluralize("minute", "minutes")} and {(timeLeft?.Seconds ?? 0).Pluralize("second", "seconds")}.");
             }
 
             // We'll ask for 2FA regardless of password being incorrect to prevent an attacker
@@ -204,12 +204,6 @@ namespace Streetwriters.Identity.Services
             return new GrantResult.Failed("locked_out", timeLeft.HasValue
                 ? $"You have been locked out. Please try again in {timeLeft.Value.Minutes.Pluralize("minute", "minutes")} and {timeLeft.Value.Seconds.Pluralize("second", "seconds")}."
                 : "You have been locked out.");
-        }
-
-        private static string Pluralize(int? value, string singular, string plural)
-        {
-            if (value == null) return $"0 {plural}";
-            return value == 1 ? $"{value} {singular}" : $"{value} {plural}";
         }
     }
 }

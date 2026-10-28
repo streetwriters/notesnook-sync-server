@@ -32,7 +32,7 @@ namespace Streetwriters.Identity.OpenIddictEngine
     /// </summary>
     [ApiController]
     [ApiExplorerSettings(IgnoreApi = true)]
-    public class RevocationController(IOpenIddictTokenManager tokens, TokenRecords records, LegacyGrants legacyGrants, RollbackBridge bridge) : ControllerBase
+    public class RevocationController(IOpenIddictTokenManager tokens, OpenIddictSessionStore sessions, LegacyGrants legacyGrants) : ControllerBase
     {
         [HttpPost("~/connect/revocation")]
         [IgnoreAntiforgeryToken]
@@ -60,8 +60,7 @@ namespace Streetwriters.Identity.OpenIddictEngine
 
             if (await tokens.HasTypeAsync(entry, TokenTypeIdentifiers.RefreshToken) && await tokens.GetSubjectAsync(entry) is string subject)
                 await RevokeAccessTokensAsync(subject, clientId!);
-            await tokens.TryRevokeAsync(entry);
-            if (await tokens.GetIdAsync(entry) is string id) await bridge.RemoveAsync([(await records.FindAsync(id))?.BridgeKey]);
+            if (await tokens.GetIdAsync(entry) is string id) await sessions.RevokeTokenAsync(id);
             return Ok();
         }
 

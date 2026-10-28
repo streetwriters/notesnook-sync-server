@@ -40,7 +40,6 @@ namespace Streetwriters.Identity.Legacy
     {
         private IMongoCollection<BsonDocument> Grants => database.GetCollection<BsonDocument>("PersistedGrants");
 
-        /// <returns>The key of the copy.</returns>
         public async Task<string> CopyAccessTokenAsync(string token, ClaimsPrincipal principal, string jti)
         {
             var key = LegacyGrants.KeyOf(token, LegacyGrants.ReferenceTokenType);
@@ -51,7 +50,6 @@ namespace Streetwriters.Identity.Legacy
 
         /// <param name="accessToken">The access token issued with it, which IdentityServer4 kept in the refresh token.</param>
         /// <param name="replacedKey">The key of the copy, or the legacy grant, of the refresh token this one replaced.</param>
-        /// <returns>The key of the copy.</returns>
         public async Task<string> CopyRefreshTokenAsync(string token, ClaimsPrincipal principal, ClaimsPrincipal accessToken, string jti, string? replacedKey)
         {
             var key = LegacyGrants.KeyOf(token, LegacyGrants.RefreshTokenType);

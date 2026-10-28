@@ -45,8 +45,14 @@ namespace Streetwriters.Identity.OpenIddictEngine
                 return;
             }
             // tokens issued without a refresh token, such as the password reset's, belong to no session
-            if (await tokens.FindByIdAsync(record.TokenId) is object token) await tokens.TryRevokeAsync(token);
-            await bridge.RemoveAsync([record.BridgeKey]);
+            await RevokeTokenAsync(record.TokenId);
+        }
+
+        /// <summary>Revokes one token, and removes its copy for IdentityServer4.</summary>
+        public async Task RevokeTokenAsync(string tokenId)
+        {
+            if (await tokens.FindByIdAsync(tokenId) is object token) await tokens.TryRevokeAsync(token);
+            await bridge.RemoveAsync([(await records.FindAsync(tokenId))?.BridgeKey]);
         }
 
         public async Task<List<string>> EndSessionsAsync(string clientId, string subjectId, string? exceptJti, string? exceptRefreshToken)
@@ -93,8 +99,8 @@ namespace Streetwriters.Identity.OpenIddictEngine
             var revoked = await records.FindByAuthorizationsAsync(authorizationIds);
             await bridge.RemoveAsync(revoked.Select((r) => r.BridgeKey));
             // a session that was refreshed from a legacy one ends that one too
-            foreach (var record in revoked.Where((r) => r.Replaced?.StartsWith(LegacyGrants.LineagePrefix) == true))
-                await legacyGrants.RemoveAsync(record.Replaced![LegacyGrants.LineagePrefix.Length..]);
+            foreach (var key in revoked.Select((r) => LegacyGrants.LineageKey(r.Replaced)).OfType<string>())
+                await legacyGrants.RemoveAsync(key);
             return [.. revoked.Where((r) => r.CacheKey != null).Select((r) => r.CacheKey!)];
         }
     }

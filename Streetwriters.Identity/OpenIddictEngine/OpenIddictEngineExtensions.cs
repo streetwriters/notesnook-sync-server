@@ -96,7 +96,7 @@ namespace Streetwriters.Identity.OpenIddictEngine
                             if (LegacyGrants.IsLegacyHandle(context.Request.RefreshToken))
                             {
                                 context.Request.GrantType = TokenController.LegacyRefreshGrantType;
-                                context.Request[TokenController.LegacyRefreshTokenParameter] = context.Request.RefreshToken;
+                                context.Request[TokenController.LegacyRefreshGrantType] = context.Request.RefreshToken;
                                 context.Request.RefreshToken = null;
                             }
                             return default;
@@ -168,7 +168,8 @@ namespace Streetwriters.Identity.OpenIddictEngine
             services.AddTransient<SessionPrincipals>();
             services.AddTransient<AccessTokens>();
             services.AddTransient<ITokenIssuer, OpenIddictTokenIssuer>();
-            services.AddTransient<ISessionStore, OpenIddictSessionStore>();
+            services.AddTransient<OpenIddictSessionStore>();
+            services.AddTransient<ISessionStore>((services) => services.GetRequiredService<OpenIddictSessionStore>());
 
             services.AddAuthentication().AddScheme<AuthenticationSchemeOptions, AccountAuthenticationHandler>(AccountAuthenticationHandler.Scheme, null);
             services.AddAuthorizationBuilder().AddPolicy(Config.ACCOUNT_API_POLICY, (policy) => policy
@@ -196,7 +197,7 @@ namespace Streetwriters.Identity.OpenIddictEngine
             return default;
         }
 
-        /// <summary>Cache headers on the token endpoints' responses, as IdentityServer4 sent them.</summary>
+        /// <summary>The token endpoints' status codes and cache headers, as IdentityServer4 sent them.</summary>
         public static IApplicationBuilder UseOpenIddictEngine(this IApplicationBuilder app)
         {
             return app.Use((context, next) =>
