@@ -27,13 +27,10 @@ using System.Security.Claims;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
 using MongoDB.Bson;
 using MongoDB.Driver;
-using Notesnook.API.Authorization;
-using Notesnook.API.Extensions;
 using Notesnook.API.Helpers;
 using Notesnook.API.Interfaces;
 using Notesnook.API.Models;
@@ -78,12 +75,6 @@ namespace Notesnook.API.Hubs
 
         public override async Task OnConnectedAsync()
         {
-            var result = new SyncRequirement().IsAuthorized(Context.User, new PathString("/hubs/sync/v2"));
-            if (!result.Succeeded)
-            {
-                var reason = result.AuthorizationFailure?.FailureReasons.FirstOrDefault();
-                throw new HubException(reason?.Message ?? "Unauthorized");
-            }
             var id = Context.User?.FindFirstValue("sub") ?? throw new HubException("User not found.");
             await Groups.AddToGroupAsync(Context.ConnectionId, id);
             await base.OnConnectedAsync();

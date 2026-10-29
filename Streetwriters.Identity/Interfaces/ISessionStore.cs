@@ -34,6 +34,7 @@ namespace Streetwriters.Identity.Interfaces
         /// <returns>The keys under which introspection results of the ended sessions' tokens are cached.</returns>
         Task<List<string>> EndSessionsAsync(string clientId, string subjectId, string? exceptJti, string? exceptRefreshToken);
 
-        Task EndAllSessionsAsync(string subjectId);
+        /// <returns>The keys under which introspection results of the ended sessions' tokens are cached.</returns>
+        Task<List<string>> EndAllSessionsAsync(string subjectId);
     }
 }

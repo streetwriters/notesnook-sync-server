@@ -65,9 +65,12 @@ namespace Streetwriters.Identity.Services
             return removedKeys;
         }
 
-        public Task EndAllSessionsAsync(string subjectId)
+        public async Task<List<string>> EndAllSessionsAsync(string subjectId)
         {
-            return persistedGrantStore.RemoveAllAsync(new PersistedGrantFilter { SubjectId = subjectId });
+            var filter = new PersistedGrantFilter { SubjectId = subjectId };
+            var keys = (await persistedGrantStore.GetAllAsync(filter)).Select((grant) => grant.Key).ToList();
+            await persistedGrantStore.RemoveAllAsync(filter);
+            return keys;
         }
     }
 }

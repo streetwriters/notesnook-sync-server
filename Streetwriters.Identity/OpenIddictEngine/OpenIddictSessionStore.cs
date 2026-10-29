@@ -77,15 +77,14 @@ namespace Streetwriters.Identity.OpenIddictEngine
             return [.. await EndAsync(ended), .. await legacyGrants.RemoveSessionsAsync(subjectId, clientId, exceptJti, exceptRefreshToken)];
         }
 
-        public async Task EndAllSessionsAsync(string subjectId)
+        public async Task<List<string>> EndAllSessionsAsync(string subjectId)
         {
             var ended = new List<string>();
             await foreach (var authorization in authorizations.FindBySubjectAsync(subjectId))
             {
                 if (await authorizations.GetIdAsync(authorization) is string id) ended.Add(id);
             }
-            await EndAsync(ended);
-            await legacyGrants.RemoveAllAsync(subjectId);
+            return [.. await EndAsync(ended), .. await legacyGrants.RemoveAllAsync(subjectId)];
         }
 
         /// <returns>The keys under which introspection results of the sessions' access tokens are cached.</returns>

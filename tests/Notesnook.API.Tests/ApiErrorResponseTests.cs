@@ -118,7 +118,7 @@ public class ApiErrorResponseTests(TestDatabase db) : IClassFixture<TestDatabase
         var deleted = false;
         var identity = Stub<IUserAccountService>.Create(
             ("VerifyPasswordAsync", (_) => Task.FromResult(false)),
-            ("DeleteUserAsync", (_) => { deleted = true; return Task.CompletedTask; }));
+            ("UnregisterUserAsync", (_) => { deleted = true; return Task.CompletedTask; }));
         await using var api = new Api(db, identity);
 
         var response = await api.Client.PostAsync("/users/delete", new FormUrlEncodedContent(new Dictionary<string, string> { ["password"] = "wrong" }));

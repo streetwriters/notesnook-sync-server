@@ -8,6 +8,7 @@ using AspNetCore.Identity.Mongo.Model;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using MongoDB.Bson;
 using MongoDB.Driver;
 using Streetwriters.Common;
 using Streetwriters.Common.Enums;
@@ -62,13 +63,29 @@ namespace Streetwriters.Identity.Services
             await sessionStore.EndAllSessionsAsync(userId);
         }
 
+        // a malformed id makes FindByIdAsync throw, and can never belong to a user
+        public async Task<bool> UserExistsAsync(string userId) => ObjectId.TryParse(userId, out _) && await userManager.FindByIdAsync(userId) != null;
+
         public async Task UnregisterUserAsync(string clientId, string userId)
         {
             var user = await userManager.FindByIdAsync(userId);
-            if (user == null || !await UserService.IsUserValidAsync(userManager, user, clientId)) return;
+            if (user == null) return;
+            if (!await UserService.IsUserValidAsync(userManager, user, clientId)) throw new Exception($"Unable to find user with ID '{user.Id}'.");
 
-            await userManager.DeleteAsync(user);
-            await sessionStore.EndAllSessionsAsync(userId);
+            // sessions end first, so a failure leaves a signed-out user who can retry rather than a deleted one still signed in
+            var removedKeys = await sessionStore.EndAllSessionsAsync(userId);
+            var result = await userManager.DeleteAsync(user);
+            if (!result.Succeeded) throw new Exception($"Failed to delete user {userId}: {string.Join(", ", result.Errors.Select((e) => e.Description))}");
+
+            // the user is already deleted, and cached tokens expire before UserPurgeJob runs
+            try
+            {
+                await PublishClearCacheAsync(removedKeys);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to clear the token cache of unregistered user {UserId}", userId);
+            }
         }
 
         public async Task<bool> ChangePasswordAsync(string userId, string oldPassword, string newPassword)
@@ -120,14 +137,19 @@ namespace Streetwriters.Identity.Services
                 ? await sessionStore.EndSessionsAsync(client.Id, user.Id.ToString(), null, null)
                 : await sessionStore.EndSessionsAsync(client.Id, user.Id.ToString(), jti, refreshToken);
 
-            await WampServers.NotesnookServer.PublishMessageAsync(IdentityServerTopics.ClearCacheTopic, new ClearCacheMessage(removedKeys));
-            await WampServers.MessengerServer.PublishMessageAsync(IdentityServerTopics.ClearCacheTopic, new ClearCacheMessage(removedKeys));
-            if (!Constants.IS_SELF_HOSTED)
-            {
-                await WampServers.SubscriptionServer.PublishMessageAsync(IdentityServerTopics.ClearCacheTopic, new ClearCacheMessage(removedKeys));
-            }
+            await PublishClearCacheAsync(removedKeys);
             // await SendLogoutMessageAsync(user.Id.ToString(), "Session revoked.");
             return true;
+        }
+
+        private static async Task PublishClearCacheAsync(List<string> keys)
+        {
+            await WampServers.NotesnookServer.PublishMessageAsync(IdentityServerTopics.ClearCacheTopic, new ClearCacheMessage(keys));
+            await WampServers.MessengerServer.PublishMessageAsync(IdentityServerTopics.ClearCacheTopic, new ClearCacheMessage(keys));
+            if (!Constants.IS_SELF_HOSTED)
+            {
+                await WampServers.SubscriptionServer.PublishMessageAsync(IdentityServerTopics.ClearCacheTopic, new ClearCacheMessage(keys));
+            }
         }
 
         public async Task<SignupResponse> CreateUserAsync(string clientId, string email, string password, string? userAgent = null)

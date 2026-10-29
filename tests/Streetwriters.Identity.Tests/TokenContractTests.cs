@@ -444,8 +444,8 @@ public abstract class TokenContractTests(IdentityHost host) : IdentityTestBase(h
         await host.WithServicesAsync(async (services) =>
         {
             var accounts = services.GetRequiredService<IUserAccountService>();
-            // another client's user, and one that doesn't exist, are left alone
-            await accounts.UnregisterUserAsync("another-client", signup.UserId);
+            // another client's user is refused, and one that doesn't exist is left alone
+            await Assert.ThrowsAnyAsync<Exception>(() => accounts.UnregisterUserAsync("another-client", signup.UserId));
             Assert.NotNull(await services.GetRequiredService<UserManager<User>>().FindByIdAsync(signup.UserId));
             await accounts.UnregisterUserAsync(ClientId, MongoDB.Bson.ObjectId.GenerateNewId().ToString());
 

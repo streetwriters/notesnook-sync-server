@@ -1,9 +1,12 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using MongoDB.Driver;
 using Notesnook.API.Hubs;
+using Notesnook.API.Interfaces;
 using Notesnook.API.Models;
 using Notesnook.API.Services;
 
@@ -11,16 +14,20 @@ namespace Notesnook.API.Tests;
 
 public class SyncV2HubTests(TestDatabase db) : IClassFixture<TestDatabase>
 {
-    private sealed class Caller(string userId) : HubCallerContext
+    private sealed class Caller(string userId, params Claim[] claims) : HubCallerContext
     {
         public override string ConnectionId => "connection";
         public override string? UserIdentifier => userId;
-        public override ClaimsPrincipal? User { get; } = new(new ClaimsIdentity([new Claim("sub", userId)], "Test"));
+        public override ClaimsPrincipal? User { get; } = new(new ClaimsIdentity([new Claim("sub", userId), .. claims], "Test"));
         public override IDictionary<object, object?> Items { get; } = new Dictionary<object, object?>();
         public override IFeatureCollection Features { get; } = new FeatureCollection();
         public override CancellationToken ConnectionAborted => CancellationToken.None;
-        public override void Abort() { }
+        public bool Aborted { get; private set; }
+        public override void Abort() => Aborted = true;
     }
+
+    private static readonly Claim[] SyncClaims = [new("scope", "notesnook.sync"), new("aud", "notesnook"), new("role", "notesnook"), new("verified", "true")];
+    private static Caller SyncCaller(string userId) => new(userId, SyncClaims);
 
     private SyncV2Hub Hub(string userId)
     {
@@ -41,6 +48,71 @@ public class SyncV2HubTests(TestDatabase db) : IClassFixture<TestDatabase>
         Assert.Equal("Missing device ID.", fetch.Message);
         Assert.Equal("Missing device ID.", push.Message);
         Assert.Equal(0, await db.CreateScope().Repositories.SyncDevices.Collection.CountDocumentsAsync((d) => d.UserId == userId));
+    }
+
+    [Fact]
+    public async Task Connecting_requires_sync_access()
+    {
+        var userId = Guid.NewGuid().ToString("N");
+        var filter = new SyncAuthorizationHubFilter(new MemoryCache(new MemoryCacheOptions()));
+        var services = new ServiceCollection().BuildServiceProvider();
+
+        var error = await Assert.ThrowsAsync<HubException>(() => filter.OnConnectedAsync(
+            new HubLifetimeContext(new Caller(userId, SyncClaims[..^1]), services, Hub(userId)),
+            (_) => throw new Exception("connected")));
+
+        Assert.Equal("Please confirm your email to sync your notes.", error.Message);
+    }
+
+    [Fact]
+    public async Task A_deleted_user_is_cut_off_but_a_live_user_is_not()
+    {
+        var (deleted, live) = (Guid.NewGuid().ToString("N"), Guid.NewGuid().ToString("N"));
+        var scope = db.CreateScope();
+        await scope.Repositories.UsersSettings.Collection.InsertManyAsync([
+            new UserSettings { UserId = deleted, Salt = "salt", DeletedAt = 1 },
+            new UserSettings { UserId = live, Salt = "salt" }]);
+        var services = new ServiceCollection().AddSingleton<ISyncItemsRepositoryAccessor>(scope.Repositories).BuildServiceProvider();
+        var filter = new SyncAuthorizationHubFilter(new MemoryCache(new MemoryCacheOptions()));
+        var connected = new List<string>();
+        Task Connect(string userId) => filter.OnConnectedAsync(new HubLifetimeContext(SyncCaller(userId), services, Hub(userId)), (_) => { connected.Add(userId); return Task.CompletedTask; });
+
+        var error = await Assert.ThrowsAsync<HubException>(() => Connect(deleted));
+        await Connect(live);
+
+        Assert.Equal("Please login to sync.", error.Message);
+        Assert.Equal([live], connected);
+    }
+
+    private sealed class Clock : Microsoft.Extensions.Internal.ISystemClock
+    {
+        public DateTimeOffset UtcNow { get; set; } = DateTimeOffset.UtcNow;
+    }
+
+    [Fact]
+    public async Task An_open_connection_is_cut_off_once_its_user_is_deleted()
+    {
+        var userId = Guid.NewGuid().ToString("N");
+        var scope = db.CreateScope();
+        await scope.Repositories.UsersSettings.Collection.InsertOneAsync(new UserSettings { UserId = userId, Salt = "salt" });
+        var services = new ServiceCollection().AddSingleton<ISyncItemsRepositoryAccessor>(scope.Repositories).BuildServiceProvider();
+        var clock = new Clock();
+        var filter = new SyncAuthorizationHubFilter(new MemoryCache(new MemoryCacheOptions { Clock = clock }));
+        var caller = SyncCaller(userId);
+        var invoked = 0;
+        ValueTask<object?> Invoke() => filter.InvokeMethodAsync(
+            new HubInvocationContext(caller, services, Hub(userId), typeof(SyncV2Hub).GetMethod(nameof(SyncV2Hub.PushCompleted))!, []),
+            (_) => { invoked++; return ValueTask.FromResult<object?>(null); });
+
+        await Invoke();
+        await scope.Repositories.UsersSettings.Collection.UpdateOneAsync((s) => s.UserId == userId, Builders<UserSettings>.Update.Set((s) => s.DeletedAt, 1));
+        clock.UtcNow += TimeSpan.FromMinutes(2);
+
+        var error = await Assert.ThrowsAsync<HubException>(async () => await Invoke());
+
+        Assert.Equal("Please login to sync.", error.Message);
+        Assert.Equal(1, invoked);
+        Assert.True(caller.Aborted);
     }
 
     [Fact]
