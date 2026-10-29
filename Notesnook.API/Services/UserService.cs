@@ -183,28 +183,18 @@ namespace Notesnook.API.Services
         {
             logger.LogInformation("Deleting user {UserId}", userId);
 
-            foreach (var collection in Repositories.SyncItemCollections)
-                collection.Repository.DeleteByUserId(userId);
-            Repositories.UsersSettings.Delete((u) => u.UserId == userId);
-            Repositories.Monographs.DeleteMany((m) => m.UserId == userId);
-            Repositories.InboxApiKey.DeleteMany((t) => t.UserId == userId);
-
-            var result = await unit.Commit();
-            logger.LogInformation("User data deleted for user {UserId}: {Result}", userId, result);
-            if (!result) throw new Exception("Could not delete user data.");
-
-            await syncDeviceService.ResetDevicesAsync(userId);
-
-            if (!Constants.IS_SELF_HOSTED)
+            // marked first so a user gone from Identity is never left unpurged; upserted so a user without settings is still purged
+            try
             {
-                await WampServers.SubscriptionServer.PublishMessageAsync(SubscriptionServerTopics.DeleteSubscriptionTopic, new DeleteSubscriptionMessage
-                {
-                    AppId = ApplicationType.NOTESNOOK,
-                    UserId = userId
-                });
+                await Repositories.UsersSettings.Collection.UpdateOneAsync(
+                    Builders<UserSettings>.Filter.Eq((s) => s.UserId, userId),
+                    Builders<UserSettings>.Update.Set((s) => s.DeletedAt, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()),
+                    new UpdateOptions { IsUpsert = true });
             }
+            // a concurrent delete upserted the settings first, so the user is already marked
+            catch (MongoWriteException ex) when (ex.WriteError.Category == ServerErrorCategory.DuplicateKey) { }
 
-            await DeleteAttachmentsAsync(userId);
+            await serviceAccessor.UserAccountService.UnregisterUserAsync(Clients.Notesnook.Id, userId);
         }
 
         public async Task DeleteUserAsync(string userId, string? jti, string password)
@@ -214,7 +204,6 @@ namespace Notesnook.API.Services
             // Identity's own "Wrong password." error only reaches us as a WAMP runtime error
             if (!await serviceAccessor.UserAccountService.VerifyPasswordAsync(userId, password))
                 throw new ClientException("Wrong password.");
-            await serviceAccessor.UserAccountService.DeleteUserAsync(Clients.Notesnook.Id, userId, password);
 
             await DeleteUserAsync(userId);
 

@@ -60,6 +60,7 @@ namespace Notesnook.API.Models
         /// </summary>
         public UserKeys? PendingKeys { get; set; }
         public long? PendingKeysSince { get; set; }
+        public long? DeletedAt { get; set; }
 
         [BsonId]
         [BsonRepresentation(BsonType.ObjectId)]

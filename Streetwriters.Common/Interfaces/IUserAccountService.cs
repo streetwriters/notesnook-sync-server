@@ -8,8 +8,8 @@ namespace Streetwriters.Common.Interfaces
     {
         [WampProcedure("co.streetwriters.identity.users.get_user")]
         Task<UserModel?> GetUserAsync(string clientId, string userId);
-        [WampProcedure("co.streetwriters.identity.users.delete_user")]
-        Task DeleteUserAsync(string clientId, string userId, string password);
+        [WampProcedure("co.streetwriters.identity.users.user_exists")]
+        Task<bool> UserExistsAsync(string userId);
         [WampProcedure("co.streetwriters.identity.users.unregister_user")]
         Task UnregisterUserAsync(string clientId, string userId);
         [WampProcedure("co.streetwriters.identity.users.change_password")]

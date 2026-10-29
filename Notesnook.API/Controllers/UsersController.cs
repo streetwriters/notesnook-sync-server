@@ -25,7 +25,6 @@ using System.Threading.Tasks;
 using IdentityModel;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.Extensions.Logging;
@@ -270,7 +269,6 @@ namespace Notesnook.API.Controllers
         }
 
         [HttpPost("delete")]
-        [RequestTimeout(5 * 60 * 1000)]
         public async Task<IActionResult> Delete([FromForm] DeleteAccountForm form)
         {
             var userId = this.User.GetUserId();

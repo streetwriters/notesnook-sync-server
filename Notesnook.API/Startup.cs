@@ -38,6 +38,7 @@ using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.ResponseCompression;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
@@ -253,7 +254,10 @@ namespace Notesnook.API
                 hub.ClientTimeoutInterval = TimeSpan.FromMinutes(10);
                 // detailed errors expose internal (e.g. Mongo) exception messages to clients
                 hub.EnableDetailedErrors = Environment.IsDevelopment();
-            }).AddMessagePackProtocol().AddJsonProtocol();
+            }).AddMessagePackProtocol().AddJsonProtocol()
+              .AddHubOptions<SyncV2Hub>((hub) => hub.AddFilter<SyncAuthorizationHubFilter>());
+            services.AddMemoryCache();
+            services.AddSingleton<SyncAuthorizationHubFilter>();
 
             if (!string.IsNullOrEmpty(Constants.SIGNALR_REDIS_CONNECTION_STRING))
             {
@@ -312,6 +316,13 @@ namespace Notesnook.API
                     .WithIdentity("DeviceCleanup-trigger")
                     // every day at midnight
                     .WithCronSchedule("0 0 0 * * ? *"));
+
+                var userPurgeJobKey = new JobKey("UserPurgeJob");
+                q.AddJob<UserPurgeJob>(opts => opts.WithIdentity(userPurgeJobKey));
+                q.AddTrigger(opts => opts
+                    .ForJob(userPurgeJobKey)
+                    .WithIdentity("UserPurge-trigger")
+                    .WithSimpleSchedule((s) => s.WithIntervalInMinutes(5).RepeatForever()));
             });
         }
 

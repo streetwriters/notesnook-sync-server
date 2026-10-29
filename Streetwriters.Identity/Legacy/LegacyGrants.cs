@@ -124,7 +124,14 @@ namespace Streetwriters.Identity.Legacy
         public Task RemoveAccessTokensAsync(string subjectId, string clientId) =>
             Grants.DeleteManyAsync(Builders<BsonDocument>.Filter.And(SubjectAndClient(subjectId, clientId), Builders<BsonDocument>.Filter.Eq("Type", ReferenceTokenType)));
 
-        public Task RemoveAllAsync(string subjectId) => Grants.DeleteManyAsync(new BsonDocument("SubjectId", subjectId));
+        public async Task<List<string>> RemoveAllAsync(string subjectId)
+        {
+            var filter = new BsonDocument("SubjectId", subjectId);
+            var removed = (await Grants.Find(filter).Project(Builders<BsonDocument>.Projection.Include("Key")).ToListAsync())
+                .Select((d) => d["Key"].AsString).ToList();
+            await Grants.DeleteManyAsync(filter);
+            return removed;
+        }
 
         public async Task<long> RemoveExpiredAsync() =>
             (await Grants.DeleteManyAsync(Builders<BsonDocument>.Filter.Lt("Expiration", timeProvider.GetUtcNow().UtcDateTime))).DeletedCount;
