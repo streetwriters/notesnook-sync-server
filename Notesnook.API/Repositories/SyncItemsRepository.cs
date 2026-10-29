@@ -33,6 +33,7 @@ using Notesnook.API.Hubs;
 using Notesnook.API.Interfaces;
 using Notesnook.API.Models;
 using Streetwriters.Common;
+using Streetwriters.Common.Exceptions;
 using Streetwriters.Data.DbContexts;
 using Streetwriters.Data.Interfaces;
 using Streetwriters.Data.Repositories;
@@ -81,7 +82,7 @@ namespace Notesnook.API.Repositories
         public void UpsertMany(IEnumerable<SyncItem> items, string userId)
         {
             var userIdFilter = Builders<SyncItem>.Filter.Eq("UserId", userId);
-            var writes = new List<WriteModel<SyncItem>>();
+            var writes = new List<ReplaceOneModel<SyncItem>>();
             foreach (var item in items)
             {
                 if (item.Length > 15 * 1024 * 1024)
@@ -119,11 +120,16 @@ namespace Notesnook.API.Repositories
                 });
             }
             if (writes.Count == 0) return;
+
+            // kept across retries, since a retry after a conflicting reset still carries data encrypted with the reset's keys
+            long? expected = null;
             dbContext.AddCommand(async (handle, ct) =>
             {
-                // inside the transaction, so a retry after a conflicting reset stamps the new generation
+                expected ??= await generations.GetAsync(handle, userId, ct);
                 var generation = await generations.StampAsync(handle, userId, ct);
-                foreach (var item in items) item.Generation = generation;
+                if (generation != expected)
+                    throw new ConflictException("Your account was reset during this sync. Please sync again.");
+                foreach (var write in writes) write.Replacement.Generation = generation;
                 await Collection.BulkWriteAsync(handle, writes, options: new BulkWriteOptions { IsOrdered = false }, ct);
             });
         }

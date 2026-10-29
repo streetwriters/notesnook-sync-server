@@ -12,6 +12,7 @@ using Notesnook.API.Services;
 using Quartz;
 using Streetwriters.Common;
 using Streetwriters.Common.Accessors;
+using Streetwriters.Common.Exceptions;
 using Streetwriters.Common.Interfaces;
 
 namespace Notesnook.API.Tests;
@@ -115,7 +116,7 @@ public class UserResetTests(TestDatabase db) : IClassFixture<TestDatabase>
     }
 
     [Fact]
-    public async Task A_push_overlapping_a_reset_is_retried_with_the_new_generation()
+    public async Task A_push_overlapping_a_reset_is_rejected()
     {
         var userId = await CreateUserAsync();
         var scope = db.CreateScope();
@@ -128,12 +129,24 @@ public class UserResetTests(TestDatabase db) : IClassFixture<TestDatabase>
             await Users().ResetUserAsync(userId, removeAttachments: false);
         });
         scope.Repositories.Notes.UpsertMany([TestItems.Note("in-flight")], userId);
-        Assert.True(await scope.Unit.Commit());
+
+        await Assert.ThrowsAsync<ConflictException>(() => scope.Unit.Commit());
 
         Assert.Equal(2, attempts);
-        Assert.Equal(["in-flight"], await FetchAsync(userId));
-        await PurgeAsync();
-        Assert.Equal(["in-flight"], await StoredNotesAsync(userId));
+        Assert.Empty(await StoredNotesAsync(userId));
+    }
+
+    [Fact]
+    public async Task Items_enumerated_lazily_are_stamped_with_the_current_generation()
+    {
+        var userId = await CreateUserAsync();
+        await Users().ResetUserAsync(userId, removeAttachments: false);
+
+        var scope = db.CreateScope();
+        scope.Repositories.Notes.UpsertMany(new[] { "lazy" }.Select(TestItems.Note), userId);
+        await scope.Unit.Commit();
+
+        Assert.Equal(["lazy"], await FetchAsync(userId));
     }
 
     [Fact]

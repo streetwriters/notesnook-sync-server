@@ -9,6 +9,7 @@ using Notesnook.API.Hubs;
 using Notesnook.API.Interfaces;
 using Notesnook.API.Models;
 using Notesnook.API.Services;
+using Streetwriters.Common.Exceptions;
 
 namespace Notesnook.API.Tests;
 
@@ -113,6 +114,22 @@ public class SyncV2HubTests(TestDatabase db) : IClassFixture<TestDatabase>
         Assert.Equal("Please login to sync.", error.Message);
         Assert.Equal(1, invoked);
         Assert.True(caller.Aborted);
+    }
+
+    [Fact]
+    public async Task A_client_error_reaches_the_client_as_a_hub_error()
+    {
+        var userId = Guid.NewGuid().ToString("N");
+        var scope = db.CreateScope();
+        await scope.Repositories.UsersSettings.Collection.InsertOneAsync(new UserSettings { UserId = userId, Salt = "salt" });
+        var services = new ServiceCollection().AddSingleton<ISyncItemsRepositoryAccessor>(scope.Repositories).BuildServiceProvider();
+        var filter = new SyncAuthorizationHubFilter(new MemoryCache(new MemoryCacheOptions()));
+
+        var error = await Assert.ThrowsAsync<HubException>(async () => await filter.InvokeMethodAsync(
+            new HubInvocationContext(SyncCaller(userId), services, Hub(userId), typeof(SyncV2Hub).GetMethod(nameof(SyncV2Hub.PushCompleted))!, []),
+            (_) => throw new ConflictException("conflict")));
+
+        Assert.Equal("conflict", error.Message);
     }
 
     [Fact]

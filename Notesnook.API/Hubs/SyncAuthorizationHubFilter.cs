@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using MongoDB.Driver;
 using Notesnook.API.Authorization;
 using Notesnook.API.Interfaces;
+using Streetwriters.Common.Exceptions;
 
 namespace Notesnook.API.Hubs
 {
@@ -21,7 +22,15 @@ namespace Notesnook.API.Hubs
         public async ValueTask<object?> InvokeMethodAsync(HubInvocationContext invocationContext, Func<HubInvocationContext, ValueTask<object?>> next)
         {
             await EnsureNotDeletedAsync(invocationContext.Context, invocationContext.ServiceProvider);
-            return await next(invocationContext);
+            try
+            {
+                return await next(invocationContext);
+            }
+            // SignalR hides the message of any other exception from clients outside development
+            catch (ClientException ex)
+            {
+                throw new HubException(ex.Message, ex);
+            }
         }
 
         public async Task OnConnectedAsync(HubLifetimeContext context, Func<HubLifetimeContext, Task> next)

@@ -33,6 +33,9 @@ namespace Notesnook.API.Repositories
         public Task<long> GetAsync(string userId) =>
             settings.Find((s) => s.UserId == userId).Project((s) => s.Generation).FirstOrDefaultAsync();
 
+        public Task<long> GetAsync(IClientSessionHandle session, string userId, CancellationToken ct) =>
+            settings.Find(session, (s) => s.UserId == userId).Project((s) => s.Generation).FirstOrDefaultAsync(ct);
+
         // a write rather than a read, since only a write conflicts with a reset committed during the transaction
         public Task<long> StampAsync(IClientSessionHandle session, string userId, CancellationToken ct) =>
             settings.FindOneAndUpdateAsync(session,
