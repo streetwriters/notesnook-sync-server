@@ -422,6 +422,19 @@ public abstract class TokenContractTests(IdentityHost host) : IdentityTestBase(h
     }
 
     [Fact]
+    public async Task Deleted_users_tokens_stop_working()
+    {
+        var email = NewEmail();
+        var signup = await SignupAsync(email);
+        var (access, refresh) = await LoginAsync(email);
+
+        await host.WithServicesAsync(async (services) => { await services.GetRequiredService<IUserAccountService>().DeleteUserAsync(ClientId, signup.UserId, Password); return 0; });
+
+        await Golden.AssertMatchesAsync("deleted.introspection", await IntrospectAsync(access));
+        await Golden.AssertMatchesAsync("deleted.refresh", await RefreshAsync(refresh));
+    }
+
+    [Fact]
     public async Task Users_are_unregistered_without_their_password()
     {
         var email = NewEmail();

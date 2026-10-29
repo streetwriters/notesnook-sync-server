@@ -45,7 +45,7 @@ public class UserPurgeJobTests : IClassFixture<TestDatabase>, IDisposable
     public void Dispose() => subscriptionServer.Dispose();
 
     private static string NewUserId() => Guid.NewGuid().ToString("N");
-    private static readonly long LongAgo = DateTimeOffset.UtcNow.AddHours(-2).ToUnixTimeMilliseconds();
+    private static readonly long LongAgo = DateTimeOffset.UtcNow.AddHours(-3).ToUnixTimeMilliseconds();
 
     private static IJobExecutionContext Context => Stub<IJobExecutionContext>.Create(("get_CancellationToken", (_) => CancellationToken.None));
 
@@ -118,6 +118,24 @@ public class UserPurgeJobTests : IClassFixture<TestDatabase>, IDisposable
 
         Assert.Null((await SettingsAsync(userId))!.DeletedAt);
         Assert.Equal(1, await CountNotesAsync(userId));
+    }
+
+    [Fact]
+    public async Task A_delete_retried_during_the_existence_check_keeps_its_mark()
+    {
+        var userId = NewUserId();
+        await CreateUserAsync(userId, LongAgo);
+        var retriedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+        async Task<bool> RetryThenExist()
+        {
+            await db.CreateScope().Repositories.UsersSettings.Collection.UpdateOneAsync((s) => s.UserId == userId, Builders<UserSettings>.Update.Set((s) => s.DeletedAt, retriedAt));
+            return true;
+        }
+
+        await RunAsync(Stub<IUserAccountService>.Create(("UserExistsAsync", (_) => RetryThenExist())), S3());
+
+        Assert.Equal(retriedAt, (await SettingsAsync(userId))!.DeletedAt);
     }
 
     [Fact]

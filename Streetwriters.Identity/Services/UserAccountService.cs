@@ -52,6 +52,17 @@ namespace Streetwriters.Identity.Services
             };
         }
 
+        public async Task DeleteUserAsync(string clientId, string userId, string password)
+        {
+            var user = await userManager.FindByIdAsync(userId);
+            if (user == null || !await UserService.IsUserValidAsync(userManager, user, clientId)) return;
+
+            if (!await userManager.CheckPasswordAsync(user, password)) throw new Exception("Wrong password.");
+
+            await userManager.DeleteAsync(user);
+            await sessionStore.EndAllSessionsAsync(userId);
+        }
+
         // a malformed id makes FindByIdAsync throw, and can never belong to a user
         public async Task<bool> UserExistsAsync(string userId) => ObjectId.TryParse(userId, out _) && await userManager.FindByIdAsync(userId) != null;
 

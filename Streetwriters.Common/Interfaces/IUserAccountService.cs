@@ -8,6 +8,9 @@ namespace Streetwriters.Common.Interfaces
     {
         [WampProcedure("co.streetwriters.identity.users.get_user")]
         Task<UserModel?> GetUserAsync(string clientId, string userId);
+        // still called by API instances that predate background deletion; remove once they're all upgraded
+        [WampProcedure("co.streetwriters.identity.users.delete_user")]
+        Task DeleteUserAsync(string clientId, string userId, string password);
         [WampProcedure("co.streetwriters.identity.users.user_exists")]
         Task<bool> UserExistsAsync(string userId);
         [WampProcedure("co.streetwriters.identity.users.unregister_user")]

@@ -22,7 +22,8 @@ public class SyncV2HubTests(TestDatabase db) : IClassFixture<TestDatabase>
         public override IDictionary<object, object?> Items { get; } = new Dictionary<object, object?>();
         public override IFeatureCollection Features { get; } = new FeatureCollection();
         public override CancellationToken ConnectionAborted => CancellationToken.None;
-        public override void Abort() { }
+        public bool Aborted { get; private set; }
+        public override void Abort() => Aborted = true;
     }
 
     private static readonly Claim[] SyncClaims = [new("scope", "notesnook.sync"), new("aud", "notesnook"), new("role", "notesnook"), new("verified", "true")];
@@ -81,6 +82,37 @@ public class SyncV2HubTests(TestDatabase db) : IClassFixture<TestDatabase>
 
         Assert.Equal("Please login to sync.", error.Message);
         Assert.Equal([live], connected);
+    }
+
+    private sealed class Clock : Microsoft.Extensions.Internal.ISystemClock
+    {
+        public DateTimeOffset UtcNow { get; set; } = DateTimeOffset.UtcNow;
+    }
+
+    [Fact]
+    public async Task An_open_connection_is_cut_off_once_its_user_is_deleted()
+    {
+        var userId = Guid.NewGuid().ToString("N");
+        var scope = db.CreateScope();
+        await scope.Repositories.UsersSettings.Collection.InsertOneAsync(new UserSettings { UserId = userId, Salt = "salt" });
+        var services = new ServiceCollection().AddSingleton<ISyncItemsRepositoryAccessor>(scope.Repositories).BuildServiceProvider();
+        var clock = new Clock();
+        var filter = new SyncAuthorizationHubFilter(new MemoryCache(new MemoryCacheOptions { Clock = clock }));
+        var caller = SyncCaller(userId);
+        var invoked = 0;
+        ValueTask<object?> Invoke() => filter.InvokeMethodAsync(
+            new HubInvocationContext(caller, services, Hub(userId), typeof(SyncV2Hub).GetMethod(nameof(SyncV2Hub.PushCompleted))!, []),
+            (_) => { invoked++; return ValueTask.FromResult<object?>(null); });
+
+        await Invoke();
+        await scope.Repositories.UsersSettings.Collection.UpdateOneAsync((s) => s.UserId == userId, Builders<UserSettings>.Update.Set((s) => s.DeletedAt, 1));
+        clock.UtcNow += TimeSpan.FromMinutes(2);
+
+        var error = await Assert.ThrowsAsync<HubException>(async () => await Invoke());
+
+        Assert.Equal("Please login to sync.", error.Message);
+        Assert.Equal(1, invoked);
+        Assert.True(caller.Aborted);
     }
 
     [Fact]
