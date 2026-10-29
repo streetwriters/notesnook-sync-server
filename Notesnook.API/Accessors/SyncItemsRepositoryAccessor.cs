@@ -50,6 +50,7 @@ namespace Notesnook.API.Accessors
         public Repository<InboxSyncItem> InboxItems { get; }
         public Repository<SyncDevice> SyncDevices { get; }
         public Repository<DeviceIdsChunk> DeviceIdsChunks { get; }
+        public UserGenerations Generations { get; }
         public IReadOnlyList<SyncItemCollection> SyncItemCollections { get; }
 
         public SyncItemsRepositoryAccessor(IDbContext dbContext,
@@ -95,19 +96,20 @@ namespace Notesnook.API.Accessors
             InboxItems = inboxItems;
             SyncDevices = syncDevices;
             DeviceIdsChunks = deviceIdsChunks;
-            Notebooks = new SyncItemsRepository(dbContext, notebooks, logger);
-            Notes = new SyncItemsRepository(dbContext, notes, logger);
-            Contents = new SyncItemsRepository(dbContext, content, logger);
-            Settings = new SyncItemsRepository(dbContext, settings, logger);
-            LegacySettings = new SyncItemsRepository(dbContext, legacySettings, logger);
-            Attachments = new SyncItemsRepository(dbContext, attachments, logger);
-            Shortcuts = new SyncItemsRepository(dbContext, shortcuts, logger);
-            Reminders = new SyncItemsRepository(dbContext, reminders, logger);
-            Relations = new SyncItemsRepository(dbContext, relations, logger);
-            Colors = new SyncItemsRepository(dbContext, colors, logger);
-            Vaults = new SyncItemsRepository(dbContext, vaults, logger);
-            Tags = new SyncItemsRepository(dbContext, tags, logger);
-            InboxItemsHistory = new SyncItemsRepository(dbContext, inboxItemsHistory, logger);
+            Generations = new UserGenerations(usersSettings.Collection);
+            Notebooks = new SyncItemsRepository(dbContext, notebooks, Generations, logger);
+            Notes = new SyncItemsRepository(dbContext, notes, Generations, logger);
+            Contents = new SyncItemsRepository(dbContext, content, Generations, logger);
+            Settings = new SyncItemsRepository(dbContext, settings, Generations, logger);
+            LegacySettings = new SyncItemsRepository(dbContext, legacySettings, Generations, logger);
+            Attachments = new SyncItemsRepository(dbContext, attachments, Generations, logger);
+            Shortcuts = new SyncItemsRepository(dbContext, shortcuts, Generations, logger);
+            Reminders = new SyncItemsRepository(dbContext, reminders, Generations, logger);
+            Relations = new SyncItemsRepository(dbContext, relations, Generations, logger);
+            Colors = new SyncItemsRepository(dbContext, colors, Generations, logger);
+            Vaults = new SyncItemsRepository(dbContext, vaults, Generations, logger);
+            Tags = new SyncItemsRepository(dbContext, tags, Generations, logger);
+            InboxItemsHistory = new SyncItemsRepository(dbContext, inboxItemsHistory, Generations, logger);
 
             SyncItemCollections = [
                 new("settingitem", Settings),

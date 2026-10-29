@@ -38,19 +38,17 @@ using Streetwriters.Common.Exceptions;
 using Streetwriters.Common.Extensions;
 using Streetwriters.Common.Messages;
 using Streetwriters.Common.Models;
-using Streetwriters.Data.Interfaces;
 
 namespace Notesnook.API.Services
 {
     public class UserService(IHttpContextAccessor accessor,
         ISyncItemsRepositoryAccessor syncItemsRepositoryAccessor,
-        IUnitOfWork unitOfWork, IS3Service s3Service, SyncDeviceService syncDeviceService, WampServiceAccessor serviceAccessor, ILogger<UserService> logger) : IUserService
+        IS3Service s3Service, SyncDeviceService syncDeviceService, WampServiceAccessor serviceAccessor, ILogger<UserService> logger) : IUserService
     {
         private static readonly System.Security.Cryptography.RandomNumberGenerator Rng = System.Security.Cryptography.RandomNumberGenerator.Create();
         private IHttpContextAccessor HttpContextAccessor { get; } = accessor;
         private ISyncItemsRepositoryAccessor Repositories { get; } = syncItemsRepositoryAccessor;
         private IS3Service S3Service { get; set; } = s3Service;
-        private readonly IUnitOfWork unit = unitOfWork;
 
         public async Task<SignupResponse> CreateUserAsync(SignupForm form)
         {
@@ -162,9 +160,15 @@ namespace Notesnook.API.Services
 
         public async Task<EncryptedData?> GetEncryptionVerifier(string userId)
         {
+            // an item from before a reset is encrypted with the old key, so it would make the client reject its new key
+            var generation = await Repositories.Generations.GetAsync(userId);
+            var filter = Builders<SyncItem>.Filter.And(
+                Builders<SyncItem>.Filter.Eq((s) => s.UserId, userId),
+                Builders<SyncItem>.Filter.In((s) => s.KeyVersion, [null, 0]),
+                UserGenerations.Filter(generation));
             foreach (var collection in Repositories.SyncItemCollections)
             {
-                var item = await collection.Repository.FindOneAsync((s) => s.UserId == userId && (s.KeyVersion == null || s.KeyVersion == 0));
+                var item = await collection.Repository.Collection.Find(filter).FirstOrDefaultAsync();
                 if (item != null)
                 {
                     return new EncryptedData
@@ -219,14 +223,12 @@ namespace Notesnook.API.Services
 
         }
 
-        public async Task<bool> ResetUserAsync(string userId, bool removeAttachments)
+        public async Task ResetUserAsync(string userId, bool removeAttachments)
         {
-            foreach (var collection in Repositories.SyncItemCollections)
-                collection.Repository.DeleteByUserId(userId);
-            Repositories.Monographs.DeleteMany((m) => m.UserId == userId);
-            Repositories.InboxApiKey.DeleteMany((t) => t.UserId == userId);
-            if (!await unit.Commit()) return false;
-
+            // first, so no new inbox items arrive
+            await Repositories.InboxApiKey.Collection.DeleteManyAsync((t) => t.UserId == userId);
+            await Repositories.InboxItems.Collection.DeleteManyAsync((i) => i.UserId == userId);
+            await Repositories.Monographs.Collection.DeleteManyAsync((m) => m.UserId == userId);
             await syncDeviceService.ResetDevicesAsync(userId);
 
             await Repositories.UsersSettings.Collection.UpdateOneAsync(Builders<UserSettings>.Filter.Eq((s) => s.UserId, userId), Builders<UserSettings>.Update
@@ -239,12 +241,12 @@ namespace Notesnook.API.Services
                 .Set((s) => s.PendingKeys, null)
                 .Set((s) => s.PendingKeysSince, null)
                 .Set((s) => s.LastSynced, 0)
-                .Inc((s) => s.Revision, 1));
+                .Inc((s) => s.Revision, 1)
+                .Inc((s) => s.Generation, 1)
+                .Set((s) => s.PurgePending, true));
 
             if (removeAttachments)
                 await DeleteAttachmentsAsync(userId);
-
-            return true;
         }
 
         // runs after the user's data is already gone, so a failure here must not turn a completed deletion into an error

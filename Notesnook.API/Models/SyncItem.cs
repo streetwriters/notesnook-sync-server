@@ -46,6 +46,15 @@ namespace Notesnook.API.Models
             get; set;
         }
 
+        [IgnoreDataMember]
+        [MessagePack.IgnoreMember]
+        [JsonIgnore]
+        [BsonIgnoreIfDefault]
+        public long Generation
+        {
+            get; set;
+        }
+
         [JsonPropertyName("iv")]
         [DataMember(Name = "iv")]
         [MessagePack.Key("iv")]

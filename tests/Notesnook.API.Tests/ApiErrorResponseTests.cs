@@ -60,7 +60,7 @@ public class ApiErrorResponseTests(TestDatabase db) : IClassFixture<TestDatabase
                     services.AddSingleton<ISyncItemsRepositoryAccessor>(scope.Repositories);
                     services.AddSingleton<IUserService>((provider) => new UserService(
                         provider.GetRequiredService<Microsoft.AspNetCore.Http.IHttpContextAccessor>(),
-                        scope.Repositories, scope.Unit, s3, scope.Devices, accessor, NullLogger<UserService>.Instance));
+                        scope.Repositories, s3, scope.Devices, accessor, NullLogger<UserService>.Instance));
                 })
                 .Configure(app =>
                 {

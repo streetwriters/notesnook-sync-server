@@ -263,9 +263,8 @@ namespace Notesnook.API.Controllers
         {
             var userId = this.User.GetUserId();
 
-            if (await UserService.ResetUserAsync(userId, removeAttachments))
-                return Ok();
-            return BadRequest();
+            await UserService.ResetUserAsync(userId, removeAttachments);
+            return Ok();
         }
 
         [HttpPost("delete")]

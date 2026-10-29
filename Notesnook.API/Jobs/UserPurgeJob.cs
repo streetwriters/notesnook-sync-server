@@ -41,6 +41,40 @@ namespace Notesnook.API.Jobs
                     logger.LogError(ex, "Failed to purge user {UserId}", user.UserId);
                 }
             }
+
+            var resets = await repositories.UsersSettings.Collection
+                .Find(Builders<UserSettings>.Filter.And(
+                    Builders<UserSettings>.Filter.Eq((s) => s.PurgePending, true),
+                    Builders<UserSettings>.Filter.Eq((s) => s.DeletedAt, null)))
+                .Project((s) => new { s.UserId, s.Generation })
+                .ToListAsync(context.CancellationToken);
+
+            foreach (var user in resets)
+            {
+                context.CancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    await PurgeResetAsync(user.UserId, user.Generation);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Failed to purge the reset data of user {UserId}", user.UserId);
+                }
+            }
+        }
+
+        private async Task PurgeResetAsync(string userId, long generation)
+        {
+            logger.LogInformation("Purging reset data of user {UserId}", userId);
+
+            foreach (var collection in repositories.SyncItemCollections)
+                await collection.Repository.DeleteOlderGenerationsAsync(userId, generation);
+
+            // only the generation we purged, so a reset made meanwhile stays pending
+            await repositories.UsersSettings.Collection.UpdateOneAsync(
+                (s) => s.UserId == userId && s.Generation == generation,
+                Builders<UserSettings>.Update.Unset((s) => s.PurgePending));
+            logger.LogInformation("Purged reset data of user {UserId}", userId);
         }
 
         // no transaction, since one this large outlives Mongo's time limit; every step is idempotent so a failed purge is retried

@@ -44,10 +44,12 @@ namespace Notesnook.API.Repositories
     {
         private readonly string collectionName;
         private readonly ILogger<SyncItemsRepository> logger;
-        public SyncItemsRepository(IDbContext dbContext, IMongoCollection<SyncItem> collection, ILogger<SyncItemsRepository> logger) : base(dbContext, collection)
+        private readonly UserGenerations generations;
+        public SyncItemsRepository(IDbContext dbContext, IMongoCollection<SyncItem> collection, UserGenerations generations, ILogger<SyncItemsRepository> logger) : base(dbContext, collection)
         {
             this.collectionName = collection.CollectionNamespace.CollectionName;
             this.logger = logger;
+            this.generations = generations;
         }
 
         private readonly List<string> ALGORITHMS = [Algorithms.Default];
@@ -56,13 +58,13 @@ namespace Notesnook.API.Repositories
             return ALGORITHMS.Contains(algorithm);
         }
 
-        public Task<IAsyncCursor<SyncItem>> FindItemsById(string userId, IEnumerable<string> ids, bool all, int batchSize)
+        public async Task<IAsyncCursor<SyncItem>> FindItemsById(string userId, IEnumerable<string> ids, bool all, int batchSize)
         {
-            var filters = new List<FilterDefinition<SyncItem>>(new[] { Builders<SyncItem>.Filter.Eq("UserId", userId) });
+            var filters = new List<FilterDefinition<SyncItem>>(new[] { Builders<SyncItem>.Filter.Eq("UserId", userId), UserGenerations.Filter(await generations.GetAsync(userId)) });
 
             if (!all) filters.Add(Builders<SyncItem>.Filter.In("ItemId", ids));
 
-            return Collection.FindAsync(Builders<SyncItem>.Filter.And(filters), new FindOptions<SyncItem>
+            return await Collection.FindAsync(Builders<SyncItem>.Filter.And(filters), new FindOptions<SyncItem>
             {
                 BatchSize = batchSize,
                 AllowDiskUse = true,
@@ -71,10 +73,9 @@ namespace Notesnook.API.Repositories
             });
         }
 
-        public void DeleteByUserId(string userId)
+        public Task DeleteOlderGenerationsAsync(string userId, long generation)
         {
-            var filter = Builders<SyncItem>.Filter.Eq("UserId", userId);
-            dbContext.AddCommand((handle, ct) => Collection.DeleteManyAsync(handle, filter, null, ct));
+            return Collection.DeleteManyAsync(Builders<SyncItem>.Filter.And(Builders<SyncItem>.Filter.Eq("UserId", userId), UserGenerations.OlderThan(generation)));
         }
 
         public void UpsertMany(IEnumerable<SyncItem> items, string userId)
@@ -118,7 +119,13 @@ namespace Notesnook.API.Repositories
                 });
             }
             if (writes.Count == 0) return;
-            dbContext.AddCommand((handle, ct) => Collection.BulkWriteAsync(handle, writes, options: new BulkWriteOptions { IsOrdered = false }, ct));
+            dbContext.AddCommand(async (handle, ct) =>
+            {
+                // inside the transaction, so a retry after a conflicting reset stamps the new generation
+                var generation = await generations.StampAsync(handle, userId, ct);
+                foreach (var item in items) item.Generation = generation;
+                await Collection.BulkWriteAsync(handle, writes, options: new BulkWriteOptions { IsOrdered = false }, ct);
+            });
         }
 
         private static bool IsBase64String(string value)

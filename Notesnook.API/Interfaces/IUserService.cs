@@ -29,7 +29,7 @@ namespace Notesnook.API.Interfaces
         Task<SignupResponse> CreateUserAsync(SignupForm form);
         Task DeleteUserAsync(string userId);
         Task DeleteUserAsync(string userId, string? jti, string password);
-        Task<bool> ResetUserAsync(string userId, bool removeAttachments);
+        Task ResetUserAsync(string userId, bool removeAttachments);
         Task<UserResponse> GetUserAsync(string userId);
         Task<EncryptedData?> GetEncryptionVerifier(string userId);
     }

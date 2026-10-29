@@ -61,6 +61,18 @@ namespace Notesnook.API.Models
         public UserKeys? PendingKeys { get; set; }
         public long? PendingKeysSince { get; set; }
         public long? DeletedAt { get; set; }
+        /// <summary>
+        /// Incremented on every reset.
+        /// </summary>
+        public long Generation { get; set; }
+        /// <summary>
+        /// Set by a reset until UserPurgeJob has deleted the sync items of older generations.
+        /// </summary>
+        public bool? PurgePending { get; set; }
+        /// <summary>
+        /// Incremented on every push, so a reset committed during the push conflicts with it.
+        /// </summary>
+        public long WriteRevision { get; set; }
 
         [BsonId]
         [BsonRepresentation(BsonType.ObjectId)]
