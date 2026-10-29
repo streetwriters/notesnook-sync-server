@@ -43,6 +43,7 @@ namespace Notesnook.API.Jobs
             }
         }
 
+        // no transaction, since one this large outlives Mongo's time limit; every step is idempotent so a failed purge is retried
         private async Task PurgeAsync(string userId)
         {
             if (await serviceAccessor.UserAccountService.UserExistsAsync(userId))
@@ -54,18 +55,12 @@ namespace Notesnook.API.Jobs
                 return;
             }
 
-            await PurgeUserAsync(userId);
-        }
-
-        // no transaction, since one this large outlives Mongo's time limit; every step is idempotent so a failed purge is retried
-        private async Task PurgeUserAsync(string userId)
-        {
             logger.LogInformation("Purging data of user {UserId}", userId);
 
             // first, so no new inbox items arrive while purging
             await repositories.InboxApiKey.Collection.DeleteManyAsync((k) => k.UserId == userId);
             foreach (var collection in repositories.SyncItemCollections)
-                await collection.Repository.Collection.DeleteManyAsync(Builders<SyncItem>.Filter.Eq("UserId", userId));
+                await collection.Repository.Collection.DeleteManyAsync((i) => i.UserId == userId);
             await repositories.InboxItems.Collection.DeleteManyAsync((i) => i.UserId == userId);
             await repositories.Monographs.Collection.DeleteManyAsync((m) => m.UserId == userId);
             await syncDeviceService.ResetDevicesAsync(userId);

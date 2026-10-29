@@ -6,8 +6,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
+using MongoDB.Driver;
 using Notesnook.API.Authorization;
-using Notesnook.API.Extensions;
 using Notesnook.API.Interfaces;
 
 namespace Notesnook.API.Hubs
@@ -41,10 +41,11 @@ namespace Notesnook.API.Hubs
             var userId = context.User?.FindFirstValue("sub");
             if (userId == null) return;
 
-            var deleted = await cache.GetOrCreateAsync($"user_deleted:{userId}", (entry) =>
+            var deleted = await cache.GetOrCreateAsync($"user_deleted:{userId}", async (entry) =>
             {
                 entry.AbsoluteExpirationRelativeToNow = CacheDuration;
-                return services.GetRequiredService<ISyncItemsRepositoryAccessor>().UsersSettings.IsUserDeletedAsync(userId);
+                return !await services.GetRequiredService<ISyncItemsRepositoryAccessor>().UsersSettings.Collection
+                    .Find((s) => s.UserId == userId && s.DeletedAt == null).AnyAsync();
             });
             if (!deleted) return;
 

@@ -25,8 +25,8 @@ public class SyncV2HubTests(TestDatabase db) : IClassFixture<TestDatabase>
         public override void Abort() { }
     }
 
-    private static Caller SyncCaller(string userId) =>
-        new(userId, new Claim("scope", "notesnook.sync"), new Claim("aud", "notesnook"), new Claim("role", "notesnook"), new Claim("verified", "true"));
+    private static readonly Claim[] SyncClaims = [new("scope", "notesnook.sync"), new("aud", "notesnook"), new("role", "notesnook"), new("verified", "true")];
+    private static Caller SyncCaller(string userId) => new(userId, SyncClaims);
 
     private SyncV2Hub Hub(string userId)
     {
@@ -57,7 +57,7 @@ public class SyncV2HubTests(TestDatabase db) : IClassFixture<TestDatabase>
         var services = new ServiceCollection().BuildServiceProvider();
 
         var error = await Assert.ThrowsAsync<HubException>(() => filter.OnConnectedAsync(
-            new HubLifetimeContext(new Caller(userId, new Claim("scope", "notesnook.sync"), new Claim("aud", "notesnook"), new Claim("role", "notesnook")), services, Hub(userId)),
+            new HubLifetimeContext(new Caller(userId, SyncClaims[..^1]), services, Hub(userId)),
             (_) => throw new Exception("connected")));
 
         Assert.Equal("Please confirm your email to sync your notes.", error.Message);

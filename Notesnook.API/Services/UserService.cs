@@ -199,8 +199,6 @@ namespace Notesnook.API.Services
 
         public async Task DeleteUserAsync(string userId, string? jti, string password)
         {
-            logger.LogInformation("Deleting user account: {UserId}", userId);
-
             // Identity's own "Wrong password." error only reaches us as a WAMP runtime error
             if (!await serviceAccessor.UserAccountService.VerifyPasswordAsync(userId, password))
                 throw new ClientException("Wrong password.");
