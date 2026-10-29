@@ -66,9 +66,9 @@ namespace Notesnook.API.Models
         /// </summary>
         public long Generation { get; set; }
         /// <summary>
-        /// Set by a reset until UserPurgeJob has deleted the data of older generations.
+        /// When the latest reset happened, kept until UserPurgeJob has deleted the data of older generations.
         /// </summary>
-        public bool? PurgePending { get; set; }
+        public long? PurgePendingSince { get; set; }
 
         [BsonId]
         [BsonRepresentation(BsonType.ObjectId)]

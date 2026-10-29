@@ -113,6 +113,10 @@ namespace Notesnook.API.Controllers
             return monograph != null && monograph.Generation == await generations.GetAsync(monograph.UserId!) ? monograph : null!;
         }
 
+        // a copy from before a reset that the purge hasn't removed yet would clash with the new one
+        private Task DeleteOlderCopiesAsync(string userId, Monograph monograph) =>
+            monographs.Collection.DeleteManyAsync(CreateMonographFilter(userId, monograph) & UserGenerations.OlderThan<Monograph>(monograph.Generation));
+
         private async Task<string> GenerateUniqueSlugAsync(int length = 10, int maxAttempts = 5)
         {
             for (var i = 0; i < maxAttempts; i++)
@@ -140,6 +144,7 @@ namespace Notesnook.API.Controllers
             {
                 monograph.Id = existingMonograph.Id;
             }
+            await DeleteOlderCopiesAsync(userId, monograph);
 
             await monographs.Collection.ReplaceOneAsync(
                 CreateMonographFilter(userId, monograph) & UserGenerations.Filter<Monograph>(monograph.Generation),
@@ -172,6 +177,7 @@ namespace Notesnook.API.Controllers
             {
                 monograph.Id = existingMonograph.Id;
             }
+            await DeleteOlderCopiesAsync(userId, monograph);
 
             await monographs.Collection.ReplaceOneAsync(
                 CreateMonographFilter(userId, monograph) & UserGenerations.Filter<Monograph>(monograph.Generation),

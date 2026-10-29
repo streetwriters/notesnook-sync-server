@@ -18,11 +18,14 @@ namespace Notesnook.API.Jobs
     {
         // a token cached at deletion (30m) can still start a 5 GiB upload (90m) or get a presigned upload URL (1h), so those land before the purge
         public static readonly TimeSpan GracePeriod = TimeSpan.FromMinutes(150);
+        // requests that read the old generation before a reset can still write to it, so those land before the purge
+        public static readonly TimeSpan ResetGracePeriod = TimeSpan.FromMinutes(15);
 
         public WampServer SubscriptionServer { get; init; } = WampServers.SubscriptionServer;
 
         public async Task Execute(IJobExecutionContext context)
         {
+            SyncEventCounterSource.Log.PurgeStarted();
             var cutoff = DateTimeOffset.UtcNow.Subtract(GracePeriod).ToUnixTimeMilliseconds();
             var users = await repositories.UsersSettings.Collection
                 .Find(Builders<UserSettings>.Filter.Lt((s) => s.DeletedAt, cutoff))
@@ -45,7 +48,7 @@ namespace Notesnook.API.Jobs
 
             var resets = await repositories.UsersSettings.Collection
                 .Find(Builders<UserSettings>.Filter.And(
-                    Builders<UserSettings>.Filter.Eq((s) => s.PurgePending, true),
+                    Builders<UserSettings>.Filter.Lt((s) => s.PurgePendingSince, DateTimeOffset.UtcNow.Subtract(ResetGracePeriod).ToUnixTimeMilliseconds()),
                     Builders<UserSettings>.Filter.Eq((s) => s.DeletedAt, null)))
                 .Project((s) => new { s.UserId, s.Generation })
                 .ToListAsync(context.CancellationToken);

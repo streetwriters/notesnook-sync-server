@@ -25,6 +25,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MongoDB.Bson;
+using MongoDB.Driver;
 using Notesnook.API.Authorization;
 using Notesnook.API.Models;
 using Notesnook.API.Repositories;
@@ -45,12 +46,16 @@ namespace Notesnook.API.Controllers
             SyncDeviceService syncDeviceService) : ControllerBase
     {
 
+        // keys from before a reset no longer work, though the purge may not have deleted them yet
+        private async Task<FilterDefinition<InboxApiKey>> CurrentKeysAsync(string userId) =>
+            Builders<InboxApiKey>.Filter.Eq((k) => k.UserId, userId) & UserGenerations.Filter<InboxApiKey>(await generations.GetAsync(userId));
+
         [HttpGet("api-keys")]
         [Authorize(Policy = "Notesnook")]
         public async Task<IActionResult> GetApiKeysAsync()
         {
             var userId = User.GetUserId();
-            var apiKeys = await inboxApiKeysRepository.FindAsync(t => t.UserId == userId);
+            var apiKeys = await inboxApiKeysRepository.Collection.Find(await CurrentKeysAsync(userId)).ToListAsync();
             return Ok(apiKeys);
         }
 
@@ -68,7 +73,7 @@ namespace Notesnook.API.Controllers
                 return BadRequest(new { error = "Expiry date is required." });
             }
 
-            var count = await inboxApiKeysRepository.CountAsync(t => t.UserId == userId);
+            var count = await inboxApiKeysRepository.Collection.CountDocumentsAsync(await CurrentKeysAsync(userId));
             if (count >= 10)
             {
                 return BadRequest(new { error = "Maximum of 10 inbox api keys allowed." });

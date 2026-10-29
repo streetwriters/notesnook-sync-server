@@ -648,11 +648,36 @@ public abstract class TokenContractTests(IdentityHost host) : IdentityTestBase(h
         Assert.Null(lockedOutUntil);
         var response = await PasswordGrantAsync(email, Password);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Equal("Your account is being reset. Please try again in a minute.", Token(await ReadAsync(response), "error_description"));
+        Assert.Equal("Your account is being reset. Please try again in a few minutes.", Token(await ReadAsync(response), "error_description"));
 
         await host.WithServicesAsync(async (services) => { await services.GetRequiredService<IUserAccountService>().UnlockUserAsync(signup.UserId, lockedOutUntil); return 0; });
 
         await LoginAsync(email);
+    }
+
+    [Fact]
+    public async Task Unlocking_keeps_a_lockout_set_during_the_reset()
+    {
+        var email = NewEmail();
+        var signup = await SignupAsync(email);
+        var lockedOutUntil = await host.WithServicesAsync((services) => services.GetRequiredService<IUserAccountService>().LockUserAsync(signup.UserId));
+        await LockOutAsync(email);
+
+        await host.WithServicesAsync(async (services) => { await services.GetRequiredService<IUserAccountService>().UnlockUserAsync(signup.UserId, lockedOutUntil); return 0; });
+
+        var response = await PasswordGrantAsync(email, Password);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.StartsWith("You have been locked out.", Token(await ReadAsync(response), "error_description"));
+    }
+
+    [Fact]
+    public async Task A_user_being_reset_cant_be_locked_again()
+    {
+        var email = NewEmail();
+        var signup = await SignupAsync(email);
+        await host.WithServicesAsync((services) => services.GetRequiredService<IUserAccountService>().LockUserAsync(signup.UserId));
+
+        await Assert.ThrowsAsync<Exception>(() => host.WithServicesAsync((services) => services.GetRequiredService<IUserAccountService>().LockUserAsync(signup.UserId)));
     }
 
     [Fact]

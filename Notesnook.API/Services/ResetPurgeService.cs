@@ -50,7 +50,7 @@ namespace Notesnook.API.Services
             // only the generation we purged, so a reset made meanwhile stays pending
             await repositories.UsersSettings.Collection.UpdateOneAsync(
                 (s) => s.UserId == userId && s.Generation == generation,
-                Builders<UserSettings>.Update.Unset((s) => s.PurgePending));
+                Builders<UserSettings>.Update.Unset((s) => s.PurgePendingSince));
         }
 
         private static FilterDefinition<T> OlderThan<T>(string userId, long generation) =>

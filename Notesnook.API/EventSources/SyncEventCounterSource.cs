@@ -38,6 +38,12 @@ public sealed class SyncEventCounterSource : EventSource
     public void RecordFetchDuration(long durationMs) => fetchV2Duration.Record(durationMs);
     public void RecordPushDuration(long durationMs) => pushV2Duration.Record(durationMs);
     public void PurgeFailed(string kind) => purgeFailures.Add(1, new KeyValuePair<string, object?>("kind", kind));
+    // a counter is only exported once it has a value, and increase() can't count the failure that creates it
+    public void PurgeStarted()
+    {
+        purgeFailures.Add(0, new KeyValuePair<string, object?>("kind", "delete"));
+        purgeFailures.Add(0, new KeyValuePair<string, object?>("kind", "reset"));
+    }
 
     protected override void Dispose(bool disposing)
     {

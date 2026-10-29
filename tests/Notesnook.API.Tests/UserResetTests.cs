@@ -48,6 +48,11 @@ public class UserResetTests(TestDatabase db) : IClassFixture<TestDatabase>
             Stub<IS3Service>.Create(), scope.ResetPurge, new WampServiceAccessor(Servers.NotesnookAPI), NullLogger<UserService>.Instance);
     }
 
+    private Task ResetAsync(string userId) => Users().ResetUserAsync(userId, removeAttachments: false);
+
+    private Task EndGracePeriodAsync(string userId) =>
+        db.CreateScope().Repositories.UsersSettings.Collection.UpdateOneAsync((s) => s.UserId == userId, Builders<UserSettings>.Update.Set((s) => s.PurgePendingSince, 0));
+
     private Task PurgeAsync(ResetPurgeService? purge = null)
     {
         var scope = db.CreateScope();
@@ -130,7 +135,7 @@ public class UserResetTests(TestDatabase db) : IClassFixture<TestDatabase>
         await PushAsync(userId, "old");
         Assert.NotNull(await Users().GetEncryptionVerifier(userId));
 
-        await Users().ResetUserAsync(userId, removeAttachments: false);
+        await ResetAsync(userId);
 
         Assert.Empty((await FetchAsync(userId)).Items);
         Assert.Null(await Users().GetEncryptionVerifier(userId));
@@ -141,7 +146,7 @@ public class UserResetTests(TestDatabase db) : IClassFixture<TestDatabase>
     public async Task Data_a_crashed_reset_left_behind_is_hidden_and_purged()
     {
         var userId = await CreateUserAsync();
-        await Users().ResetUserAsync(userId, removeAttachments: false);
+        await ResetAsync(userId);
         var (monograph, _) = await LeaveOldDataAsync(userId);
 
         var fetched = await FetchAsync(userId);
@@ -153,6 +158,7 @@ public class UserResetTests(TestDatabase db) : IClassFixture<TestDatabase>
         Assert.Empty(fetched.InboxItems);
         Assert.IsType<NotFoundObjectResult>(await monographs.GetMonographBySlugAsync(monograph.Slug!));
 
+        await EndGracePeriodAsync(userId);
         await PurgeAsync();
 
         var repositories = db.CreateScope().Repositories;
@@ -166,7 +172,7 @@ public class UserResetTests(TestDatabase db) : IClassFixture<TestDatabase>
     public async Task A_device_from_before_the_reset_does_a_full_fetch()
     {
         var userId = await CreateUserAsync();
-        await Users().ResetUserAsync(userId, removeAttachments: false);
+        await ResetAsync(userId);
         await LeaveOldDataAsync(userId);
         await PushAsync(userId, "new");
 
@@ -177,7 +183,7 @@ public class UserResetTests(TestDatabase db) : IClassFixture<TestDatabase>
     public async Task An_inbox_key_from_before_the_reset_is_rejected()
     {
         var userId = await CreateUserAsync();
-        await Users().ResetUserAsync(userId, removeAttachments: false);
+        await ResetAsync(userId);
         var (_, oldKey) = await LeaveOldDataAsync(userId);
         var newKey = new InboxApiKey { UserId = userId, Name = "new", Generation = 1 };
         await db.CreateScope().Repositories.InboxApiKey.Collection.InsertOneAsync(newKey);
@@ -207,7 +213,7 @@ public class UserResetTests(TestDatabase db) : IClassFixture<TestDatabase>
         var caller = new HubCaller(userId);
         await filter.OnConnectedAsync(new HubLifetimeContext(caller, services, Hub(scope, caller)), (_) => Task.CompletedTask);
 
-        await Users().ResetUserAsync(userId, removeAttachments: false);
+        await ResetAsync(userId);
 
         var error = await Assert.ThrowsAsync<HubException>(async () => await filter.InvokeMethodAsync(
             new HubInvocationContext(caller, services, Hub(scope, caller), typeof(SyncV2Hub).GetMethod(nameof(SyncV2Hub.PushItems))!, ["device", Notes("old")]),
@@ -225,10 +231,14 @@ public class UserResetTests(TestDatabase db) : IClassFixture<TestDatabase>
         // pinned by the filter before the reset committed
         scope.Repositories.Generations.Pin(userId, 0);
 
-        await Users().ResetUserAsync(userId, removeAttachments: false);
+        await ResetAsync(userId);
+        await PurgeAsync();
         await Hub(scope, new HubCaller(userId)).PushItems("device", Notes("in-flight"));
 
         Assert.Empty((await FetchAsync(userId)).Items);
+        Assert.NotNull((await SettingsAsync(userId)).PurgePendingSince);
+        Assert.Equal(["in-flight"], await StoredNotesAsync(userId));
+        await EndGracePeriodAsync(userId);
         await PurgeAsync();
         Assert.Empty(await StoredNotesAsync(userId));
     }
@@ -238,27 +248,88 @@ public class UserResetTests(TestDatabase db) : IClassFixture<TestDatabase>
     {
         var userId = await CreateUserAsync();
         await PushAsync(userId, "old", "kept");
-        await Users().ResetUserAsync(userId, removeAttachments: false);
+        await ResetAsync(userId);
 
         await PushAsync(userId, "new", "kept");
+        await EndGracePeriodAsync(userId);
         await PurgeAsync();
 
         Assert.Equal(["kept", "new"], (await StoredNotesAsync(userId)).Order());
         Assert.Equal(["kept", "new"], (await FetchAsync(userId)).Items.Order());
-        Assert.Null((await SettingsAsync(userId)).PurgePending);
+        Assert.Null((await SettingsAsync(userId)).PurgePendingSince);
     }
 
     [Fact]
     public async Task Items_enumerated_lazily_are_stamped_with_the_current_generation()
     {
         var userId = await CreateUserAsync();
-        await Users().ResetUserAsync(userId, removeAttachments: false);
+        await ResetAsync(userId);
 
         var scope = db.CreateScope();
         scope.Repositories.Notes.UpsertMany(new[] { "lazy" }.Select(TestItems.Note), userId);
         await scope.Unit.Commit();
 
         Assert.Equal(["lazy"], (await FetchAsync(userId)).Items);
+    }
+
+    [Fact]
+    public async Task A_device_that_registers_again_keeps_its_new_ids_through_the_purge()
+    {
+        var userId = await CreateUserAsync();
+        await ResetAsync(userId);
+        await LeaveOldDataAsync(userId);
+        var devices = db.CreateScope().Devices;
+        await devices.RegisterDeviceAsync(userId, "old-device");
+        await devices.AddIdsToAllDevicesAsync(userId, [new("new", "note")]);
+
+        await EndGracePeriodAsync(userId);
+        await PurgeAsync();
+
+        Assert.Equal([new("new", "note")], await db.CreateScope().Devices.GetIdsAsync(userId, "old-device", "unsynced"));
+    }
+
+    [Fact]
+    public async Task A_monograph_can_be_published_again_before_its_old_copy_is_purged()
+    {
+        var userId = await CreateUserAsync();
+        await ResetAsync(userId);
+        var (old, _) = await LeaveOldDataAsync(userId);
+
+        MonographsController Controller()
+        {
+            var scope = db.CreateScope();
+            return new MonographsController(scope.Repositories.Monographs, scope.Repositories.Generations, Stub<IURLAnalyzer>.Create(),
+                scope.Devices, new WampServiceAccessor(Servers.NotesnookAPI), NullLogger<MonographsController>.Instance)
+            {
+                ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", userId)], "Test")) } }
+            };
+        }
+        var republished = new Monograph { ItemId = old.ItemId, Title = "new", EncryptedContent = new EncryptedData { Cipher = "cipher", IV = "iv", Salt = "salt", Length = 6 } };
+
+        Assert.IsType<OkObjectResult>(await Controller().PublishV2Async(null, republished));
+        Assert.IsType<OkObjectResult>(await Controller().UpdateAsync(null, new Monograph { ItemId = old.ItemId, Title = "updated", EncryptedContent = republished.EncryptedContent }));
+
+        var stored = await db.CreateScope().Repositories.Monographs.Collection.Find((m) => m.UserId == userId).ToListAsync();
+        Assert.Equal("updated", Assert.Single(stored).Title);
+    }
+
+    [Fact]
+    public async Task Inbox_keys_from_before_the_reset_dont_count()
+    {
+        var userId = await CreateUserAsync();
+        await ResetAsync(userId);
+        // what a crashed reset leaves behind
+        await db.CreateScope().Repositories.InboxApiKey.Collection.InsertManyAsync(Enumerable.Range(0, 10).Select((i) => new InboxApiKey { UserId = userId, Name = $"old {i}" }));
+
+        var scope = db.CreateScope();
+        var inbox = new InboxController(scope.Repositories.InboxApiKey, scope.Repositories.UsersSettings, scope.Repositories.InboxItems, scope.Repositories.Generations, scope.Devices)
+        {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", userId)], "Test")) } }
+        };
+
+        Assert.IsType<OkObjectResult>(await inbox.CreateApiKeyAsync(new CreateInboxApiKeyRequest { Name = "new", ExpiryDate = long.MaxValue }));
+        var listed = Assert.IsAssignableFrom<IEnumerable<InboxApiKey>>(Assert.IsType<OkObjectResult>(await inbox.GetApiKeysAsync()).Value);
+        Assert.Equal("new", Assert.Single(listed).Name);
     }
 
     [Fact]
@@ -332,21 +403,23 @@ public class UserResetTests(TestDatabase db) : IClassFixture<TestDatabase>
     {
         var userId = await CreateUserAsync();
         await PushAsync(userId, "first");
-        await Users().ResetUserAsync(userId, removeAttachments: false);
+        await ResetAsync(userId);
         await PushAsync(userId, "second");
 
         var real = db.CreateScope().Repositories;
-        var resetDuringPurge = new Lazy<Task>(() => Users().ResetUserAsync(userId, removeAttachments: false));
+        var resetDuringPurge = new Lazy<Task>(() => ResetAsync(userId));
+        await EndGracePeriodAsync(userId);
         await PurgeAsync(PurgeWithSyncItems(() => { resetDuringPurge.Value.GetAwaiter().GetResult(); return real.SyncItemCollections; }));
 
         var settings = await SettingsAsync(userId);
         Assert.Equal(2, settings.Generation);
-        Assert.True(settings.PurgePending);
+        Assert.NotNull(settings.PurgePendingSince);
         Assert.Equal(["second"], await StoredNotesAsync(userId));
 
+        await EndGracePeriodAsync(userId);
         await PurgeAsync();
 
-        Assert.Null((await SettingsAsync(userId)).PurgePending);
+        Assert.Null((await SettingsAsync(userId)).PurgePendingSince);
         Assert.Empty(await StoredNotesAsync(userId));
     }
 
@@ -355,16 +428,18 @@ public class UserResetTests(TestDatabase db) : IClassFixture<TestDatabase>
     {
         var userId = await CreateUserAsync();
         await PushAsync(userId, "old");
-        await Users().ResetUserAsync(userId, removeAttachments: false);
+        await ResetAsync(userId);
 
+        await EndGracePeriodAsync(userId);
         await PurgeAsync(PurgeWithSyncItems(() => throw new TimeoutException()));
 
-        Assert.True((await SettingsAsync(userId)).PurgePending);
+        Assert.NotNull((await SettingsAsync(userId)).PurgePendingSince);
         Assert.Equal(["old"], await StoredNotesAsync(userId));
 
+        await EndGracePeriodAsync(userId);
         await PurgeAsync();
 
-        Assert.Null((await SettingsAsync(userId)).PurgePending);
+        Assert.Null((await SettingsAsync(userId)).PurgePendingSince);
         Assert.Empty(await StoredNotesAsync(userId));
     }
 }

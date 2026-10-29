@@ -158,8 +158,18 @@ namespace Notesnook.API.Services
             var filter = UserFilter(userId) & UserGenerations.OlderThan<SyncDevice>(generation);
             var deviceIds = await repositories.SyncDevices.Collection.Find(filter).Project((d) => d.DeviceId).ToListAsync();
             if (deviceIds.Count == 0) return;
-            await repositories.SyncDevices.Collection.DeleteManyAsync(filter);
-            await repositories.DeviceIdsChunks.Collection.DeleteManyAsync(DeviceIdsChunkFilter(userId) & Builders<DeviceIdsChunk>.Filter.In(x => x.DeviceId, deviceIds));
+            using var session = await repositories.SyncDevices.Collection.Database.Client.StartSessionAsync();
+            foreach (var deviceId in deviceIds)
+            {
+                // a transaction, so a device registering again meanwhile conflicts with it instead of losing its new ids
+                await session.WithTransactionAsync(async (s, ct) =>
+                {
+                    var deleted = await repositories.SyncDevices.Collection.DeleteOneAsync(s, DeviceFilter(userId, deviceId) & UserGenerations.OlderThan<SyncDevice>(generation), cancellationToken: ct);
+                    if (deleted.DeletedCount == 1)
+                        await repositories.DeviceIdsChunks.Collection.DeleteManyAsync(s, DeviceIdsChunkFilter(userId, deviceId), cancellationToken: ct);
+                    return true;
+                });
+            }
         }
 
         public async Task ResetDevicesAsync(string userId)

@@ -199,7 +199,7 @@ namespace Streetwriters.Identity.Services
         {
             // a later lockout, e.g. for failed attempts, ends at a different time
             if (user.ResetLockoutEnd != null && user.ResetLockoutEnd == user.LockoutEnd?.ToUnixTimeMilliseconds())
-                return "Your account is being reset. Please try again in a minute.";
+                return "Your account is being reset. Please try again in a few minutes.";
             var timeLeft = user.LockoutEnd - DateTimeOffset.Now;
             return timeLeft.HasValue
                 ? $"You have been locked out. Please try again in {timeLeft.Value.Minutes.Pluralize("minute", "minutes")} and {timeLeft.Value.Seconds.Pluralize("second", "seconds")}."

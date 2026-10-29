@@ -27,7 +27,8 @@ namespace Streetwriters.Identity.Services
     public class UserAccountService(UserManager<User> userManager, IMFAService mfaService, ISessionStore sessionStore, RoleManager<MongoRole> roleManager, EmailAddressValidator emailValidator, ITemplatedEmailSender emailSender, ITokenIssuer tokenIssuer, ILogger<UserAccountService> logger) : IUserAccountService
     {
         // long enough for the API to finish an account reset, short enough to not lock out a user it never unlocks
-        private static readonly TimeSpan LockDuration = TimeSpan.FromMinutes(2);
+        // well past the slowest reset: three tries at clearing sessions, each waiting on two servers, then the attachments' removal
+        private static readonly TimeSpan LockDuration = TimeSpan.FromMinutes(10);
         private static readonly TimeSpan ClearCacheTimeout = TimeSpan.FromSeconds(10);
 
         public async Task<UserModel?> GetUserAsync(string clientId, string userId)
@@ -151,6 +152,9 @@ namespace Streetwriters.Identity.Services
         {
             var user = await userManager.FindByIdAsync(userId) ?? throw new Exception("User not found.");
             var lockedOutUntil = user.LockoutEnd > DateTimeOffset.UtcNow ? user.LockoutEnd : null;
+            // the other reset's unlock would end this one's lock, or this one's would restore the other's
+            if (lockedOutUntil != null && user.ResetLockoutEnd == lockedOutUntil.Value.ToUnixTimeMilliseconds())
+                throw new Exception($"User {userId} is already being reset.");
             var until = DateTimeOffset.UtcNow.Add(LockDuration);
 
             // users created before lockout was enabled have it off
@@ -163,6 +167,8 @@ namespace Streetwriters.Identity.Services
         public async Task UnlockUserAsync(string userId, long? lockedOutUntil)
         {
             var user = await userManager.FindByIdAsync(userId) ?? throw new Exception("User not found.");
+            // a lockout set since, e.g. for failed attempts once this one ran out, is kept
+            if (user.ResetLockoutEnd != user.LockoutEnd?.ToUnixTimeMilliseconds()) return;
             EnsureSucceeded(await userManager.SetLockoutEndDateAsync(user, lockedOutUntil == null ? null : DateTimeOffset.FromUnixTimeMilliseconds(lockedOutUntil.Value)), userId);
         }
 

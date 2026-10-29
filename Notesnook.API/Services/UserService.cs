@@ -238,7 +238,7 @@ namespace Notesnook.API.Services
                 .Set((s) => s.LastSynced, 0)
                 .Inc((s) => s.Revision, 1)
                 .Inc((s) => s.Generation, 1)
-                .Set((s) => s.PurgePending, true),
+                .Set((s) => s.PurgePendingSince, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()),
                 new FindOneAndUpdateOptions<UserSettings> { ReturnDocument = ReturnDocument.After }) ?? throw new NotFoundException("User not found.");
 
             // best effort, since UserPurgeJob retries whatever is left
