@@ -36,10 +36,7 @@ namespace Streetwriters.Common.Extensions
             return services;
         }
 
-        /// <summary>
-        /// The cache of token introspections. With Redis it is shared by every replica, so clearing a revoked
-        /// token's entry once clears it everywhere; without, the server is expected to run as a single instance.
-        /// </summary>
+        // with Redis every replica shares it, so clearing a revoked token once clears it everywhere; without, the server must run as one instance
         public static IServiceCollection AddTokenCache(this IServiceCollection services, Server server)
         {
             if (!string.IsNullOrEmpty(Constants.CACHE_REDIS_CONNECTION_STRING))

@@ -89,9 +89,5 @@ namespace Notesnook.API.Models
 
         [JsonIgnore]
         public ContentSanitizationLevel ContentSanitizationLevel { get; set; }
-
-        [JsonIgnore]
-        [BsonIgnoreIfDefault]
-        public long Generation { get; set; }
     }
 }

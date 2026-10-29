@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 using System.Diagnostics.Tracing;
 
@@ -37,13 +36,9 @@ public sealed class SyncEventCounterSource : EventSource
     public void Push() => pushCounter.Add(1);
     public void RecordFetchDuration(long durationMs) => fetchV2Duration.Record(durationMs);
     public void RecordPushDuration(long durationMs) => pushV2Duration.Record(durationMs);
-    public void PurgeFailed(string kind) => purgeFailures.Add(1, new KeyValuePair<string, object?>("kind", kind));
+    public void PurgeFailed() => purgeFailures.Add(1);
     // a counter is only exported once it has a value, and increase() can't count the failure that creates it
-    public void PurgeStarted()
-    {
-        purgeFailures.Add(0, new KeyValuePair<string, object?>("kind", "delete"));
-        purgeFailures.Add(0, new KeyValuePair<string, object?>("kind", "reset"));
-    }
+    public void PurgeStarted() => purgeFailures.Add(0);
 
     protected override void Dispose(bool disposing)
     {

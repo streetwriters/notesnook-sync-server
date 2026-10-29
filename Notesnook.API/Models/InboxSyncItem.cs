@@ -81,14 +81,5 @@ namespace Notesnook.API.Models
         {
             get; set;
         }
-
-        [IgnoreDataMember]
-        [MessagePack.IgnoreMember]
-        [JsonIgnore]
-        [BsonIgnoreIfDefault]
-        public long Generation
-        {
-            get; set;
-        }
     }
 }

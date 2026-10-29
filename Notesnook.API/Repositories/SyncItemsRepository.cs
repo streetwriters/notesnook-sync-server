@@ -60,7 +60,7 @@ namespace Notesnook.API.Repositories
 
         public async Task<IAsyncCursor<SyncItem>> FindItemsById(string userId, IEnumerable<string> ids, bool all, int batchSize)
         {
-            var filters = new List<FilterDefinition<SyncItem>>(new[] { Builders<SyncItem>.Filter.Eq("UserId", userId), UserGenerations.Filter<SyncItem>(await generations.GetAsync(userId)) });
+            var filters = new List<FilterDefinition<SyncItem>>(new[] { Builders<SyncItem>.Filter.Eq("UserId", userId), UserGenerations.Filter(await generations.GetAsync(userId)) });
 
             if (!all) filters.Add(Builders<SyncItem>.Filter.In("ItemId", ids));
 
@@ -75,7 +75,7 @@ namespace Notesnook.API.Repositories
 
         public Task DeleteOlderGenerationsAsync(string userId, long generation)
         {
-            return Collection.DeleteManyAsync(Builders<SyncItem>.Filter.And(Builders<SyncItem>.Filter.Eq("UserId", userId), UserGenerations.OlderThan<SyncItem>(generation)));
+            return Collection.DeleteManyAsync(Builders<SyncItem>.Filter.And(Builders<SyncItem>.Filter.Eq("UserId", userId), UserGenerations.OlderThan(generation)));
         }
 
         public void UpsertMany(IEnumerable<SyncItem> items, string userId)

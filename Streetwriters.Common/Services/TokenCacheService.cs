@@ -23,7 +23,6 @@ using Streetwriters.Common.Interfaces;
 
 namespace Streetwriters.Common.Services
 {
-    // every replica shares the cache, so clearing it once clears it for all of them
     public class TokenCacheService(IDistributedCache cache) : ITokenCacheService
     {
         public async Task ClearAsync(string[] keys)

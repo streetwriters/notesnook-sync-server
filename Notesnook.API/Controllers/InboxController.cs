@@ -25,10 +25,8 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MongoDB.Bson;
-using MongoDB.Driver;
 using Notesnook.API.Authorization;
 using Notesnook.API.Models;
-using Notesnook.API.Repositories;
 using Notesnook.API.Services;
 using Streetwriters.Common;
 using Streetwriters.Common.Messages;
@@ -42,20 +40,15 @@ namespace Notesnook.API.Controllers
             Repository<InboxApiKey> inboxApiKeysRepository,
             Repository<UserSettings> userSettingsRepository,
             Repository<InboxSyncItem> inboxItemsRepository,
-            UserGenerations generations,
             SyncDeviceService syncDeviceService) : ControllerBase
     {
-
-        // keys from before a reset no longer work, though the purge may not have deleted them yet
-        private async Task<FilterDefinition<InboxApiKey>> CurrentKeysAsync(string userId) =>
-            Builders<InboxApiKey>.Filter.Eq((k) => k.UserId, userId) & UserGenerations.Filter<InboxApiKey>(await generations.GetAsync(userId));
 
         [HttpGet("api-keys")]
         [Authorize(Policy = "Notesnook")]
         public async Task<IActionResult> GetApiKeysAsync()
         {
             var userId = User.GetUserId();
-            var apiKeys = await inboxApiKeysRepository.Collection.Find(await CurrentKeysAsync(userId)).ToListAsync();
+            var apiKeys = await inboxApiKeysRepository.FindAsync(t => t.UserId == userId);
             return Ok(apiKeys);
         }
 
@@ -73,7 +66,7 @@ namespace Notesnook.API.Controllers
                 return BadRequest(new { error = "Expiry date is required." });
             }
 
-            var count = await inboxApiKeysRepository.Collection.CountDocumentsAsync(await CurrentKeysAsync(userId));
+            var count = await inboxApiKeysRepository.CountAsync(t => t.UserId == userId);
             if (count >= 10)
             {
                 return BadRequest(new { error = "Maximum of 10 inbox api keys allowed." });
@@ -85,8 +78,7 @@ namespace Notesnook.API.Controllers
                 Name = request.Name,
                 DateCreated = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
                 ExpiryDate = request.ExpiryDate,
-                LastUsedAt = 0,
-                Generation = await generations.GetAsync(userId)
+                LastUsedAt = 0
             };
             await inboxApiKeysRepository.InsertAsync(inboxApiKey);
             return Ok(inboxApiKey);
@@ -139,8 +131,6 @@ namespace Notesnook.API.Controllers
 
             request.UserId = userId;
             request.ItemId = ObjectId.GenerateNewId().ToString();
-            // the API key's generation, pinned when it was checked
-            request.Generation = await generations.GetAsync(userId);
             await inboxItemsRepository.InsertAsync(request);
             await syncDeviceService.AddIdsToAllDevicesAsync(userId, [new(request.ItemId, "inbox_item")]);
             await WampServers.MessengerServer.PublishMessageAsync(MessengerServerTopics.SendSSETopic, new SendSSEMessage

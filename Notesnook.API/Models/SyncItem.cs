@@ -50,10 +50,7 @@ namespace Notesnook.API.Models
         [MessagePack.IgnoreMember]
         [JsonIgnore]
         [BsonIgnoreIfDefault]
-        public long Generation
-        {
-            get; set;
-        }
+        public long Generation { get; set; }
 
         [JsonPropertyName("iv")]
         [DataMember(Name = "iv")]

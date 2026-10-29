@@ -59,7 +59,7 @@ public class UserPurgeJobTests : IClassFixture<TestDatabase>, IDisposable
     {
         var scope = db.CreateScope();
         var accessor = new WampServiceAccessor(Servers.NotesnookAPI) { UserAccountService = identity };
-        return new UserPurgeJob(scope.Repositories, scope.Devices, scope.ResetPurge, s3, accessor, NullLogger<UserPurgeJob>.Instance) { SubscriptionServer = subscriptionClient }.Execute(Context);
+        return new UserPurgeJob(scope.Repositories, scope.Devices, s3, accessor, NullLogger<UserPurgeJob>.Instance) { SubscriptionServer = subscriptionClient }.Execute(Context);
     }
 
     private async Task CreateUserAsync(string userId, long? deletedAt)

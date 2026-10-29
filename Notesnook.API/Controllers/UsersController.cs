@@ -289,8 +289,7 @@ namespace Notesnook.API.Controllers
             var jti = User.FindFirstValue("jti");
             var accounts = serviceAccessor.UserAccountService;
 
-            // the other devices hold the old keys, so they're logged out, and kept from logging back in until the reset is done,
-            // attachments included, since removing them would also take any a new login uploaded
+            // the other devices hold the old keys, so they're kept out until the reset, attachments included, is done
             var lockedOutUntil = await RetryAsync(() => accounts.LockUserAsync(userId));
             try
             {

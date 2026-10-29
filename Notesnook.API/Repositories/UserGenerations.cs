@@ -26,7 +26,7 @@ using Notesnook.API.Models;
 namespace Notesnook.API.Repositories
 {
     /// <summary>
-    /// Every reset starts a new generation of the user's data. Data from an older one is hidden until UserPurgeJob deletes it.
+    /// Every reset starts a new generation of the user's sync items. Items from an older one are hidden until UserPurgeJob deletes them.
     /// </summary>
     public class UserGenerations(IMongoCollection<UserSettings> settings)
     {
@@ -38,22 +38,19 @@ namespace Notesnook.API.Repositories
         public async Task<long> GetAsync(string userId)
         {
             if (!pinned.TryGetValue(userId, out var generation))
-                pinned[userId] = generation = await ReadAsync(userId);
+                pinned[userId] = generation = await settings.Find((s) => s.UserId == userId).Project((s) => s.Generation).FirstOrDefaultAsync();
             return generation;
         }
 
         public void Pin(string userId, long generation) => pinned[userId] = generation;
 
-        public Task<long> ReadAsync(string userId) =>
-            settings.Find((s) => s.UserId == userId).Project((s) => s.Generation).FirstOrDefaultAsync();
+        // items stored before generations existed have no Generation, so they belong to generation 0
+        public static FilterDefinition<SyncItem> Filter(long generation) => generation == 0
+            ? Builders<SyncItem>.Filter.In("Generation", new BsonValue[] { 0, BsonNull.Value })
+            : Builders<SyncItem>.Filter.Eq("Generation", generation);
 
-        // data stored before generations existed has no Generation, so it belongs to generation 0
-        public static FilterDefinition<T> Filter<T>(long generation) => generation == 0
-            ? Builders<T>.Filter.In("Generation", new BsonValue[] { 0, BsonNull.Value })
-            : Builders<T>.Filter.Eq("Generation", generation);
-
-        public static FilterDefinition<T> OlderThan<T>(long generation) => Builders<T>.Filter.Or(
-            Builders<T>.Filter.Lt("Generation", generation),
-            Builders<T>.Filter.Eq("Generation", BsonNull.Value));
+        public static FilterDefinition<SyncItem> OlderThan(long generation) => Builders<SyncItem>.Filter.Or(
+            Builders<SyncItem>.Filter.Lt("Generation", generation),
+            Builders<SyncItem>.Filter.Eq("Generation", BsonNull.Value));
     }
 }

@@ -34,7 +34,6 @@ using MongoDB.Driver;
 using Notesnook.API.Helpers;
 using Notesnook.API.Interfaces;
 using Notesnook.API.Models;
-using Notesnook.API.Repositories;
 using Notesnook.API.Services;
 using Streetwriters.Data.Interfaces;
 
@@ -234,7 +233,6 @@ namespace Notesnook.API.Hubs
 
             SyncEventCounterSource.Log.FetchV2();
 
-            var generation = await Repositories.Generations.GetAsync(userId);
             var device = await SyncDeviceService.GetDeviceAsync(userId, deviceId);
             if (device == null)
                 device = await SyncDeviceService.RegisterDeviceAsync(userId, deviceId);
@@ -274,11 +272,10 @@ namespace Notesnook.API.Hubs
                     var unsyncedMonographIds = ids.Where(k => k.Type == "monograph").Select(k => k.ItemId).ToList();
                     // _id is stored as an ObjectId, so string IDs would never match it
                     var unsyncedMonographObjectIds = unsyncedMonographIds.Where(id => ObjectId.TryParse(id, out _)).Select(ObjectId.Parse);
-                    var userFilter = Builders<Monograph>.Filter.Eq(m => m.UserId, userId) & UserGenerations.Filter<Monograph>(generation);
                     FilterDefinition<Monograph> filter = device.IsSyncReset
-                        ? userFilter
+                        ? Builders<Monograph>.Filter.Eq(m => m.UserId, userId)
                         : Builders<Monograph>.Filter.And(
-                            userFilter,
+                            Builders<Monograph>.Filter.Eq(m => m.UserId, userId),
                             Builders<Monograph>.Filter.Or(
                                 Builders<Monograph>.Filter.In(m => m.ItemId, unsyncedMonographIds),
                                 Builders<Monograph>.Filter.In("_id", unsyncedMonographObjectIds)
@@ -311,9 +308,9 @@ namespace Notesnook.API.Hubs
                 if (includeInboxItems)
                 {
                     var unsyncedInboxItemIds = ids.Where(k => k.Type == "inbox_item").Select(k => k.ItemId);
-                    var inboxFilter = Builders<InboxSyncItem>.Filter.Eq(m => m.UserId, userId) & UserGenerations.Filter<InboxSyncItem>(generation);
-                    if (!device.IsSyncReset) inboxFilter &= Builders<InboxSyncItem>.Filter.In(m => m.ItemId, unsyncedInboxItemIds);
-                    var userInboxItems = await Repositories.InboxItems.Collection.Find(inboxFilter).ToListAsync();
+                    var userInboxItems = device.IsSyncReset
+                        ? await Repositories.InboxItems.FindAsync(m => m.UserId == userId)
+                        : await Repositories.InboxItems.FindAsync(m => m.UserId == userId && unsyncedInboxItemIds.Contains(m.ItemId));
                     if (userInboxItems.Any() && !await Clients.Caller.SendInboxItems(userInboxItems).WaitAsync(TimeSpan.FromMinutes(10)))
                     {
                         throw new HubException("Client rejected inbox items.");

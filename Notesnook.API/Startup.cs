@@ -224,9 +224,7 @@ namespace Notesnook.API
                     .AddMongoCollection(Collections.InboxItemsHistoryKey);
 
             services.AddScoped<ISyncItemsRepositoryAccessor, SyncItemsRepositoryAccessor>();
-            services.AddScoped((provider) => provider.GetRequiredService<ISyncItemsRepositoryAccessor>().Generations);
             services.AddScoped<SyncDeviceService>();
-            services.AddScoped<ResetPurgeService>();
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<IUserKeysService, UserKeysService>();
             services.AddSingleton<S3Clients>();

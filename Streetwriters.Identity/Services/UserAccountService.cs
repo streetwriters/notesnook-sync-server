@@ -26,8 +26,7 @@ namespace Streetwriters.Identity.Services
 {
     public class UserAccountService(UserManager<User> userManager, IMFAService mfaService, ISessionStore sessionStore, RoleManager<MongoRole> roleManager, EmailAddressValidator emailValidator, ITemplatedEmailSender emailSender, ITokenIssuer tokenIssuer, ILogger<UserAccountService> logger) : IUserAccountService
     {
-        // long enough for the API to finish an account reset, short enough to not lock out a user it never unlocks
-        // well past the slowest reset: three tries at clearing sessions, each waiting on two servers, then the attachments' removal
+        // well past the slowest reset (three tries at clearing sessions on two servers, then the attachments), yet brief if never unlocked
         private static readonly TimeSpan LockDuration = TimeSpan.FromMinutes(10);
         private static readonly TimeSpan ClearCacheTimeout = TimeSpan.FromSeconds(10);
 

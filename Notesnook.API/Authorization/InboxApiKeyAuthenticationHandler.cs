@@ -26,7 +26,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 using Notesnook.API.Models;
-using Notesnook.API.Repositories;
 using Streetwriters.Data.Repositories;
 
 namespace Notesnook.API.Authorization
@@ -43,18 +42,15 @@ namespace Notesnook.API.Authorization
     public class InboxApiKeyAuthenticationHandler : AuthenticationHandler<InboxApiKeyAuthenticationSchemeOptions>
     {
         private readonly Repository<InboxApiKey> _inboxApiKeyRepository;
-        private readonly UserGenerations _generations;
 
         public InboxApiKeyAuthenticationHandler(
             IOptionsMonitor<InboxApiKeyAuthenticationSchemeOptions> options,
             ILoggerFactory logger,
             UrlEncoder encoder,
-            Repository<InboxApiKey> inboxApiKeyRepository,
-            UserGenerations generations)
+            Repository<InboxApiKey> inboxApiKeyRepository)
             : base(options, logger, encoder)
         {
             _inboxApiKeyRepository = inboxApiKeyRepository;
-            _generations = generations;
         }
 
         protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
@@ -80,12 +76,6 @@ namespace Notesnook.API.Authorization
             {
                 return AuthenticateResult.Fail("API key has expired");
             }
-            // a key from before a reset is invalid even if the reset didn't get to delete it
-            if (inboxApiKey.Generation != await _generations.ReadAsync(inboxApiKey.UserId))
-            {
-                return AuthenticateResult.Fail("Invalid API key");
-            }
-            _generations.Pin(inboxApiKey.UserId, inboxApiKey.Generation);
 
             // not an upsert, which would recreate a key deleted while this request was in flight
             await _inboxApiKeyRepository.Collection.UpdateOneAsync(

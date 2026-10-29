@@ -38,17 +38,19 @@ using Streetwriters.Common.Exceptions;
 using Streetwriters.Common.Extensions;
 using Streetwriters.Common.Messages;
 using Streetwriters.Common.Models;
+using Streetwriters.Data.Interfaces;
 
 namespace Notesnook.API.Services
 {
     public class UserService(IHttpContextAccessor accessor,
         ISyncItemsRepositoryAccessor syncItemsRepositoryAccessor,
-        IS3Service s3Service, ResetPurgeService resetPurgeService, WampServiceAccessor serviceAccessor, ILogger<UserService> logger) : IUserService
+        IUnitOfWork unitOfWork, IS3Service s3Service, SyncDeviceService syncDeviceService, WampServiceAccessor serviceAccessor, ILogger<UserService> logger) : IUserService
     {
         private static readonly System.Security.Cryptography.RandomNumberGenerator Rng = System.Security.Cryptography.RandomNumberGenerator.Create();
         private IHttpContextAccessor HttpContextAccessor { get; } = accessor;
         private ISyncItemsRepositoryAccessor Repositories { get; } = syncItemsRepositoryAccessor;
         private IS3Service S3Service { get; set; } = s3Service;
+        private readonly IUnitOfWork unit = unitOfWork;
 
         public async Task<SignupResponse> CreateUserAsync(SignupForm form)
         {
@@ -165,7 +167,7 @@ namespace Notesnook.API.Services
             var filter = Builders<SyncItem>.Filter.And(
                 Builders<SyncItem>.Filter.Eq((s) => s.UserId, userId),
                 Builders<SyncItem>.Filter.In((s) => s.KeyVersion, [null, 0]),
-                UserGenerations.Filter<SyncItem>(generation));
+                UserGenerations.Filter(generation));
             foreach (var collection in Repositories.SyncItemCollections)
             {
                 var item = await collection.Repository.Collection.Find(filter).FirstOrDefaultAsync();
@@ -225,8 +227,14 @@ namespace Notesnook.API.Services
 
         public async Task ResetUserAsync(string userId, bool removeAttachments)
         {
-            // the reset itself: everything from an older generation is invisible from here on
-            var settings = await Repositories.UsersSettings.Collection.FindOneAndUpdateAsync(Builders<UserSettings>.Filter.Eq((s) => s.UserId, userId), Builders<UserSettings>.Update
+            // small enough to delete right away, and before the generation changes, so a failure leaves nothing reset
+            Repositories.Monographs.DeleteMany((m) => m.UserId == userId);
+            Repositories.InboxApiKey.DeleteMany((t) => t.UserId == userId);
+            Repositories.InboxItems.DeleteMany((i) => i.UserId == userId);
+            await unit.Commit();
+            await syncDeviceService.ResetDevicesAsync(userId);
+
+            var result = await Repositories.UsersSettings.Collection.UpdateOneAsync(Builders<UserSettings>.Filter.Eq((s) => s.UserId, userId), Builders<UserSettings>.Update
                 .Set((s) => s.AttachmentsKey, null)
                 .Set((s) => s.MonographPasswordsKey, null)
                 .Set((s) => s.DataEncryptionKey, null)
@@ -238,18 +246,8 @@ namespace Notesnook.API.Services
                 .Set((s) => s.LastSynced, 0)
                 .Inc((s) => s.Revision, 1)
                 .Inc((s) => s.Generation, 1)
-                .Set((s) => s.PurgePendingSince, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()),
-                new FindOneAndUpdateOptions<UserSettings> { ReturnDocument = ReturnDocument.After }) ?? throw new NotFoundException("User not found.");
-
-            // best effort, since UserPurgeJob retries whatever is left
-            try
-            {
-                await resetPurgeService.PurgeSmallCollectionsAsync(userId, settings.Generation);
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Failed to purge the reset data of user {UserId}", userId);
-            }
+                .Set((s) => s.PurgePendingSince, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()));
+            if (result.MatchedCount == 0) throw new NotFoundException("User not found.");
 
             if (removeAttachments)
                 await DeleteAttachmentsAsync(userId);

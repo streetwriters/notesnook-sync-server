@@ -61,9 +61,6 @@ namespace Notesnook.API.Models
         public UserKeys? PendingKeys { get; set; }
         public long? PendingKeysSince { get; set; }
         public long? DeletedAt { get; set; }
-        /// <summary>
-        /// Incremented on every reset.
-        /// </summary>
         public long Generation { get; set; }
         /// <summary>
         /// When the latest reset happened, kept until UserPurgeJob has deleted the data of older generations.

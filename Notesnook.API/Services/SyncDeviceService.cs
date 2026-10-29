@@ -28,7 +28,6 @@ using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
 using Notesnook.API.Interfaces;
 using Notesnook.API.Models;
-using Notesnook.API.Repositories;
 using Streetwriters.Data.Interfaces;
 
 namespace Notesnook.API.Services
@@ -148,28 +147,7 @@ namespace Notesnook.API.Services
 
         public async Task<SyncDevice?> GetDeviceAsync(string userId, string deviceId)
         {
-            var device = await repositories.SyncDevices.Collection.Find(DeviceFilter(userId, deviceId)).FirstOrDefaultAsync();
-            // a device from before a reset counts as new, so it registers again and does a full sync
-            return device?.Generation == await repositories.Generations.GetAsync(userId) ? device : null;
-        }
-
-        public async Task DeleteOlderDevicesAsync(string userId, long generation)
-        {
-            var filter = UserFilter(userId) & UserGenerations.OlderThan<SyncDevice>(generation);
-            var deviceIds = await repositories.SyncDevices.Collection.Find(filter).Project((d) => d.DeviceId).ToListAsync();
-            if (deviceIds.Count == 0) return;
-            using var session = await repositories.SyncDevices.Collection.Database.Client.StartSessionAsync();
-            foreach (var deviceId in deviceIds)
-            {
-                // a transaction, so a device registering again meanwhile conflicts with it instead of losing its new ids
-                await session.WithTransactionAsync(async (s, ct) =>
-                {
-                    var deleted = await repositories.SyncDevices.Collection.DeleteOneAsync(s, DeviceFilter(userId, deviceId) & UserGenerations.OlderThan<SyncDevice>(generation), cancellationToken: ct);
-                    if (deleted.DeletedCount == 1)
-                        await repositories.DeviceIdsChunks.Collection.DeleteManyAsync(s, DeviceIdsChunkFilter(userId, deviceId), cancellationToken: ct);
-                    return true;
-                });
-            }
+            return await repositories.SyncDevices.Collection.Find(DeviceFilter(userId, deviceId)).FirstOrDefaultAsync();
         }
 
         public async Task ResetDevicesAsync(string userId)
@@ -211,8 +189,7 @@ namespace Notesnook.API.Services
             var idStrings = ids.Select(i => i.ToString()).ToArray();
             if (idStrings.Length == 0) return;
 
-            var generation = await repositories.Generations.GetAsync(userId);
-            var devices = await repositories.SyncDevices.Collection.Find(session, UserFilter(userId) & UserGenerations.Filter<SyncDevice>(generation)).ToListAsync(ct);
+            var devices = await repositories.SyncDevices.Collection.Find(session, UserFilter(userId)).ToListAsync(ct);
             var writes = devices
                 .Where(d => d.DeviceId != excludedDeviceId)
                 .Select(d => AppendIdsModel(userId, d.DeviceId, "unsynced", idStrings))
@@ -233,8 +210,7 @@ namespace Notesnook.API.Services
                 DeviceFilter(userId, deviceId),
                 Builders<SyncDevice>.Update
                     .Set(x => x.LastAccessTime, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
-                    .Set(x => x.IsSyncReset, true)
-                    .Set(x => x.Generation, await repositories.Generations.GetAsync(userId)),
+                    .Set(x => x.IsSyncReset, true),
                 new FindOneAndUpdateOptions<SyncDevice> { IsUpsert = true, ReturnDocument = ReturnDocument.After });
         }
 
