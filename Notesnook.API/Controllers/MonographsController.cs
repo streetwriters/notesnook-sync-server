@@ -32,6 +32,7 @@ using MongoDB.Driver;
 using NanoidDotNet;
 using Notesnook.API.Extensions;
 using Notesnook.API.Models;
+using Notesnook.API.Repositories;
 using Notesnook.API.Services;
 using Streetwriters.Common;
 using Streetwriters.Common.Accessors;
@@ -47,7 +48,7 @@ namespace Notesnook.API.Controllers
     [ApiController]
     [Route("monographs")]
     [Authorize("Sync")]
-    public class MonographsController(Repository<Monograph> monographs, IURLAnalyzer analyzer, SyncDeviceService syncDeviceService, WampServiceAccessor serviceAccessor, ILogger<MonographsController> logger) : ControllerBase
+    public class MonographsController(Repository<Monograph> monographs, UserGenerations generations, IURLAnalyzer analyzer, SyncDeviceService syncDeviceService, WampServiceAccessor serviceAccessor, ILogger<MonographsController> logger) : ControllerBase
     {
         const string SVG_PIXEL = "<svg xmlns='http://www.w3.org/2000/svg' width='1' height='1'><circle r='9'/></svg>";
         private const int MAX_DOC_SIZE = 15 * 1024 * 1024;
@@ -84,7 +85,7 @@ namespace Notesnook.API.Controllers
             {
                 Limit = 1
             });
-            return await result.FirstOrDefaultAsync();
+            return await CurrentAsync(await result.FirstOrDefaultAsync());
         }
 
         private async Task<Monograph> FindMonographAsync(string itemId)
@@ -93,7 +94,7 @@ namespace Notesnook.API.Controllers
             {
                 Limit = 1
             });
-            return await result.FirstOrDefaultAsync();
+            return await CurrentAsync(await result.FirstOrDefaultAsync());
         }
 
         private async Task<Monograph> FindMonographBySlugAsync(string slug)
@@ -103,7 +104,13 @@ namespace Notesnook.API.Controllers
                 {
                     Limit = 1
                 });
-            return await result.FirstOrDefaultAsync();
+            return await CurrentAsync(await result.FirstOrDefaultAsync());
+        }
+
+        // a monograph from before its owner's reset no longer exists
+        private async Task<Monograph> CurrentAsync(Monograph monograph)
+        {
+            return monograph != null && monograph.Generation == await generations.GetAsync(monograph.UserId!) ? monograph : null!;
         }
 
         private async Task<string> GenerateUniqueSlugAsync(int length = 10, int maxAttempts = 5)
@@ -135,7 +142,7 @@ namespace Notesnook.API.Controllers
             }
 
             await monographs.Collection.ReplaceOneAsync(
-                CreateMonographFilter(userId, monograph),
+                CreateMonographFilter(userId, monograph) & UserGenerations.Filter<Monograph>(monograph.Generation),
                 monograph,
                 new ReplaceOptions { IsUpsert = true }
             );
@@ -167,7 +174,7 @@ namespace Notesnook.API.Controllers
             }
 
             await monographs.Collection.ReplaceOneAsync(
-                CreateMonographFilter(userId, monograph),
+                CreateMonographFilter(userId, monograph) & UserGenerations.Filter<Monograph>(monograph.Generation),
                 monograph,
                 new ReplaceOptions { IsUpsert = true }
             );
@@ -208,7 +215,7 @@ namespace Notesnook.API.Controllers
 
             monograph.DatePublished = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             var result = await monographs.Collection.UpdateOneAsync(
-                CreateMonographFilter(userId, monograph),
+                CreateMonographFilter(userId, monograph) & UserGenerations.Filter<Monograph>(existingMonograph.Generation),
                 Builders<Monograph>.Update
                 .Set(m => m.DatePublished, monograph.DatePublished)
                 .Set(m => m.CompressedContent, monograph.CompressedContent)
@@ -238,7 +245,8 @@ namespace Notesnook.API.Controllers
             var userMonographs = (await monographs.Collection.FindAsync(
                     Builders<Monograph>.Filter.And(
                         Builders<Monograph>.Filter.Eq("UserId", userId),
-                        Builders<Monograph>.Filter.Ne("Deleted", true)
+                        Builders<Monograph>.Filter.Ne("Deleted", true),
+                        UserGenerations.Filter<Monograph>(await generations.GetAsync(userId))
                     )
                , new FindOptions<Monograph, ObjectWithId>
                {
@@ -337,14 +345,15 @@ namespace Notesnook.API.Controllers
             var jti = this.User.FindFirstValue("jti");
 
             await monographs.Collection.ReplaceOneAsync(
-                CreateMonographFilter(userId, monograph),
+                CreateMonographFilter(userId, monograph) & UserGenerations.Filter<Monograph>(monograph.Generation),
                 new Monograph
                 {
                     ItemId = id,
                     Id = monograph.Id,
                     Deleted = true,
                     UserId = monograph.UserId,
-                    ViewCount = 0
+                    ViewCount = 0,
+                    Generation = monograph.Generation
                 }
             );
 
@@ -411,6 +420,7 @@ namespace Notesnook.API.Controllers
             }
 
             monograph.UserId = userId;
+            monograph.Generation = await generations.GetAsync(userId);
             monograph.DatePublished = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
             if (monograph.EncryptedContent?.Cipher.Length > MAX_DOC_SIZE || monograph.CompressedContent?.Length > MAX_DOC_SIZE)
@@ -436,7 +446,8 @@ namespace Notesnook.API.Controllers
                         Id = monograph.Id,
                         Deleted = true,
                         UserId = monograph.UserId,
-                        ViewCount = 0
+                        ViewCount = 0,
+                        Generation = monograph.Generation
                     }
                 );
                 await MarkMonographForSyncAsync(monograph.UserId!, monograph.ItemId ?? monograph.Id);

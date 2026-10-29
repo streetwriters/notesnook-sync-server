@@ -15,6 +15,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Configuration;
 using MongoDB.Driver;
 using Streetwriters.Common;
+using Streetwriters.Common.Interfaces;
 using Streetwriters.Common.Messages;
 using Streetwriters.Common.Models;
 using Streetwriters.Identity.Interfaces;
@@ -72,12 +73,15 @@ public sealed class TestClock : TimeProvider, ISystemClock
     public void Reset() => offset = TimeSpan.Zero;
 }
 
-/// <summary>A WAMP router standing in for another server, recording what Identity publishes to it.</summary>
-public sealed class WampRecorder : IDisposable
+/// <summary>A WAMP router standing in for another server, recording what Identity publishes to it and calls on it.</summary>
+public sealed class WampRecorder : IDisposable, ITokenCacheService
 {
     private readonly DefaultWampHost host;
     public ConcurrentQueue<ClearCacheMessage> ClearCache { get; } = new();
     public ConcurrentQueue<SendSSEMessage> SSE { get; } = new();
+    public ConcurrentQueue<string> ClearedTokens { get; } = new();
+    /// <summary>Clearing any of these keys throws its exception, so a test can fail its own tokens without affecting others.</summary>
+    public ConcurrentDictionary<string, Exception> TokenCacheFailures { get; } = new();
 
     public WampRecorder(int port)
     {
@@ -86,13 +90,23 @@ public sealed class WampRecorder : IDisposable
         // the subjects error when the host shuts down
         realm.Services.GetSubject<ClearCacheMessage>(IdentityServerTopics.ClearCacheTopic).Subscribe(ClearCache.Enqueue, _ => { });
         realm.Services.GetSubject<SendSSEMessage>(MessengerServerTopics.SendSSETopic).Subscribe(SSE.Enqueue, _ => { });
+        realm.Services.RegisterCallee(this).Wait();
         host.Open();
+    }
+
+    public Task ClearAsync(string[] keys)
+    {
+        foreach (var key in keys)
+            if (TokenCacheFailures.TryGetValue(key, out var failure)) return Task.FromException(failure);
+        foreach (var key in keys) ClearedTokens.Enqueue(key);
+        return Task.CompletedTask;
     }
 
     public void Clear()
     {
         ClearCache.Clear();
         SSE.Clear();
+        ClearedTokens.Clear();
     }
 
     public void Dispose() => host.Dispose();

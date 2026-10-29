@@ -4,7 +4,6 @@ using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using MongoDB.Driver;
 using Notesnook.API.Authorization;
@@ -13,15 +12,14 @@ using Streetwriters.Common.Exceptions;
 
 namespace Notesnook.API.Hubs
 {
-    // hub connections outlive their token, so a deleted user's open connection is cut off here instead
-    public class SyncAuthorizationHubFilter(IMemoryCache cache) : IHubFilter
+    // hub connections outlive their token, so a deleted or reset user's open connection is cut off here instead
+    public class SyncAuthorizationHubFilter : IHubFilter
     {
-        // a stale answer only lets through writes that land well before UserPurgeJob's grace period ends
-        private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(1);
+        private const string GenerationKey = "generation";
 
         public async ValueTask<object?> InvokeMethodAsync(HubInvocationContext invocationContext, Func<HubInvocationContext, ValueTask<object?>> next)
         {
-            await EnsureNotDeletedAsync(invocationContext.Context, invocationContext.ServiceProvider);
+            await EnsureCurrentAsync(invocationContext.Context, invocationContext.ServiceProvider);
             try
             {
                 return await next(invocationContext);
@@ -41,25 +39,35 @@ namespace Notesnook.API.Hubs
                 var reason = result.AuthorizationFailure?.FailureReasons.FirstOrDefault();
                 throw new HubException(reason?.Message ?? "Unauthorized");
             }
-            await EnsureNotDeletedAsync(context.Context, context.ServiceProvider);
+            await EnsureCurrentAsync(context.Context, context.ServiceProvider);
             await next(context);
         }
 
-        private async Task EnsureNotDeletedAsync(HubCallerContext context, IServiceProvider services)
+        // uncached, since a connection must not write under its generation once a reset has ended it
+        private static async Task EnsureCurrentAsync(HubCallerContext context, IServiceProvider services)
         {
             var userId = context.User?.FindFirstValue("sub");
             if (userId == null) return;
 
-            var deleted = await cache.GetOrCreateAsync($"user_deleted:{userId}", async (entry) =>
+            var repositories = services.GetRequiredService<ISyncItemsRepositoryAccessor>();
+            var settings = await repositories.UsersSettings.Collection
+                .Find((s) => s.UserId == userId)
+                .Project((s) => new { s.DeletedAt, s.Generation })
+                .FirstOrDefaultAsync();
+            if (settings == null || settings.DeletedAt != null)
             {
-                entry.AbsoluteExpirationRelativeToNow = CacheDuration;
-                return !await services.GetRequiredService<ISyncItemsRepositoryAccessor>().UsersSettings.Collection
-                    .Find((s) => s.UserId == userId && s.DeletedAt == null).AnyAsync();
-            });
-            if (!deleted) return;
+                context.Abort();
+                throw new HubException("Please login to sync.");
+            }
 
-            context.Abort();
-            throw new HubException("Please login to sync.");
+            if (!context.Items.TryGetValue(GenerationKey, out var generation))
+                context.Items[GenerationKey] = generation = settings.Generation;
+            if ((long)generation! != settings.Generation)
+            {
+                context.Abort();
+                throw new HubException("Your account was reset. Please sync again.");
+            }
+            repositories.Generations.Pin(userId, settings.Generation);
         }
     }
 }

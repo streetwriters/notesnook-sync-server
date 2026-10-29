@@ -33,7 +33,6 @@ using Notesnook.API.Hubs;
 using Notesnook.API.Interfaces;
 using Notesnook.API.Models;
 using Streetwriters.Common;
-using Streetwriters.Common.Exceptions;
 using Streetwriters.Data.DbContexts;
 using Streetwriters.Data.Interfaces;
 using Streetwriters.Data.Repositories;
@@ -61,7 +60,7 @@ namespace Notesnook.API.Repositories
 
         public async Task<IAsyncCursor<SyncItem>> FindItemsById(string userId, IEnumerable<string> ids, bool all, int batchSize)
         {
-            var filters = new List<FilterDefinition<SyncItem>>(new[] { Builders<SyncItem>.Filter.Eq("UserId", userId), UserGenerations.Filter(await generations.GetAsync(userId)) });
+            var filters = new List<FilterDefinition<SyncItem>>(new[] { Builders<SyncItem>.Filter.Eq("UserId", userId), UserGenerations.Filter<SyncItem>(await generations.GetAsync(userId)) });
 
             if (!all) filters.Add(Builders<SyncItem>.Filter.In("ItemId", ids));
 
@@ -76,7 +75,7 @@ namespace Notesnook.API.Repositories
 
         public Task DeleteOlderGenerationsAsync(string userId, long generation)
         {
-            return Collection.DeleteManyAsync(Builders<SyncItem>.Filter.And(Builders<SyncItem>.Filter.Eq("UserId", userId), UserGenerations.OlderThan(generation)));
+            return Collection.DeleteManyAsync(Builders<SyncItem>.Filter.And(Builders<SyncItem>.Filter.Eq("UserId", userId), UserGenerations.OlderThan<SyncItem>(generation)));
         }
 
         public void UpsertMany(IEnumerable<SyncItem> items, string userId)
@@ -121,14 +120,9 @@ namespace Notesnook.API.Repositories
             }
             if (writes.Count == 0) return;
 
-            // kept across retries, since a retry after a conflicting reset still carries data encrypted with the reset's keys
-            long? expected = null;
             dbContext.AddCommand(async (handle, ct) =>
             {
-                expected ??= await generations.GetAsync(handle, userId, ct);
-                var generation = await generations.StampAsync(handle, userId, ct);
-                if (generation != expected)
-                    throw new ConflictException("Your account was reset during this sync. Please sync again.");
+                var generation = await generations.GetAsync(userId);
                 foreach (var write in writes) write.Replacement.Generation = generation;
                 await Collection.BulkWriteAsync(handle, writes, options: new BulkWriteOptions { IsOrdered = false }, ct);
             });

@@ -36,10 +36,22 @@ namespace Streetwriters.Common.Extensions
             return services;
         }
 
-        public static IServiceCollection AddCacheInvalidator(this IServiceCollection services, Server server)
+        /// <summary>
+        /// The cache of token introspections. With Redis it is shared by every replica, so clearing a revoked
+        /// token's entry once clears it everywhere; without, the server is expected to run as a single instance.
+        /// </summary>
+        public static IServiceCollection AddTokenCache(this IServiceCollection services, Server server)
         {
-            services.AddSingleton((provider) => ActivatorUtilities.CreateInstance<CacheInvalidator>(provider, server));
-            services.AddHostedService(provider => provider.GetRequiredService<CacheInvalidator>());
+            if (!string.IsNullOrEmpty(Constants.CACHE_REDIS_CONNECTION_STRING))
+                services.AddStackExchangeRedisCache((options) =>
+                {
+                    options.Configuration = Constants.CACHE_REDIS_CONNECTION_STRING;
+                    // servers that share the Redis keep their introspections apart
+                    options.InstanceName = $"{server.Id}:";
+                });
+            else
+                services.AddDistributedMemoryCache((options) => options.SizeLimit = 262144000L);
+            services.AddSingleton<TokenCacheService>();
             return services;
         }
 

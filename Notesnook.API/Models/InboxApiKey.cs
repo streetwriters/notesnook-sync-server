@@ -65,5 +65,9 @@ namespace Notesnook.API.Models
 
         [JsonPropertyName("lastUsedAt")]
         public long LastUsedAt { get; set; }
+
+        [JsonIgnore]
+        [BsonIgnoreIfDefault]
+        public long Generation { get; set; }
     }
 }

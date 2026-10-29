@@ -20,11 +20,16 @@ using Streetwriters.Identity.Enums;
 using Streetwriters.Identity.Extensions;
 using Streetwriters.Identity.Interfaces;
 using Streetwriters.Identity.Models;
+using WampSharp.V2.Core.Contracts;
 
 namespace Streetwriters.Identity.Services
 {
     public class UserAccountService(UserManager<User> userManager, IMFAService mfaService, ISessionStore sessionStore, RoleManager<MongoRole> roleManager, EmailAddressValidator emailValidator, ITemplatedEmailSender emailSender, ITokenIssuer tokenIssuer, ILogger<UserAccountService> logger) : IUserAccountService
     {
+        // long enough for the API to finish an account reset, short enough to not lock out a user it never unlocks
+        private static readonly TimeSpan LockDuration = TimeSpan.FromMinutes(2);
+        private static readonly TimeSpan ClearCacheTimeout = TimeSpan.FromSeconds(10);
+
         public async Task<UserModel?> GetUserAsync(string clientId, string userId)
         {
             var user = await userManager.FindByIdAsync(userId);
@@ -80,7 +85,7 @@ namespace Streetwriters.Identity.Services
             // the user is already deleted, and cached tokens expire before UserPurgeJob runs
             try
             {
-                await PublishClearCacheAsync(removedKeys);
+                await ClearCacheAsync(removedKeys);
             }
             catch (Exception ex)
             {
@@ -137,18 +142,64 @@ namespace Streetwriters.Identity.Services
                 ? await sessionStore.EndSessionsAsync(client.Id, user.Id.ToString(), null, null)
                 : await sessionStore.EndSessionsAsync(client.Id, user.Id.ToString(), jti, refreshToken);
 
-            await PublishClearCacheAsync(removedKeys);
+            await ClearCacheAsync(removedKeys);
             // await SendLogoutMessageAsync(user.Id.ToString(), "Session revoked.");
             return true;
         }
 
-        private static async Task PublishClearCacheAsync(List<string> keys)
+        public async Task<long?> LockUserAsync(string userId)
         {
-            await WampServers.NotesnookServer.PublishMessageAsync(IdentityServerTopics.ClearCacheTopic, new ClearCacheMessage(keys));
-            await WampServers.MessengerServer.PublishMessageAsync(IdentityServerTopics.ClearCacheTopic, new ClearCacheMessage(keys));
+            var user = await userManager.FindByIdAsync(userId) ?? throw new Exception("User not found.");
+            var lockedOutUntil = user.LockoutEnd > DateTimeOffset.UtcNow ? user.LockoutEnd : null;
+            var until = DateTimeOffset.UtcNow.Add(LockDuration);
+
+            // users created before lockout was enabled have it off
+            EnsureSucceeded(await userManager.SetLockoutEnabledAsync(user, true), userId);
+            user.ResetLockoutEnd = until.ToUnixTimeMilliseconds();
+            EnsureSucceeded(await userManager.SetLockoutEndDateAsync(user, lockedOutUntil > until ? lockedOutUntil : until), userId);
+            return lockedOutUntil?.ToUnixTimeMilliseconds();
+        }
+
+        public async Task UnlockUserAsync(string userId, long? lockedOutUntil)
+        {
+            var user = await userManager.FindByIdAsync(userId) ?? throw new Exception("User not found.");
+            EnsureSucceeded(await userManager.SetLockoutEndDateAsync(user, lockedOutUntil == null ? null : DateTimeOffset.FromUnixTimeMilliseconds(lockedOutUntil.Value)), userId);
+        }
+
+        private static void EnsureSucceeded(IdentityResult result, string userId)
+        {
+            if (!result.Succeeded) throw new Exception($"Failed to update the lockout of user {userId}: {string.Join(", ", result.Errors.Select((e) => e.Description))}");
+        }
+
+        // throws unless the API and the subscription server confirmed it, since a token they still have cached keeps working there
+        private async Task ClearCacheAsync(List<string> keys)
+        {
+            await ClearCacheAsync(WampServers.NotesnookServer, keys);
             if (!Constants.IS_SELF_HOSTED)
+                await ClearCacheAsync(WampServers.SubscriptionServer, keys);
+
+            // it only streams events, and can't change user data
+            try
             {
-                await WampServers.SubscriptionServer.PublishMessageAsync(IdentityServerTopics.ClearCacheTopic, new ClearCacheMessage(keys));
+                await WampServers.MessengerServer.PublishMessageAsync(IdentityServerTopics.ClearCacheTopic, new ClearCacheMessage(keys));
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to clear the token cache of the messenger");
+            }
+        }
+
+        private static async Task ClearCacheAsync(WampServer server, List<string> keys)
+        {
+            try
+            {
+                var cache = await server.GetServiceAsync<ITokenCacheService>().WaitAsync(ClearCacheTimeout);
+                await cache.ClearAsync([.. keys]).WaitAsync(ClearCacheTimeout);
+            }
+            // servers that predate the token cache call only listen for the message; remove once they're all upgraded
+            catch (WampException ex) when (ex.ErrorUri == WampErrors.NoSuchProcedure)
+            {
+                await server.PublishMessageAsync(IdentityServerTopics.ClearCacheTopic, new ClearCacheMessage(keys));
             }
         }
 

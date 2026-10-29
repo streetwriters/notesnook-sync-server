@@ -14,7 +14,7 @@ using Streetwriters.Common.Messages;
 namespace Notesnook.API.Jobs
 {
     [DisallowConcurrentExecution]
-    public class UserPurgeJob(ISyncItemsRepositoryAccessor repositories, SyncDeviceService syncDeviceService, IS3Service s3Service, WampServiceAccessor serviceAccessor, ILogger<UserPurgeJob> logger) : IJob
+    public class UserPurgeJob(ISyncItemsRepositoryAccessor repositories, SyncDeviceService syncDeviceService, ResetPurgeService resetPurgeService, IS3Service s3Service, WampServiceAccessor serviceAccessor, ILogger<UserPurgeJob> logger) : IJob
     {
         // a token cached at deletion (30m) can still start a 5 GiB upload (90m) or get a presigned upload URL (1h), so those land before the purge
         public static readonly TimeSpan GracePeriod = TimeSpan.FromMinutes(150);
@@ -39,6 +39,7 @@ namespace Notesnook.API.Jobs
                 catch (Exception ex)
                 {
                     logger.LogError(ex, "Failed to purge user {UserId}", user.UserId);
+                    SyncEventCounterSource.Log.PurgeFailed("delete");
                 }
             }
 
@@ -59,6 +60,7 @@ namespace Notesnook.API.Jobs
                 catch (Exception ex)
                 {
                     logger.LogError(ex, "Failed to purge the reset data of user {UserId}", user.UserId);
+                    SyncEventCounterSource.Log.PurgeFailed("reset");
                 }
             }
         }
@@ -66,14 +68,7 @@ namespace Notesnook.API.Jobs
         private async Task PurgeResetAsync(string userId, long generation)
         {
             logger.LogInformation("Purging reset data of user {UserId}", userId);
-
-            foreach (var collection in repositories.SyncItemCollections)
-                await collection.Repository.DeleteOlderGenerationsAsync(userId, generation);
-
-            // only the generation we purged, so a reset made meanwhile stays pending
-            await repositories.UsersSettings.Collection.UpdateOneAsync(
-                (s) => s.UserId == userId && s.Generation == generation,
-                Builders<UserSettings>.Update.Unset((s) => s.PurgePending));
+            await resetPurgeService.PurgeAsync(userId, generation);
             logger.LogInformation("Purged reset data of user {UserId}", userId);
         }
 

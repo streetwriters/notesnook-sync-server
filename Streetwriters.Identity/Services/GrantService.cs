@@ -47,11 +47,7 @@ namespace Streetwriters.Identity.Services
             if (user == null) return GrantResult.InvalidGrant;
 
             var result = await signInManager.CheckPasswordSignInAsync(user, password, true);
-            if (result.IsLockedOut)
-            {
-                var timeLeft = user.LockoutEnd - DateTimeOffset.Now;
-                return new GrantResult.Failed("user_locked_out", $"You have been locked out. Please try again in {(timeLeft?.Minutes ?? 0).Pluralize("minute", "minutes")} and {(timeLeft?.Seconds ?? 0).Pluralize("second", "seconds")}.");
-            }
+            if (result.IsLockedOut) return new GrantResult.Failed("user_locked_out", LockedOutMessage(user));
 
             // We'll ask for 2FA regardless of password being incorrect to prevent an attacker
             // from knowing whether the password is correct or not.
@@ -112,7 +108,7 @@ namespace Streetwriters.Identity.Services
             if (user == null) return UnregisteredMFA(mfaCode, mfaMethod);
 
             if (await userManager.IsLockedOutAsync(user))
-                return LockedOut(user.LockoutEnd - DateTimeOffset.Now);
+                return new GrantResult.Failed("locked_out", LockedOutMessage(user));
 
             if (string.IsNullOrEmpty(mfaCode)) return InvalidMFACode;
 
@@ -174,7 +170,7 @@ namespace Streetwriters.Identity.Services
 
             var result = await signInManager.CheckPasswordSignInAsync(user, password, true);
             if (result.IsLockedOut)
-                return LockedOut(user.LockoutEnd - DateTimeOffset.Now);
+                return new GrantResult.Failed("locked_out", LockedOutMessage(user));
 
             if (!result.Succeeded)
             {
@@ -199,11 +195,15 @@ namespace Streetwriters.Identity.Services
             };
         }
 
-        private static GrantResult.Failed LockedOut(TimeSpan? timeLeft)
+        public static string LockedOutMessage(User user)
         {
-            return new GrantResult.Failed("locked_out", timeLeft.HasValue
+            // a later lockout, e.g. for failed attempts, ends at a different time
+            if (user.ResetLockoutEnd != null && user.ResetLockoutEnd == user.LockoutEnd?.ToUnixTimeMilliseconds())
+                return "Your account is being reset. Please try again in a minute.";
+            var timeLeft = user.LockoutEnd - DateTimeOffset.Now;
+            return timeLeft.HasValue
                 ? $"You have been locked out. Please try again in {timeLeft.Value.Minutes.Pluralize("minute", "minutes")} and {timeLeft.Value.Seconds.Pluralize("second", "seconds")}."
-                : "You have been locked out.");
+                : "You have been locked out.";
         }
     }
 }

@@ -15,5 +15,7 @@ namespace Notesnook.API.Models
         public required bool IsSyncReset { get; set; }
         public string? AppVersion { get; set; }
         public string? DatabaseVersion { get; set; }
+        [BsonIgnoreIfDefault]
+        public long Generation { get; set; }
     }
 }

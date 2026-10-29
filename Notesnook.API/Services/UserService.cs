@@ -43,7 +43,7 @@ namespace Notesnook.API.Services
 {
     public class UserService(IHttpContextAccessor accessor,
         ISyncItemsRepositoryAccessor syncItemsRepositoryAccessor,
-        IS3Service s3Service, SyncDeviceService syncDeviceService, WampServiceAccessor serviceAccessor, ILogger<UserService> logger) : IUserService
+        IS3Service s3Service, ResetPurgeService resetPurgeService, WampServiceAccessor serviceAccessor, ILogger<UserService> logger) : IUserService
     {
         private static readonly System.Security.Cryptography.RandomNumberGenerator Rng = System.Security.Cryptography.RandomNumberGenerator.Create();
         private IHttpContextAccessor HttpContextAccessor { get; } = accessor;
@@ -165,7 +165,7 @@ namespace Notesnook.API.Services
             var filter = Builders<SyncItem>.Filter.And(
                 Builders<SyncItem>.Filter.Eq((s) => s.UserId, userId),
                 Builders<SyncItem>.Filter.In((s) => s.KeyVersion, [null, 0]),
-                UserGenerations.Filter(generation));
+                UserGenerations.Filter<SyncItem>(generation));
             foreach (var collection in Repositories.SyncItemCollections)
             {
                 var item = await collection.Repository.Collection.Find(filter).FirstOrDefaultAsync();
@@ -225,13 +225,8 @@ namespace Notesnook.API.Services
 
         public async Task ResetUserAsync(string userId, bool removeAttachments)
         {
-            // first, so no new inbox items arrive
-            await Repositories.InboxApiKey.Collection.DeleteManyAsync((t) => t.UserId == userId);
-            await Repositories.InboxItems.Collection.DeleteManyAsync((i) => i.UserId == userId);
-            await Repositories.Monographs.Collection.DeleteManyAsync((m) => m.UserId == userId);
-            await syncDeviceService.ResetDevicesAsync(userId);
-
-            await Repositories.UsersSettings.Collection.UpdateOneAsync(Builders<UserSettings>.Filter.Eq((s) => s.UserId, userId), Builders<UserSettings>.Update
+            // the reset itself: everything from an older generation is invisible from here on
+            var settings = await Repositories.UsersSettings.Collection.FindOneAndUpdateAsync(Builders<UserSettings>.Filter.Eq((s) => s.UserId, userId), Builders<UserSettings>.Update
                 .Set((s) => s.AttachmentsKey, null)
                 .Set((s) => s.MonographPasswordsKey, null)
                 .Set((s) => s.DataEncryptionKey, null)
@@ -243,7 +238,18 @@ namespace Notesnook.API.Services
                 .Set((s) => s.LastSynced, 0)
                 .Inc((s) => s.Revision, 1)
                 .Inc((s) => s.Generation, 1)
-                .Set((s) => s.PurgePending, true));
+                .Set((s) => s.PurgePending, true),
+                new FindOneAndUpdateOptions<UserSettings> { ReturnDocument = ReturnDocument.After }) ?? throw new NotFoundException("User not found.");
+
+            // best effort, since UserPurgeJob retries whatever is left
+            try
+            {
+                await resetPurgeService.PurgeSmallCollectionsAsync(userId, settings.Generation);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to purge the reset data of user {UserId}", userId);
+            }
 
             if (removeAttachments)
                 await DeleteAttachmentsAsync(userId);

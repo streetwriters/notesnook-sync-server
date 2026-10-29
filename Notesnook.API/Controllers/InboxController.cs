@@ -27,6 +27,7 @@ using Microsoft.AspNetCore.Mvc;
 using MongoDB.Bson;
 using Notesnook.API.Authorization;
 using Notesnook.API.Models;
+using Notesnook.API.Repositories;
 using Notesnook.API.Services;
 using Streetwriters.Common;
 using Streetwriters.Common.Messages;
@@ -40,6 +41,7 @@ namespace Notesnook.API.Controllers
             Repository<InboxApiKey> inboxApiKeysRepository,
             Repository<UserSettings> userSettingsRepository,
             Repository<InboxSyncItem> inboxItemsRepository,
+            UserGenerations generations,
             SyncDeviceService syncDeviceService) : ControllerBase
     {
 
@@ -78,7 +80,8 @@ namespace Notesnook.API.Controllers
                 Name = request.Name,
                 DateCreated = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
                 ExpiryDate = request.ExpiryDate,
-                LastUsedAt = 0
+                LastUsedAt = 0,
+                Generation = await generations.GetAsync(userId)
             };
             await inboxApiKeysRepository.InsertAsync(inboxApiKey);
             return Ok(inboxApiKey);
@@ -131,6 +134,8 @@ namespace Notesnook.API.Controllers
 
             request.UserId = userId;
             request.ItemId = ObjectId.GenerateNewId().ToString();
+            // the API key's generation, pinned when it was checked
+            request.Generation = await generations.GetAsync(userId);
             await inboxItemsRepository.InsertAsync(request);
             await syncDeviceService.AddIdsToAllDevicesAsync(userId, [new(request.ItemId, "inbox_item")]);
             await WampServers.MessengerServer.PublishMessageAsync(MessengerServerTopics.SendSSETopic, new SendSSEMessage

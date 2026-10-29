@@ -34,6 +34,7 @@ using Notesnook.API.Models.Responses;
 using Notesnook.API.Services;
 using Streetwriters.Common;
 using Streetwriters.Common.Accessors;
+using Streetwriters.Common.Exceptions;
 using Streetwriters.Common.Extensions;
 using Streetwriters.Common.Messages;
 using Streetwriters.Common.Models;
@@ -185,20 +186,42 @@ namespace Notesnook.API.Controllers
             try
             {
                 await serviceAccessor.UserAccountService.ClearSessionsAsync(userId, clientId, all: false, jti, null);
-                await WampServers.MessengerServer.PublishMessageAsync(MessengerServerTopics.SendSSETopic, new SendSSEMessage
-                {
-                    UserId = userId,
-                    OriginTokenId = jti,
-                    Message = new Message
-                    {
-                        Type = "logout",
-                        Data = JsonSerializer.Serialize(new { reason = "Password changed." })
-                    }
-                });
+                await PublishLogoutAsync(userId, jti, "Password changed.");
             }
             catch (Exception ex)
             {
                 logger.LogError(ex, "Failed to end other sessions of user with id: {UserId}", userId);
+            }
+        }
+
+        private static Task PublishLogoutAsync(string userId, string? jti, string reason) =>
+            WampServers.MessengerServer.PublishMessageAsync(MessengerServerTopics.SendSSETopic, new SendSSEMessage
+            {
+                UserId = userId,
+                OriginTokenId = jti,
+                Message = new Message
+                {
+                    Type = "logout",
+                    Data = JsonSerializer.Serialize(new { reason })
+                }
+            });
+
+        private static async Task<T> RetryAsync<T>(Func<Task<T>> action)
+        {
+            for (var attempt = 1; ; attempt++)
+            {
+                try
+                {
+                    return await action();
+                }
+                catch (Exception) when (attempt < 3)
+                {
+                    await Task.Delay(TimeSpan.FromMilliseconds(200 * attempt));
+                }
+                catch (Exception ex)
+                {
+                    throw new ServiceUnavailableException("Your account could not be reset. Please try again.", ex);
+                }
             }
         }
 
@@ -262,8 +285,38 @@ namespace Notesnook.API.Controllers
         public async Task<IActionResult> Reset([FromForm] bool removeAttachments)
         {
             var userId = this.User.GetUserId();
+            var clientId = User.FindFirstValue("client_id");
+            var jti = User.FindFirstValue("jti");
+            var accounts = serviceAccessor.UserAccountService;
 
-            await UserService.ResetUserAsync(userId, removeAttachments);
+            // the other devices hold the old keys, so they're logged out, and kept from logging back in, before anything is reset
+            var lockedOutUntil = await RetryAsync(() => accounts.LockUserAsync(userId));
+            try
+            {
+                await RetryAsync(async () => await accounts.ClearSessionsAsync(userId, clientId, all: false, jti, null) ? true : throw new Exception("Sessions were not cleared."));
+                await UserService.ResetUserAsync(userId, removeAttachments);
+            }
+            finally
+            {
+                try
+                {
+                    await accounts.UnlockUserAsync(userId, lockedOutUntil);
+                }
+                // the lock expires on its own
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Failed to unlock user {UserId} after a reset", userId);
+                }
+            }
+
+            try
+            {
+                await PublishLogoutAsync(userId, jti, "Account reset.");
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to log out the other sessions of user {UserId}", userId);
+            }
             return Ok();
         }
 

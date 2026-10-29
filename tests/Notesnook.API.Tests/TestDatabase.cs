@@ -58,6 +58,7 @@ public sealed class TestDatabase : IAsyncLifetime
         public UnitOfWork Unit { get; }
         public SyncItemsRepositoryAccessor Repositories { get; }
         public SyncDeviceService Devices { get; }
+        public ResetPurgeService ResetPurge { get; }
 
         public Scope(TestDatabase db)
         {
@@ -78,6 +79,7 @@ public sealed class TestDatabase : IAsyncLifetime
                 new Repository<DeviceIdsChunk>(DbContext, db.Collection<DeviceIdsChunk>(Collections.DeviceIdsChunksKey)),
                 NullLogger<Notesnook.API.Repositories.SyncItemsRepository>.Instance);
             Devices = new SyncDeviceService(Repositories, DbContext, NullLogger<SyncDeviceService>.Instance);
+            ResetPurge = new ResetPurgeService(Repositories, Devices);
         }
     }
 

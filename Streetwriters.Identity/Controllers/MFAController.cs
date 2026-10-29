@@ -77,7 +77,7 @@ namespace Streetwriters.Identity.Controllers
             var user = await UserManager.GetUserAsync(User) ?? throw new NotFoundException("User not found.");
 
             var result = await SignInManager.CheckPasswordSignInAsync(user, password, true);
-            if (result.IsLockedOut) return BadRequest("Too many failed attempts. Please try again later.");
+            if (result.IsLockedOut) return BadRequest(GrantService.LockedOutMessage(user));
             if (!result.Succeeded) return BadRequest("Wrong password.");
 
             if (!await UserManager.GetTwoFactorEnabledAsync(user)) return Ok();

@@ -362,10 +362,8 @@ public abstract class LegacyFixtureTests(IdentityHost host) : IdentityTestBase(h
         Assert.False(await IsActiveAsync(Get(fixture, "two_devices", "other_access")));
         Assert.Equal(400, await RefreshStatusAsync(fixture, "two_devices", "other_refresh"));
 
-        // the API servers evict the restored token's cached introspection
-        var key = (Get(fixture, "two_devices", "other_access") + ":reference_token").Sha256();
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-        while (!host.NotesnookServer.ClearCache.SelectMany((m) => m.Keys).Contains(key)) await Task.Delay(50, cts.Token);
+        // the API evicts the restored token's cached introspection before the call returns
+        Assert.Contains((Get(fixture, "two_devices", "other_access") + ":reference_token").Sha256(), host.NotesnookServer.ClearedTokens);
     }
 
     [Fact]
