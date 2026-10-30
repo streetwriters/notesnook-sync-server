@@ -194,17 +194,27 @@ namespace Notesnook.API.Controllers
             }
         }
 
-        private static Task PublishLogoutAsync(string userId, string? jti, string reason) =>
-            WampServers.MessengerServer.PublishMessageAsync(MessengerServerTopics.SendSSETopic, new SendSSEMessage
+        // best effort, since the sessions are already ended and this only tells their devices sooner
+        private async Task PublishLogoutAsync(string userId, string? jti, string reason)
+        {
+            try
             {
-                UserId = userId,
-                OriginTokenId = jti,
-                Message = new Message
+                await WampServers.MessengerServer.PublishMessageAsync(MessengerServerTopics.SendSSETopic, new SendSSEMessage
                 {
-                    Type = "logout",
-                    Data = JsonSerializer.Serialize(new { reason })
-                }
-            });
+                    UserId = userId,
+                    OriginTokenId = jti,
+                    Message = new Message
+                    {
+                        Type = "logout",
+                        Data = JsonSerializer.Serialize(new { reason })
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to log out the other sessions of user {UserId}", userId);
+            }
+        }
 
         private static async Task<T> RetryAsync<T>(Func<Task<T>> action)
         {
@@ -294,6 +304,8 @@ namespace Notesnook.API.Controllers
             try
             {
                 await RetryAsync(async () => await accounts.ClearSessionsAsync(userId, clientId, all: false, jti, null) ? true : throw new Exception("Sessions were not cleared."));
+                // before the reset, so their open sync connections close sooner
+                await PublishLogoutAsync(userId, jti, "Your account is being reset.");
                 await UserService.ResetUserAsync(userId, removeAttachments);
             }
             finally
@@ -307,15 +319,6 @@ namespace Notesnook.API.Controllers
                 {
                     logger.LogError(ex, "Failed to unlock user {UserId} after a reset", userId);
                 }
-            }
-
-            try
-            {
-                await PublishLogoutAsync(userId, jti, "Account reset.");
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Failed to log out the other sessions of user {UserId}", userId);
             }
             return Ok();
         }
