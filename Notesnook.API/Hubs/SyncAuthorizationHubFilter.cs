@@ -24,9 +24,11 @@ namespace Notesnook.API.Hubs
         }
 
         // HubConnectionHandler's own logging is turned off in appsettings.json: it logs every rejection below
-        // (e.g. unconfirmed emails) as an error, so connection failures are logged here instead.
+        // (e.g. unconfirmed emails) as an error, so connection failures are logged and counted here instead.
+        // Rejections are logged at Information, which production filters out, so the counter is what shows them.
         public async Task OnConnectedAsync(HubLifetimeContext context, Func<HubLifetimeContext, Task> next)
         {
+            var stage = "unauthorized";
             try
             {
                 var result = new SyncRequirement().IsAuthorized(context.Context.User, new PathString("/hubs/sync/v2"));
@@ -36,16 +38,20 @@ namespace Notesnook.API.Hubs
                     // clients read this message from the close error, so it must stay a HubException
                     throw new HubException(reason?.Message ?? "Unauthorized");
                 }
+                stage = "account";
                 await EnsureCurrentAsync(context.Context, context.ServiceProvider);
+                stage = "hub";
                 await next(context);
             }
             catch (HubException ex)
             {
+                SyncEventCounterSource.Log.ConnectionRejected(stage);
                 logger.LogInformation("Connection {ConnectionId} rejected: {Reason}", context.Context.ConnectionId, ex.Message);
                 throw;
             }
             catch (Exception ex)
             {
+                SyncEventCounterSource.Log.ConnectionRejected("error");
                 logger.LogError(ex, "OnConnectedAsync failed for connection {ConnectionId}", context.Context.ConnectionId);
                 throw;
             }

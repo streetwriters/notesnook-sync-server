@@ -92,16 +92,7 @@ namespace Notesnook.API.Hubs
             {
                 Logger.LogInformation("Connection {ConnectionId} disconnected cleanly (client-initiated)", Context.ConnectionId);
             }
-            // HubConnectionHandler's own logging is turned off in appsettings.json (see SyncAuthorizationHubFilter)
-            try
-            {
-                await base.OnDisconnectedAsync(exception);
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "OnDisconnectedAsync failed for connection {ConnectionId}", Context.ConnectionId);
-                throw;
-            }
+            await base.OnDisconnectedAsync(exception);
         }
 
 

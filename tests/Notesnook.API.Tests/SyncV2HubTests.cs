@@ -1,7 +1,9 @@
+using System.Diagnostics.Metrics;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using MongoDB.Driver;
 using Notesnook.API.Hubs;
@@ -27,6 +29,38 @@ public class SyncV2HubTests(TestDatabase db) : IClassFixture<TestDatabase>
 
     private static readonly Claim[] SyncClaims = [new("scope", "notesnook.sync"), new("aud", "notesnook"), new("role", "notesnook"), new("verified", "true")];
     private static Caller SyncCaller(string userId) => new(userId, SyncClaims);
+
+    private sealed class ListLogger<T> : ILogger<T>
+    {
+        public List<(LogLevel Level, string Message)> Entries { get; } = [];
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
+            Entries.Add((logLevel, formatter(state, exception)));
+    }
+
+    // the meter is static and tests run in parallel, so other tests' measurements can show up here too
+    private sealed class Reasons : IDisposable
+    {
+        private readonly MeterListener listener = new();
+        private readonly List<string> recorded = [];
+
+        public Reasons(string instrument)
+        {
+            listener.InstrumentPublished = (i, l) =>
+            {
+                if (i.Meter.Name == "Notesnook.API.Metrics.Sync" && i.Name == instrument) l.EnableMeasurementEvents(i);
+            };
+            listener.SetMeasurementEventCallback<int>((_, _, tags, _) =>
+            {
+                foreach (var tag in tags) if (tag.Key == "reason") lock (recorded) recorded.Add((string)tag.Value!);
+            });
+            listener.Start();
+        }
+
+        public List<string> Recorded { get { lock (recorded) return [.. recorded]; } }
+        public void Dispose() => listener.Dispose();
+    }
 
     private SyncV2Hub Hub(string userId)
     {
@@ -234,5 +268,102 @@ public class SyncV2HubTests(TestDatabase db) : IClassFixture<TestDatabase>
 
         var acked = firstAttempt[0].Items.Select((i) => i.ItemId);
         Assert.Equal(notes.Select((n) => n.ItemId).Except(acked).Order(), retry.SelectMany((c) => c.Items).Select((i) => i.ItemId).Order());
+    }
+
+    [Fact]
+    public async Task Rejected_connections_are_logged_and_counted_by_stage()
+    {
+        var (live, deleted) = (Guid.NewGuid().ToString("N"), Guid.NewGuid().ToString("N"));
+        var scope = db.CreateScope();
+        await scope.Repositories.UsersSettings.Collection.InsertManyAsync([
+            new UserSettings { UserId = live, Salt = "salt" },
+            new UserSettings { UserId = deleted, Salt = "salt", DeletedAt = 1 }]);
+        var services = new ServiceCollection().AddSingleton<ISyncItemsRepositoryAccessor>(scope.Repositories).BuildServiceProvider();
+        var logger = new ListLogger<SyncAuthorizationHubFilter>();
+        var filter = new SyncAuthorizationHubFilter(logger);
+        using var reasons = new Reasons("sync.v2.connection_rejections");
+        Task Connect(Caller caller, Func<HubLifetimeContext, Task> next) =>
+            filter.OnConnectedAsync(new HubLifetimeContext(caller, services, Hub(caller.UserIdentifier!)), next);
+
+        await Assert.ThrowsAsync<HubException>(() => Connect(new Caller(live, SyncClaims[..^1]), (_) => Task.CompletedTask));
+        await Assert.ThrowsAsync<HubException>(() => Connect(SyncCaller(deleted), (_) => Task.CompletedTask));
+        await Assert.ThrowsAsync<HubException>(() => Connect(SyncCaller(live), (_) => throw new HubException("User not found.")));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => Connect(SyncCaller(live), (_) => throw new InvalidOperationException("redis down")));
+        await Connect(SyncCaller(live), (_) => Task.CompletedTask);
+
+        Assert.Equal(
+        [
+            (LogLevel.Information, "Connection connection rejected: Please confirm your email to sync your notes."),
+            (LogLevel.Information, "Connection connection rejected: Please login to sync."),
+            (LogLevel.Information, "Connection connection rejected: User not found."),
+            (LogLevel.Error, "OnConnectedAsync failed for connection connection"),
+        ], logger.Entries);
+        var recorded = reasons.Recorded;
+        Assert.All(new[] { "unauthorized", "account", "hub", "error" }, (reason) => Assert.Contains(reason, recorded));
+    }
+
+    public static TheoryData<Exception, string> FailedAcks => new()
+    {
+        { new TimeoutException(), "timeout" },
+        { new IOException("Connection 'connection' disconnected."), "disconnected" },
+        { new OperationCanceledException(), "disconnected" },
+        { new HubException("client threw"), "client_error" },
+        { new InvalidOperationException(), "server_error" },
+    };
+
+    [Theory]
+    [MemberData(nameof(FailedAcks))]
+    public async Task Fetch_failures_are_counted_by_reason(Exception failure, string reason)
+    {
+        var userId = Guid.NewGuid().ToString("N");
+        await InsertNotesAsync(userId, 1, 100, length: 100);
+        await db.CreateScope().Devices.RegisterDeviceAsync(userId, "new");
+        var client = Stub<ISyncV2HubClient>.Create(("SendItems", (_) => Task.FromException<bool>(failure)));
+        var hub = Hub(userId);
+        hub.Clients = Stub<IHubCallerClients<ISyncV2HubClient>>.Create(("get_Caller", (_) => client));
+        using var reasons = new Reasons("sync.v2.fetch_failures");
+
+        await Assert.ThrowsAnyAsync<Exception>(() => hub.RequestFetchV4("new"));
+
+        Assert.Contains(reason, reasons.Recorded);
+    }
+
+    [Fact]
+    public async Task An_item_replaced_after_a_reset_mid_fetch_is_not_sent_and_stays_pending()
+    {
+        var userId = Guid.NewGuid().ToString("N");
+        var scope = db.CreateScope();
+        await scope.Repositories.UsersSettings.Collection.InsertOneAsync(new UserSettings { UserId = userId, Salt = "salt" });
+        // 1MB items: chunks of 3, so the remaining items' ids are planned before the reset lands
+        var notes = await InsertNotesAsync(userId, 8, 1024 * 1024, length: 1024 * 1024);
+        var devices = scope.Devices;
+        await devices.RegisterDeviceAsync(userId, "device");
+        await devices.ResetAsync(userId, "device");
+        await devices.AddIdsToAllDevicesAsync(userId, notes.Select((n) => new ItemKey(n.ItemId!, "note")));
+        var sent = new List<string>();
+        string? replaced = null;
+        var client = Stub<ISyncV2HubClient>.Create(
+            ("SendItems", (args) =>
+            {
+                sent.AddRange(((SyncTransferRawItemV2)args[0]!).Items.Select((i) => i.ItemId!));
+                if (replaced != null) return Task.FromResult(true);
+                // the user is reset and another device pushes over an item this fetch has yet to send
+                replaced = notes.Select((n) => n.ItemId!).First((id) => !sent.Contains(id));
+                var repositories = db.CreateScope().Repositories;
+                repositories.UsersSettings.Collection.UpdateOne((s) => s.UserId == userId, Builders<UserSettings>.Update.Set((s) => s.Generation, 1));
+                repositories.Notes.Collection.UpdateOne((n) => n.UserId == userId && n.ItemId == replaced, Builders<SyncItem>.Update.Set((n) => n.Generation, 1));
+                return Task.FromResult(true);
+            }),
+            ("SendMonographs", (_) => Task.FromResult(true)),
+            ("SendInboxItems", (_) => Task.FromResult(true)));
+        var hub = Hub(userId);
+        hub.Clients = Stub<IHubCallerClients<ISyncV2HubClient>>.Create(("get_Caller", (_) => client));
+
+        await hub.RequestFetchV4("device");
+
+        Assert.NotNull(replaced);
+        Assert.DoesNotContain(replaced, sent);
+        Assert.Equal(notes.Count - 1, sent.Distinct().Count());
+        Assert.Equal([new ItemKey(replaced, "note")], await devices.GetIdsAsync(userId, "device", "pending"));
     }
 }
