@@ -142,7 +142,19 @@ namespace Streetwriters.Identity.Services
                 ? await sessionStore.EndSessionsAsync(client.Id, user.Id.ToString(), null, null)
                 : await sessionStore.EndSessionsAsync(client.Id, user.Id.ToString(), jti, refreshToken);
 
-            await ClearCacheAsync(removedKeys);
+            // ended sessions can't be found again, so their keys are kept for a retry to clear if this clear fails
+            var keys = (user.PendingCacheKeys ?? []).Union(removedKeys).ToList();
+            if (removedKeys.Count > 0)
+            {
+                user.PendingCacheKeys = keys;
+                EnsureSucceeded(await userManager.UpdateAsync(user), userId);
+            }
+            await ClearCacheAsync(keys);
+            if (user.PendingCacheKeys != null)
+            {
+                user.PendingCacheKeys = null;
+                EnsureSucceeded(await userManager.UpdateAsync(user), userId);
+            }
             // await SendLogoutMessageAsync(user.Id.ToString(), "Session revoked.");
             return true;
         }
@@ -173,7 +185,7 @@ namespace Streetwriters.Identity.Services
 
         private static void EnsureSucceeded(IdentityResult result, string userId)
         {
-            if (!result.Succeeded) throw new Exception($"Failed to update the lockout of user {userId}: {string.Join(", ", result.Errors.Select((e) => e.Description))}");
+            if (!result.Succeeded) throw new Exception($"Failed to update user {userId}: {string.Join(", ", result.Errors.Select((e) => e.Description))}");
         }
 
         // throws unless the API and the subscription server confirmed it, since a token they still have cached keeps working there

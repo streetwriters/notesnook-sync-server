@@ -602,17 +602,25 @@ public abstract class TokenContractTests(IdentityHost host) : IdentityTestBase(h
         JsonNode.Parse(await (await IntrospectAsync(access)).Content.ReadAsStringAsync())!["jti"]!.GetValue<string>();
 
     [Fact]
-    public async Task Clearing_sessions_fails_if_the_api_cannot_clear_its_cache()
+    public async Task Clearing_sessions_fails_if_the_api_cannot_clear_its_cache_and_a_retry_clears_it()
     {
         var email = NewEmail();
         var signup = await SignupAsync(email);
         var (access, _) = await LoginAsync(email);
         var (otherAccess, _) = await LoginAsync(email);
         var jti = await JtiAsync(access);
-        host.NotesnookServer.TokenCacheFailures[(otherAccess + ":reference_token").Sha256()] = new Exception("Redis is down.");
+        var key = (otherAccess + ":reference_token").Sha256();
+        host.NotesnookServer.TokenCacheFailures[key] = new Exception("Redis is down.");
 
         await Assert.ThrowsAnyAsync<Exception>(() => host.WithServicesAsync((services) =>
             services.GetRequiredService<IUserAccountService>().ClearSessionsAsync(signup.UserId, ClientId, all: false, jti, null)));
+        host.NotesnookServer.TokenCacheFailures.TryRemove(key, out _);
+
+        // the session is already gone, so only the kept key lets the retry clear it
+        Assert.True(await host.WithServicesAsync((services) =>
+            services.GetRequiredService<IUserAccountService>().ClearSessionsAsync(signup.UserId, ClientId, all: false, jti, null)));
+        Assert.Contains(key, host.NotesnookServer.ClearedTokens);
+        Assert.Null((await UserAsync(email)).PendingCacheKeys);
     }
 
     [Fact]
