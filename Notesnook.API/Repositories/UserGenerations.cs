@@ -51,12 +51,13 @@ namespace Notesnook.API.Repositories
             settings.Find((s) => s.UserId == userId).Project((s) => s.Generation).FirstOrDefaultAsync();
 
         // items stored before generations existed have no Generation, so they belong to generation 0
+        // null is written as raw BSON: a typed filter first tries to convert it to long, and that throws and is swallowed on every query
         public static FilterDefinition<SyncItem> Filter(long generation) => generation == 0
-            ? Builders<SyncItem>.Filter.In("Generation", new BsonValue[] { 0, BsonNull.Value })
+            ? new BsonDocument("Generation", new BsonDocument("$in", new BsonArray { 0L, BsonNull.Value }))
             : Builders<SyncItem>.Filter.Eq("Generation", generation);
 
         public static FilterDefinition<SyncItem> OlderThan(long generation) => Builders<SyncItem>.Filter.Or(
             Builders<SyncItem>.Filter.Lt("Generation", generation),
-            Builders<SyncItem>.Filter.Eq("Generation", BsonNull.Value));
+            new BsonDocument("Generation", BsonNull.Value));
     }
 }
