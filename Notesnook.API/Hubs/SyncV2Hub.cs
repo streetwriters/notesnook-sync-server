@@ -18,7 +18,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 using System;
-using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -57,9 +56,6 @@ namespace Notesnook.API.Hubs
         private ISyncItemsRepositoryAccessor Repositories { get; }
         private SyncDeviceService SyncDeviceService { get; }
         private readonly IUnitOfWork unit;
-        private readonly FrozenDictionary<string, Action<IEnumerable<SyncItem>, string>> UpsertActionsMap;
-        private readonly CollectionDef[] BaseCollectionDefs;
-        private readonly CollectionDef[] V4CollectionDefs;
         ILogger<SyncV2Hub> Logger { get; }
 
         public SyncV2Hub(ISyncItemsRepositoryAccessor syncItemsRepositoryAccessor, IUnitOfWork unitOfWork, SyncDeviceService syncDeviceService, ILogger<SyncV2Hub> logger)
@@ -68,11 +64,14 @@ namespace Notesnook.API.Hubs
             Repositories = syncItemsRepositoryAccessor;
             unit = unitOfWork;
             SyncDeviceService = syncDeviceService;
+        }
 
-            var synced = Repositories.SyncItemCollections.Where((c) => c.Type != null).ToArray();
-            BaseCollectionDefs = [.. synced.Where((c) => !c.RequiresV4).Select((c) => new CollectionDef(c.Type!, c.Repository))];
-            V4CollectionDefs = [.. synced.Select((c) => new CollectionDef(c.Type!, c.Repository))];
-            UpsertActionsMap = synced.ToFrozenDictionary((c) => c.Type!, (c) => (Action<IEnumerable<SyncItem>, string>)c.Repository.UpsertMany);
+        // a hub is created for every invocation, so the collections are looked up rather than mapped up front
+        private SyncItemsRepository? FindRepository(string type)
+        {
+            foreach (var collection in Repositories.SyncItemCollections)
+                if (collection.Type == type) return collection.Repository;
+            return null;
         }
 
         public override async Task OnConnectedAsync()
@@ -106,9 +105,8 @@ namespace Notesnook.API.Hubs
             var stopwatch = Stopwatch.StartNew();
             try
             {
-                if (!UpsertActionsMap.TryGetValue(pushItem.Type, out var UpsertItems))
-                    throw new HubException($"Invalid item type: {pushItem.Type}.");
-                UpsertItems(pushItem.Items, userId);
+                var repository = FindRepository(pushItem.Type) ?? throw new HubException($"Invalid item type: {pushItem.Type}.");
+                repository.UpsertMany(pushItem.Items, userId);
                 if (pushItem.Items.Any())
                 {
                     SyncDeviceService.QueueAddIdsToOtherDevices(userId, deviceId, pushItem.Items.Select((i) => new ItemKey(i.ItemId, pushItem.Type)));
@@ -214,22 +212,22 @@ namespace Notesnook.API.Hubs
 
         public async Task<SyncV2Metadata> RequestFetch(string deviceId)
         {
-            return await HandleRequestFetch(deviceId, false, false, BaseCollectionDefs);
+            return await HandleRequestFetch(deviceId, false, false, CollectionDefs(includeV4: false));
         }
 
         public async Task<SyncV2Metadata> RequestFetchV2(string deviceId)
         {
-            return await HandleRequestFetch(deviceId, true, false, BaseCollectionDefs);
+            return await HandleRequestFetch(deviceId, true, false, CollectionDefs(includeV4: false));
         }
 
         public async Task<SyncV2Metadata> RequestFetchV3(string deviceId)
         {
-            return await HandleRequestFetch(deviceId, true, true, BaseCollectionDefs);
+            return await HandleRequestFetch(deviceId, true, true, CollectionDefs(includeV4: false));
         }
 
         public async Task<SyncV2Metadata> RequestFetchV4(string deviceId)
         {
-            return await HandleRequestFetch(deviceId, true, true, V4CollectionDefs);
+            return await HandleRequestFetch(deviceId, true, true, CollectionDefs(includeV4: true));
         }
 
         private async Task<SyncV2Metadata> HandleRequestFetch(string deviceId, bool includeMonographs, bool includeInboxItems, CollectionDef[] collectionDefs)
@@ -353,6 +351,9 @@ namespace Notesnook.API.Hubs
                 SyncEventCounterSource.Log.RecordFetchDuration(stopwatch.ElapsedMilliseconds);
             }
         }
+
+        private CollectionDef[] CollectionDefs(bool includeV4) =>
+            [.. Repositories.SyncItemCollections.Where((c) => c.Type != null && (includeV4 || !c.RequiresV4)).Select((c) => new CollectionDef(c.Type!, c.Repository))];
 
         private record CollectionDef(string Key, SyncItemsRepository Repository);
     }

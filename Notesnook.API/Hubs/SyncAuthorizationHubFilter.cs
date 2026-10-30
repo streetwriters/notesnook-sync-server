@@ -6,9 +6,11 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using MongoDB.Bson;
 using MongoDB.Driver;
 using Notesnook.API.Authorization;
 using Notesnook.API.Interfaces;
+using Notesnook.API.Models;
 
 namespace Notesnook.API.Hubs
 {
@@ -57,6 +59,16 @@ namespace Notesnook.API.Hubs
             }
         }
 
+        private sealed class AccountState
+        {
+            public long? DeletedAt { get; set; }
+            public long Generation { get; set; }
+        }
+
+        // built once: a LINQ projection to an anonymous type rebuilt its class map and compiled a constructor on every call
+        private static readonly ProjectionDefinition<UserSettings, AccountState> AccountStateProjection =
+            new BsonDocument { { "_id", 0 }, { nameof(UserSettings.DeletedAt), 1 }, { nameof(UserSettings.Generation), 1 } };
+
         // uncached, since a connection must not write under its generation once a reset has ended it
         private static async Task EnsureCurrentAsync(HubCallerContext context, IServiceProvider services)
         {
@@ -65,8 +77,8 @@ namespace Notesnook.API.Hubs
 
             var repositories = services.GetRequiredService<ISyncItemsRepositoryAccessor>();
             var settings = await repositories.UsersSettings.Collection
-                .Find((s) => s.UserId == userId)
-                .Project((s) => new { s.DeletedAt, s.Generation })
+                .Find(Builders<UserSettings>.Filter.Eq(nameof(UserSettings.UserId), userId))
+                .Project(AccountStateProjection)
                 .FirstOrDefaultAsync();
             if (settings == null || settings.DeletedAt != null)
             {
