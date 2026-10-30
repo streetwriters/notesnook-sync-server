@@ -186,15 +186,14 @@ namespace Notesnook.API.Controllers
             try
             {
                 await serviceAccessor.UserAccountService.ClearSessionsAsync(userId, clientId, all: false, jti, null);
-                await PublishLogoutAsync(userId, jti, "Password changed.");
             }
             catch (Exception ex)
             {
                 logger.LogError(ex, "Failed to end other sessions of user with id: {UserId}", userId);
             }
+            await PublishLogoutAsync(userId, jti, "Password changed.");
         }
 
-        // best effort, since the sessions are already ended and this only tells their devices sooner
         private async Task PublishLogoutAsync(string userId, string? jti, string reason)
         {
             try
@@ -304,7 +303,6 @@ namespace Notesnook.API.Controllers
             try
             {
                 await RetryAsync(async () => await accounts.ClearSessionsAsync(userId, clientId, all: false, jti, null) ? true : throw new Exception("Sessions were not cleared."));
-                // before the reset, so their open sync connections close sooner
                 await PublishLogoutAsync(userId, jti, "Your account is being reset.");
                 await UserService.ResetUserAsync(userId, removeAttachments);
             }
@@ -314,7 +312,6 @@ namespace Notesnook.API.Controllers
                 {
                     await accounts.UnlockUserAsync(userId, lockedOutUntil);
                 }
-                // the lock expires on its own
                 catch (Exception ex)
                 {
                     logger.LogError(ex, "Failed to unlock user {UserId} after a reset", userId);
