@@ -41,6 +41,8 @@ namespace Streetwriters.Identity.Services
         public Task<bool> ChangePasswordAsync(string userId, string oldPassword, string newPassword) => WithServiceAsync((s) => s.ChangePasswordAsync(userId, oldPassword, newPassword));
         public Task<bool> ResetPasswordAsync(string userId, string newPassword) => WithServiceAsync((s) => s.ResetPasswordAsync(userId, newPassword));
         public Task<bool> VerifyPasswordAsync(string userId, string password) => WithServiceAsync((s) => s.VerifyPasswordAsync(userId, password));
+        public Task<long?> LockUserAsync(string userId) => WithServiceAsync((s) => s.LockUserAsync(userId));
+        public Task UnlockUserAsync(string userId, long? lockedOutUntil) => WithServiceAsync(async (s) => { await s.UnlockUserAsync(userId, lockedOutUntil); return true; });
         public Task<bool> ClearSessionsAsync(string userId, string clientId, bool all, string jti, string? refreshToken) => WithServiceAsync((s) => s.ClearSessionsAsync(userId, clientId, all, jti, refreshToken));
         public Task<SignupResponse> CreateUserAsync(string clientId, string email, string password, string? userAgent = null) => WithServiceAsync((s) => s.CreateUserAsync(clientId, email, password, userAgent));
     }

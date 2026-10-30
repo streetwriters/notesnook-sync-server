@@ -18,11 +18,14 @@ namespace Notesnook.API.Jobs
     {
         // a token cached at deletion (30m) can still start a 5 GiB upload (90m) or get a presigned upload URL (1h), so those land before the purge
         public static readonly TimeSpan GracePeriod = TimeSpan.FromMinutes(150);
+        // requests that read the old generation before a reset can still write to it, so those land before the purge
+        public static readonly TimeSpan ResetGracePeriod = TimeSpan.FromMinutes(15);
 
         public WampServer SubscriptionServer { get; init; } = WampServers.SubscriptionServer;
 
         public async Task Execute(IJobExecutionContext context)
         {
+            SyncEventCounterSource.Log.PurgeStarted();
             var cutoff = DateTimeOffset.UtcNow.Subtract(GracePeriod).ToUnixTimeMilliseconds();
             var users = await repositories.UsersSettings.Collection
                 .Find(Builders<UserSettings>.Filter.Lt((s) => s.DeletedAt, cutoff))
@@ -39,8 +42,43 @@ namespace Notesnook.API.Jobs
                 catch (Exception ex)
                 {
                     logger.LogError(ex, "Failed to purge user {UserId}", user.UserId);
+                    SyncEventCounterSource.Log.PurgeFailed();
                 }
             }
+
+            var resets = await repositories.UsersSettings.Collection
+                .Find(Builders<UserSettings>.Filter.And(
+                    Builders<UserSettings>.Filter.Lt((s) => s.PurgePendingSince, DateTimeOffset.UtcNow.Subtract(ResetGracePeriod).ToUnixTimeMilliseconds()),
+                    Builders<UserSettings>.Filter.Eq((s) => s.DeletedAt, null)))
+                .Project((s) => new { s.UserId, s.Generation })
+                .ToListAsync(context.CancellationToken);
+
+            foreach (var user in resets)
+            {
+                context.CancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    await PurgeResetAsync(user.UserId, user.Generation);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Failed to purge the reset data of user {UserId}", user.UserId);
+                    SyncEventCounterSource.Log.PurgeFailed();
+                }
+            }
+        }
+
+        private async Task PurgeResetAsync(string userId, long generation)
+        {
+            logger.LogInformation("Purging reset data of user {UserId}", userId);
+            foreach (var collection in repositories.SyncItemCollections)
+                await collection.Repository.DeleteOlderGenerationsAsync(userId, generation);
+
+            // only the generation we purged, so a reset made meanwhile stays pending
+            await repositories.UsersSettings.Collection.UpdateOneAsync(
+                (s) => s.UserId == userId && s.Generation == generation,
+                Builders<UserSettings>.Update.Unset((s) => s.PurgePendingSince));
+            logger.LogInformation("Purged reset data of user {UserId}", userId);
         }
 
         // no transaction, since one this large outlives Mongo's time limit; every step is idempotent so a failed purge is retried

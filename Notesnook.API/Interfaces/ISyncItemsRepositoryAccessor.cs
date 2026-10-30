@@ -50,6 +50,7 @@ namespace Notesnook.API.Interfaces
         Repository<InboxSyncItem> InboxItems { get; }
         Repository<SyncDevice> SyncDevices { get; }
         Repository<DeviceIdsChunk> DeviceIdsChunks { get; }
+        UserGenerations Generations { get; }
 
         /// <summary>
         /// Every collection of a user's sync items, in the order they are synced.

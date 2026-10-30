@@ -15,6 +15,7 @@ public sealed class SyncEventCounterSource : EventSource
     private readonly Counter<int> fetchV2Failures;
     private readonly Histogram<long> fetchV2Duration;
     private readonly Histogram<long> pushV2Duration;
+    private readonly Counter<int> purgeFailures;
     private SyncEventCounterSource()
     {
         fetchCounter = meter.CreateCounter<int>("sync.fetches", "fetches", "Total fetches");
@@ -24,6 +25,8 @@ public sealed class SyncEventCounterSource : EventSource
         fetchV2Failures = meter.CreateCounter<int>("sync.v2.fetch_failures", "fetches", "Fetches that threw, including chunks the client rejected");
         fetchV2Duration = meter.CreateHistogram<long>("sync.v2.fetch_duration");
         pushV2Duration = meter.CreateHistogram<long>("sync.v2.push_duration");
+        // no unit, which the Prometheus exporter would append to the name the alert rule uses
+        purgeFailures = meter.CreateCounter<int>("users.purge_failures", null, "Deleted or reset users whose data failed to purge");
     }
 
     public void Fetch() => fetchCounter.Add(1);
@@ -33,6 +36,9 @@ public sealed class SyncEventCounterSource : EventSource
     public void Push() => pushCounter.Add(1);
     public void RecordFetchDuration(long durationMs) => fetchV2Duration.Record(durationMs);
     public void RecordPushDuration(long durationMs) => pushV2Duration.Record(durationMs);
+    public void PurgeFailed() => purgeFailures.Add(1);
+    // a counter is only exported once it has a value, and increase() can't count the failure that creates it
+    public void PurgeStarted() => purgeFailures.Add(0);
 
     protected override void Dispose(bool disposing)
     {

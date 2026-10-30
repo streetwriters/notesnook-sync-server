@@ -1,7 +1,6 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.SignalR;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using MongoDB.Driver;
@@ -54,7 +53,7 @@ public class SyncV2HubTests(TestDatabase db) : IClassFixture<TestDatabase>
     public async Task Connecting_requires_sync_access()
     {
         var userId = Guid.NewGuid().ToString("N");
-        var filter = new SyncAuthorizationHubFilter(new MemoryCache(new MemoryCacheOptions()));
+        var filter = new SyncAuthorizationHubFilter();
         var services = new ServiceCollection().BuildServiceProvider();
 
         var error = await Assert.ThrowsAsync<HubException>(() => filter.OnConnectedAsync(
@@ -73,7 +72,7 @@ public class SyncV2HubTests(TestDatabase db) : IClassFixture<TestDatabase>
             new UserSettings { UserId = deleted, Salt = "salt", DeletedAt = 1 },
             new UserSettings { UserId = live, Salt = "salt" }]);
         var services = new ServiceCollection().AddSingleton<ISyncItemsRepositoryAccessor>(scope.Repositories).BuildServiceProvider();
-        var filter = new SyncAuthorizationHubFilter(new MemoryCache(new MemoryCacheOptions()));
+        var filter = new SyncAuthorizationHubFilter();
         var connected = new List<string>();
         Task Connect(string userId) => filter.OnConnectedAsync(new HubLifetimeContext(SyncCaller(userId), services, Hub(userId)), (_) => { connected.Add(userId); return Task.CompletedTask; });
 
@@ -84,11 +83,6 @@ public class SyncV2HubTests(TestDatabase db) : IClassFixture<TestDatabase>
         Assert.Equal([live], connected);
     }
 
-    private sealed class Clock : Microsoft.Extensions.Internal.ISystemClock
-    {
-        public DateTimeOffset UtcNow { get; set; } = DateTimeOffset.UtcNow;
-    }
-
     [Fact]
     public async Task An_open_connection_is_cut_off_once_its_user_is_deleted()
     {
@@ -96,8 +90,7 @@ public class SyncV2HubTests(TestDatabase db) : IClassFixture<TestDatabase>
         var scope = db.CreateScope();
         await scope.Repositories.UsersSettings.Collection.InsertOneAsync(new UserSettings { UserId = userId, Salt = "salt" });
         var services = new ServiceCollection().AddSingleton<ISyncItemsRepositoryAccessor>(scope.Repositories).BuildServiceProvider();
-        var clock = new Clock();
-        var filter = new SyncAuthorizationHubFilter(new MemoryCache(new MemoryCacheOptions { Clock = clock }));
+        var filter = new SyncAuthorizationHubFilter();
         var caller = SyncCaller(userId);
         var invoked = 0;
         ValueTask<object?> Invoke() => filter.InvokeMethodAsync(
@@ -106,7 +99,6 @@ public class SyncV2HubTests(TestDatabase db) : IClassFixture<TestDatabase>
 
         await Invoke();
         await scope.Repositories.UsersSettings.Collection.UpdateOneAsync((s) => s.UserId == userId, Builders<UserSettings>.Update.Set((s) => s.DeletedAt, 1));
-        clock.UtcNow += TimeSpan.FromMinutes(2);
 
         var error = await Assert.ThrowsAsync<HubException>(async () => await Invoke());
 

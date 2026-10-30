@@ -317,7 +317,9 @@ namespace Notesnook.API.Hubs
                     }
                 }
 
-                await SyncDeviceService.ResetAsync(userId, deviceId);
+                // a device that fetched across a reset re-registered after its deletion, and must still do a full sync after logging in again
+                if (await Repositories.Generations.IsCurrentAsync(userId))
+                    await SyncDeviceService.ResetAsync(userId, deviceId);
 
                 return new SyncV2Metadata
                 {

@@ -55,7 +55,7 @@ namespace Notesnook.API.Services
             ["notes"] = [.. SyncIndexes, I("Length_1", ("Length", 1))],
             ["sync_devices"] = [I("UserId_1_DeviceId_1", true, false, ("UserId", 1), ("DeviceId", 1)), I("LastAccessTime_1", ("LastAccessTime", 1)),
                 I("UserId_1", ("UserId", 1)), I("idx_device_user_activity", ("UserId", 1), ("LastAccessTime", -1))],
-            ["user_settings"] = [I("UserId_1", true, false, ("UserId", 1)), I("DeletedAt_1", ("DeletedAt", 1))]
+            ["user_settings"] = [I("UserId_1", true, false, ("UserId", 1)), I("DeletedAt_1", ("DeletedAt", 1)), I("PurgePendingSince_1", ("PurgePendingSince", 1))]
         };
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)

@@ -102,10 +102,7 @@ namespace Notesnook.API
 
             services.AddDefaultCors();
 
-            services.AddDistributedMemoryCache(delegate (MemoryDistributedCacheOptions cacheOptions)
-            {
-                cacheOptions.SizeLimit = 262144000L;
-            });
+            services.AddTokenCache(Servers.NotesnookAPI);
 
             services.AddAuthorization(options =>
             {
@@ -240,7 +237,6 @@ namespace Notesnook.API
             services.AddHostedService<MongoIndexesHostedService>();
 
             services.AddWampServiceAccessor(Servers.NotesnookAPI);
-            services.AddCacheInvalidator(Servers.NotesnookAPI);
 
             services.AddControllers();
             services.AddApiExceptionHandler();
@@ -352,7 +348,9 @@ namespace Notesnook.API
                     await scope.ServiceProvider.GetRequiredService<IUserService>().DeleteUserAsync(ev.UserId);
                 });
 
-                realm.Subscribe<ClearCacheMessage>(IdentityServerTopics.ClearCacheTopic, (ev) => app.GetService<CacheInvalidator>().ClearAsync(ev.Keys));
+                realm.Services.RegisterCallee(app.GetService<TokenCacheService>());
+                // sent by Identity instances that predate the token cache call
+                realm.Subscribe<ClearCacheMessage>(IdentityServerTopics.ClearCacheTopic, (ev) => app.GetService<TokenCacheService>().ClearAsync([.. ev.Keys]));
             });
 
             app.UseRouting();

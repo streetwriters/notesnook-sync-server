@@ -44,7 +44,7 @@ namespace Notesnook.API.Services
 {
     public class UserService(IHttpContextAccessor accessor,
         ISyncItemsRepositoryAccessor syncItemsRepositoryAccessor,
-        IUnitOfWork unitOfWork, IS3Service s3Service, SyncDeviceService syncDeviceService, WampServiceAccessor serviceAccessor, ILogger<UserService> logger) : IUserService
+        IUnitOfWork unitOfWork, IS3Service s3Service, IDbContext dbContext, WampServiceAccessor serviceAccessor, ILogger<UserService> logger) : IUserService
     {
         private static readonly System.Security.Cryptography.RandomNumberGenerator Rng = System.Security.Cryptography.RandomNumberGenerator.Create();
         private IHttpContextAccessor HttpContextAccessor { get; } = accessor;
@@ -162,9 +162,15 @@ namespace Notesnook.API.Services
 
         public async Task<EncryptedData?> GetEncryptionVerifier(string userId)
         {
+            // an item from before a reset is encrypted with the old key, so it would make the client reject its new key
+            var generation = await Repositories.Generations.GetAsync(userId);
+            var filter = Builders<SyncItem>.Filter.And(
+                Builders<SyncItem>.Filter.Eq((s) => s.UserId, userId),
+                Builders<SyncItem>.Filter.In((s) => s.KeyVersion, [null, 0]),
+                UserGenerations.Filter(generation));
             foreach (var collection in Repositories.SyncItemCollections)
             {
-                var item = await collection.Repository.FindOneAsync((s) => s.UserId == userId && (s.KeyVersion == null || s.KeyVersion == 0));
+                var item = await collection.Repository.Collection.Find(filter).FirstOrDefaultAsync();
                 if (item != null)
                 {
                     return new EncryptedData
@@ -219,17 +225,9 @@ namespace Notesnook.API.Services
 
         }
 
-        public async Task<bool> ResetUserAsync(string userId, bool removeAttachments)
+        public async Task ResetUserAsync(string userId, bool removeAttachments)
         {
-            foreach (var collection in Repositories.SyncItemCollections)
-                collection.Repository.DeleteByUserId(userId);
-            Repositories.Monographs.DeleteMany((m) => m.UserId == userId);
-            Repositories.InboxApiKey.DeleteMany((t) => t.UserId == userId);
-            if (!await unit.Commit()) return false;
-
-            await syncDeviceService.ResetDevicesAsync(userId);
-
-            await Repositories.UsersSettings.Collection.UpdateOneAsync(Builders<UserSettings>.Filter.Eq((s) => s.UserId, userId), Builders<UserSettings>.Update
+            var update = Builders<UserSettings>.Update
                 .Set((s) => s.AttachmentsKey, null)
                 .Set((s) => s.MonographPasswordsKey, null)
                 .Set((s) => s.DataEncryptionKey, null)
@@ -239,12 +237,24 @@ namespace Notesnook.API.Services
                 .Set((s) => s.PendingKeys, null)
                 .Set((s) => s.PendingKeysSince, null)
                 .Set((s) => s.LastSynced, 0)
-                .Inc((s) => s.Revision, 1));
+                .Inc((s) => s.Revision, 1)
+                .Inc((s) => s.Generation, 1)
+                .Set((s) => s.PurgePendingSince, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+            // one transaction with the deletes of everything small enough, so a failure leaves nothing reset; the sync items are purged later
+            dbContext.AddCommand(async (handle, ct) =>
+            {
+                var result = await Repositories.UsersSettings.Collection.UpdateOneAsync(handle, Builders<UserSettings>.Filter.Eq((s) => s.UserId, userId), update, cancellationToken: ct);
+                if (result.MatchedCount == 0) throw new NotFoundException("User not found.");
+            });
+            Repositories.Monographs.DeleteMany((m) => m.UserId == userId);
+            Repositories.InboxApiKey.DeleteMany((t) => t.UserId == userId);
+            Repositories.InboxItems.DeleteMany((i) => i.UserId == userId);
+            Repositories.SyncDevices.DeleteMany((d) => d.UserId == userId);
+            Repositories.DeviceIdsChunks.DeleteMany((c) => c.UserId == userId);
+            await unit.Commit();
 
             if (removeAttachments)
                 await DeleteAttachmentsAsync(userId);
-
-            return true;
         }
 
         // runs after the user's data is already gone, so a failure here must not turn a completed deletion into an error

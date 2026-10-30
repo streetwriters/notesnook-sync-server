@@ -586,16 +586,122 @@ public abstract class TokenContractTests(IdentityHost host) : IdentityTestBase(h
         Assert.False(await IsActiveAsync(otherAccess));
         Assert.Equal(HttpStatusCode.BadRequest, (await RefreshAsync(otherRefresh)).StatusCode);
 
-        // the API servers cache introspection results under this key, and evict them on this message
-        await WaitUntilAsync(() => !host.NotesnookServer.ClearCache.IsEmpty && !host.MessengerServer.ClearCache.IsEmpty);
-        foreach (var server in new[] { host.NotesnookServer, host.MessengerServer })
-        {
-            var keys = server.ClearCache.SelectMany((m) => m.Keys).ToList();
-            Assert.Contains((otherAccess + ":reference_token").Sha256(), keys);
-            Assert.DoesNotContain((access + ":reference_token").Sha256(), keys);
-        }
+        // the servers cache introspection results under this key: the API evicts them before the call returns, the messenger on this message
+        Assert.Contains((otherAccess + ":reference_token").Sha256(), host.NotesnookServer.ClearedTokens);
+        Assert.DoesNotContain((access + ":reference_token").Sha256(), host.NotesnookServer.ClearedTokens);
+        await WaitUntilAsync(() => !host.MessengerServer.ClearCache.IsEmpty);
+        var keys = host.MessengerServer.ClearCache.SelectMany((m) => m.Keys).ToList();
+        Assert.Contains((otherAccess + ":reference_token").Sha256(), keys);
+        Assert.DoesNotContain((access + ":reference_token").Sha256(), keys);
         await WaitUntilAsync(() => !host.MessengerServer.SSE.IsEmpty);
         Golden.AssertMatches("sessions.clear.sse", Golden.Normalize(JsonSerializer.SerializeToNode(host.MessengerServer.SSE.Single()), null)!);
+    }
+
+    // what the API passes to keep its own session, read from the token's introspection like it does
+    private async Task<string> JtiAsync(string access) =>
+        JsonNode.Parse(await (await IntrospectAsync(access)).Content.ReadAsStringAsync())!["jti"]!.GetValue<string>();
+
+    [Fact]
+    public async Task Clearing_sessions_fails_if_the_api_cannot_clear_its_cache_and_a_retry_clears_it()
+    {
+        var email = NewEmail();
+        var signup = await SignupAsync(email);
+        var (access, _) = await LoginAsync(email);
+        var (otherAccess, _) = await LoginAsync(email);
+        var jti = await JtiAsync(access);
+        var key = (otherAccess + ":reference_token").Sha256();
+        host.NotesnookServer.TokenCacheFailures[key] = new Exception("Redis is down.");
+
+        await Assert.ThrowsAnyAsync<Exception>(() => host.WithServicesAsync((services) =>
+            services.GetRequiredService<IUserAccountService>().ClearSessionsAsync(signup.UserId, ClientId, all: false, jti, null)));
+        host.NotesnookServer.TokenCacheFailures.TryRemove(key, out _);
+
+        // the session is already gone, so only the kept key lets the retry clear it
+        Assert.True(await host.WithServicesAsync((services) =>
+            services.GetRequiredService<IUserAccountService>().ClearSessionsAsync(signup.UserId, ClientId, all: false, jti, null)));
+        Assert.Contains(key, host.NotesnookServer.ClearedTokens);
+        Assert.Null((await UserAsync(email)).PendingCacheKeys);
+    }
+
+    [Fact]
+    public async Task Clearing_sessions_falls_back_to_the_message_for_apis_without_the_call()
+    {
+        var email = NewEmail();
+        var signup = await SignupAsync(email);
+        var (access, _) = await LoginAsync(email);
+        var (otherAccess, _) = await LoginAsync(email);
+        var key = (otherAccess + ":reference_token").Sha256();
+        var jti = await JtiAsync(access);
+        host.NotesnookServer.TokenCacheFailures[key] = new WampSharp.V2.Core.Contracts.WampException(WampSharp.V2.Core.Contracts.WampErrors.NoSuchProcedure);
+
+        Assert.True(await host.WithServicesAsync((services) =>
+            services.GetRequiredService<IUserAccountService>().ClearSessionsAsync(signup.UserId, ClientId, all: false, jti, null)));
+
+        await WaitUntilAsync(() => host.NotesnookServer.ClearCache.SelectMany((m) => m.Keys).Contains(key));
+    }
+
+    // Lockout during an account reset
+
+    [Fact]
+    public async Task A_locked_user_cant_log_in_until_unlocked()
+    {
+        var email = NewEmail();
+        var signup = await SignupAsync(email);
+        var user = await UserAsync(email);
+        // like users created before lockout was enabled
+        await host.WithServicesAsync((services) => services.GetRequiredService<UserManager<User>>().SetLockoutEnabledAsync(user, false));
+
+        var lockedOutUntil = await host.WithServicesAsync((services) => services.GetRequiredService<IUserAccountService>().LockUserAsync(signup.UserId));
+
+        Assert.Null(lockedOutUntil);
+        var response = await PasswordGrantAsync(email, Password);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("Your account is being reset. Please try again in a few minutes.", Token(await ReadAsync(response), "error_description"));
+
+        await host.WithServicesAsync(async (services) => { await services.GetRequiredService<IUserAccountService>().UnlockUserAsync(signup.UserId, lockedOutUntil); return 0; });
+
+        await LoginAsync(email);
+    }
+
+    [Fact]
+    public async Task Unlocking_keeps_a_lockout_set_during_the_reset()
+    {
+        var email = NewEmail();
+        var signup = await SignupAsync(email);
+        var lockedOutUntil = await host.WithServicesAsync((services) => services.GetRequiredService<IUserAccountService>().LockUserAsync(signup.UserId));
+        await LockOutAsync(email);
+
+        await host.WithServicesAsync(async (services) => { await services.GetRequiredService<IUserAccountService>().UnlockUserAsync(signup.UserId, lockedOutUntil); return 0; });
+
+        var response = await PasswordGrantAsync(email, Password);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.StartsWith("You have been locked out.", Token(await ReadAsync(response), "error_description"));
+    }
+
+    [Fact]
+    public async Task A_user_being_reset_cant_be_locked_again()
+    {
+        var email = NewEmail();
+        var signup = await SignupAsync(email);
+        await host.WithServicesAsync((services) => services.GetRequiredService<IUserAccountService>().LockUserAsync(signup.UserId));
+
+        await Assert.ThrowsAsync<Exception>(() => host.WithServicesAsync((services) => services.GetRequiredService<IUserAccountService>().LockUserAsync(signup.UserId)));
+    }
+
+    [Fact]
+    public async Task Unlocking_keeps_an_earlier_lockout()
+    {
+        var email = NewEmail();
+        var signup = await SignupAsync(email);
+        await LockOutAsync(email);
+
+        var lockedOutUntil = await host.WithServicesAsync((services) => services.GetRequiredService<IUserAccountService>().LockUserAsync(signup.UserId));
+        await host.WithServicesAsync(async (services) => { await services.GetRequiredService<IUserAccountService>().UnlockUserAsync(signup.UserId, lockedOutUntil); return 0; });
+
+        Assert.NotNull(lockedOutUntil);
+        var response = await PasswordGrantAsync(email, Password);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.StartsWith("You have been locked out.", Token(await ReadAsync(response), "error_description"));
     }
 
     [Fact]

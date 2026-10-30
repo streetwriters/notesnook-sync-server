@@ -19,11 +19,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
 
+using System.Collections.Generic;
 using AspNetCore.Identity.Mongo.Model;
+using MongoDB.Bson.Serialization.Attributes;
 
 namespace Streetwriters.Common.Models
 {
     public class User : MongoUser
     {
+        /// <summary>
+        /// The end of the lockout during an account reset, so a lockout that ends then is reported as the reset.
+        /// </summary>
+        [BsonIgnoreIfNull]
+        public long? ResetLockoutEnd { get; set; }
+
+        /// <summary>
+        /// Keys of ended sessions whose cached tokens some server may still hold, kept until a clear succeeds.
+        /// </summary>
+        [BsonIgnoreIfNull]
+        public List<string>? PendingCacheKeys { get; set; }
     }
 }
