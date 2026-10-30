@@ -90,7 +90,7 @@ public class UserResetTests(TestDatabase db) : IClassFixture<TestDatabase>
     {
         var fetched = new Fetched([], [], []);
         var client = Stub<ISyncV2HubClient>.Create(
-            ("SendItems", (args) => { fetched.Items.AddRange(((SyncTransferItemV2)args[0]!).Items.Select((i) => i.ItemId!)); return Task.FromResult(true); }),
+            ("SendItems", (args) => { fetched.Items.AddRange(((SyncTransferRawItemV2)args[0]!).Items.Select((i) => i.ItemId!)); return Task.FromResult(true); }),
             ("SendMonographs", (args) => { fetched.Monographs.AddRange(((IEnumerable<MonographMetadata>)args[0]!).Select((m) => m.ItemId!)); return Task.FromResult(true); }),
             ("SendInboxItems", (args) => { fetched.InboxItems.AddRange(((IEnumerable<InboxSyncItem>)args[0]!).Select((i) => i.ItemId!)); return Task.FromResult(true); }));
         var hub = Hub(scope ?? db.CreateScope(), new HubCaller(userId));
@@ -149,7 +149,7 @@ public class UserResetTests(TestDatabase db) : IClassFixture<TestDatabase>
         var userId = await CreateUserAsync();
         var scope = db.CreateScope();
         var services = new ServiceCollection().AddSingleton<ISyncItemsRepositoryAccessor>(scope.Repositories).BuildServiceProvider();
-        var filter = new SyncAuthorizationHubFilter();
+        var filter = new SyncAuthorizationHubFilter(NullLogger<SyncAuthorizationHubFilter>.Instance);
         var caller = new HubCaller(userId);
         await filter.OnConnectedAsync(new HubLifetimeContext(caller, services, Hub(scope, caller)), (_) => Task.CompletedTask);
 

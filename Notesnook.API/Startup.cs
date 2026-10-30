@@ -250,7 +250,7 @@ namespace Notesnook.API
                 hub.ClientTimeoutInterval = TimeSpan.FromMinutes(10);
                 // detailed errors expose internal (e.g. Mongo) exception messages to clients
                 hub.EnableDetailedErrors = Environment.IsDevelopment();
-            }).AddMessagePackProtocol().AddJsonProtocol()
+            }).AddJsonProtocol()
               .AddHubOptions<SyncV2Hub>((hub) => hub.AddFilter<SyncAuthorizationHubFilter>());
             services.AddMemoryCache();
             services.AddSingleton<SyncAuthorizationHubFilter>();

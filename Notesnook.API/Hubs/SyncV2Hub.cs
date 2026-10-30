@@ -21,6 +21,7 @@ using System;
 using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Security.Claims;
@@ -34,6 +35,7 @@ using MongoDB.Driver;
 using Notesnook.API.Helpers;
 using Notesnook.API.Interfaces;
 using Notesnook.API.Models;
+using Notesnook.API.Repositories;
 using Notesnook.API.Services;
 using Streetwriters.Data.Interfaces;
 
@@ -41,7 +43,7 @@ namespace Notesnook.API.Hubs
 {
     public interface ISyncV2HubClient
     {
-        Task<bool> SendItems(SyncTransferItemV2 transferItem);
+        Task<bool> SendItems(SyncTransferRawItemV2 transferItem);
         Task<bool> SendVaultKey(EncryptedData vaultKey);
         Task<bool> SendMonographs(IEnumerable<MonographMetadata> monographs);
         Task<bool> SendInboxItems(IEnumerable<InboxSyncItem> inboxItems);
@@ -68,8 +70,8 @@ namespace Notesnook.API.Hubs
             SyncDeviceService = syncDeviceService;
 
             var synced = Repositories.SyncItemCollections.Where((c) => c.Type != null).ToArray();
-            BaseCollectionDefs = [.. synced.Where((c) => !c.RequiresV4).Select((c) => new CollectionDef(c.Type!, c.Repository.FindItemsById))];
-            V4CollectionDefs = [.. synced.Select((c) => new CollectionDef(c.Type!, c.Repository.FindItemsById))];
+            BaseCollectionDefs = [.. synced.Where((c) => !c.RequiresV4).Select((c) => new CollectionDef(c.Type!, c.Repository))];
+            V4CollectionDefs = [.. synced.Select((c) => new CollectionDef(c.Type!, c.Repository))];
             UpsertActionsMap = synced.ToFrozenDictionary((c) => c.Type!, (c) => (Action<IEnumerable<SyncItem>, string>)c.Repository.UpsertMany);
         }
 
@@ -156,54 +158,58 @@ namespace Notesnook.API.Hubs
             return true;
         }
 
-        private async IAsyncEnumerable<SyncTransferItemV2> PrepareChunks(string userId, HashSet<ItemKey> ids, int size, bool resetSync, long maxBytes, CollectionDef[] collectionDefs)
+        /// <summary>
+        /// Groups the items to send into chunks by their stored size, reading only ids and sizes, so a fetch
+        /// holds one chunk of items at a time instead of a whole cursor batch.
+        /// </summary>
+        private static async IAsyncEnumerable<(CollectionDef Def, List<ObjectId> Ids)> PrepareChunks(string userId, HashSet<ItemKey> ids, bool resetSync, long maxBytes, int maxItems, CollectionDef[] collectionDefs)
         {
-            var itemsProcessed = 0;
             foreach (var def in collectionDefs)
             {
-                var type = def.Key;
-
-                var filteredIds = ids.Where((id) => id.Type == type).Select((id) => id.ItemId).ToArray();
+                var filteredIds = ids.Where((id) => id.Type == def.Key).Select((id) => id.ItemId).ToArray();
                 if (!resetSync && filteredIds.Length == 0) continue;
 
-                using var cursor = await def.FindItems(userId, filteredIds, resetSync, size);
+                using var cursor = await def.Repository.FindItemSizes(userId, filteredIds, resetSync);
 
-                var chunk = new List<SyncItem>();
+                var chunk = new List<ObjectId>();
                 long totalBytes = 0;
-                long METADATA_BYTES = 5 * 1024;
 
                 while (await cursor.MoveNextAsync())
                 {
                     foreach (var item in cursor.Current)
                     {
-                        chunk.Add(item);
-                        totalBytes += item.Length + METADATA_BYTES;
-                        if (totalBytes >= maxBytes)
+                        chunk.Add(item.Id);
+                        totalBytes += item.Size;
+                        if (totalBytes >= maxBytes || chunk.Count >= maxItems)
                         {
-                            itemsProcessed += chunk.Count;
-                            yield return new SyncTransferItemV2
-                            {
-                                Items = chunk,
-                                Type = type,
-                                Count = itemsProcessed
-                            };
-
+                            yield return (def, chunk);
                             totalBytes = 0;
-                            chunk.Clear();
+                            chunk = [];
                         }
                     }
                 }
-                if (chunk.Count > 0)
-                {
-                    itemsProcessed += chunk.Count;
-                    yield return new SyncTransferItemV2
-                    {
-                        Items = chunk,
-                        Type = type,
-                        Count = itemsProcessed
-                    };
-                }
+                if (chunk.Count > 0) yield return (def, chunk);
             }
+        }
+
+        /// <summary>
+        /// Loads and sends one chunk, and returns without awaiting the client's ack so that the items
+        /// aren't kept alive while the client applies them.
+        /// </summary>
+        private async Task<(Task<bool> Ack, List<ItemKey> SentIds)> SendChunkAsync(string userId, CollectionDef def, List<ObjectId> objectIds, int itemsProcessed)
+        {
+            var items = await def.Repository.FindItemsByObjectIds(userId, objectIds);
+            var sentIds = items.Select((i) => new ItemKey(i.ItemId, def.Key)).ToList();
+            // items deleted since their sizes were read
+            if (items.Count == 0) return (Task.FromResult(true), sentIds);
+
+            var ack = Clients.Caller.SendItems(new SyncTransferRawItemV2
+            {
+                Items = items,
+                Type = def.Key,
+                Count = itemsProcessed + items.Count
+            });
+            return (ack, sentIds);
         }
 
         public async Task<SyncV2Metadata> RequestFetch(string deviceId)
@@ -249,19 +255,22 @@ namespace Notesnook.API.Hubs
                 var chunks = PrepareChunks(
                     userId,
                     ids,
-                    size: 100,
                     resetSync: device.IsSyncReset,
                     maxBytes: 3 * 1024 * 1024,
+                    // clients apply each chunk as one batch, so small items must not pack thousands into one
+                    maxItems: 500,
                     collectionDefs
                 );
 
-                await foreach (var chunk in chunks)
+                var itemsProcessed = 0;
+                await foreach (var (def, objectIds) in chunks)
                 {
-                    if (!await Clients.Caller.SendItems(chunk).WaitAsync(TimeSpan.FromMinutes(10))) throw new HubException("Client rejected sent items.");
+                    var (ack, sentIds) = await SendChunkAsync(userId, def, objectIds, itemsProcessed);
+                    if (!await ack.WaitAsync(TimeSpan.FromMinutes(10))) throw new HubException("Client rejected sent items.");
+                    itemsProcessed += sentIds.Count;
 
-                    if (!device.IsSyncReset)
+                    if (!device.IsSyncReset && sentIds.Count > 0)
                     {
-                        var sentIds = chunk.Items.Select(i => new ItemKey(i.ItemId, chunk.Type)).ToList();
                         ids.ExceptWith(sentIds);
                         await SyncDeviceService.RemovePendingIdsAsync(userId, deviceId, sentIds);
                     }
@@ -326,9 +335,17 @@ namespace Notesnook.API.Hubs
                     Synced = true,
                 };
             }
-            catch
+            catch (Exception ex)
             {
-                SyncEventCounterSource.Log.FetchV2Failed();
+                SyncEventCounterSource.Log.FetchV2Failed(ex switch
+                {
+                    _ when Context.ConnectionAborted.IsCancellationRequested => "disconnected",
+                    IOException or OperationCanceledException => "disconnected",
+                    TimeoutException => "timeout",
+                    // the client threw while handling what we sent, or acked it with false
+                    HubException => "client_error",
+                    _ => "server_error",
+                });
                 throw;
             }
             finally
@@ -337,31 +354,36 @@ namespace Notesnook.API.Hubs
             }
         }
 
-        private record CollectionDef(
-            string Key,
-            Func<string, IEnumerable<string>, bool, int, Task<IAsyncCursor<SyncItem>>> FindItems
-        );
+        private record CollectionDef(string Key, SyncItemsRepository Repository);
     }
 
-    [MessagePack.MessagePackObject]
     public struct SyncV2Metadata
     {
-        [MessagePack.Key("synced")]
         [JsonPropertyName("synced")]
         public bool Synced { get; set; }
     }
 
-    [MessagePack.MessagePackObject]
     public struct SyncTransferItemV2
     {
-        [MessagePack.Key("items")]
         [JsonPropertyName("items")]
         public IEnumerable<SyncItem> Items { get; set; }
 
-        [MessagePack.Key("type")]
         [JsonPropertyName("type")]
         public string Type { get; set; }
-        [MessagePack.Key("count")]
+        [JsonPropertyName("count")]
+        public int Count { get; set; }
+    }
+
+    /// <summary>
+    /// What <see cref="SyncTransferItemV2"/> is on the wire, with items that are sent from their stored bytes.
+    /// </summary>
+    public struct SyncTransferRawItemV2
+    {
+        [JsonPropertyName("items")]
+        public IEnumerable<RawSyncItem> Items { get; set; }
+
+        [JsonPropertyName("type")]
+        public string Type { get; set; }
         [JsonPropertyName("count")]
         public int Count { get; set; }
     }

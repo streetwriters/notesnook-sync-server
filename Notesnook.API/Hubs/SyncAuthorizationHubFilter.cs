@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
 using Notesnook.API.Authorization;
 using Notesnook.API.Interfaces;
@@ -12,7 +13,7 @@ using Notesnook.API.Interfaces;
 namespace Notesnook.API.Hubs
 {
     // hub connections outlive their token, so a deleted or reset user's open connection is cut off here instead
-    public class SyncAuthorizationHubFilter : IHubFilter
+    public class SyncAuthorizationHubFilter(ILogger<SyncAuthorizationHubFilter> logger) : IHubFilter
     {
         private const string GenerationKey = "generation";
 
@@ -22,16 +23,38 @@ namespace Notesnook.API.Hubs
             return await next(invocationContext);
         }
 
+        // HubConnectionHandler's own logging is turned off in appsettings.json: it logs every rejection below
+        // (e.g. unconfirmed emails) as an error, so connection failures are logged and counted here instead.
+        // Rejections are logged at Information, which production filters out, so the counter is what shows them.
         public async Task OnConnectedAsync(HubLifetimeContext context, Func<HubLifetimeContext, Task> next)
         {
-            var result = new SyncRequirement().IsAuthorized(context.Context.User, new PathString("/hubs/sync/v2"));
-            if (!result.Succeeded)
+            var stage = "unauthorized";
+            try
             {
-                var reason = result.AuthorizationFailure?.FailureReasons.FirstOrDefault();
-                throw new HubException(reason?.Message ?? "Unauthorized");
+                var result = new SyncRequirement().IsAuthorized(context.Context.User, new PathString("/hubs/sync/v2"));
+                if (!result.Succeeded)
+                {
+                    var reason = result.AuthorizationFailure?.FailureReasons.FirstOrDefault();
+                    // clients read this message from the close error, so it must stay a HubException
+                    throw new HubException(reason?.Message ?? "Unauthorized");
+                }
+                stage = "account";
+                await EnsureCurrentAsync(context.Context, context.ServiceProvider);
+                stage = "hub";
+                await next(context);
             }
-            await EnsureCurrentAsync(context.Context, context.ServiceProvider);
-            await next(context);
+            catch (HubException ex)
+            {
+                SyncEventCounterSource.Log.ConnectionRejected(stage);
+                logger.LogInformation("Connection {ConnectionId} rejected: {Reason}", context.Context.ConnectionId, ex.Message);
+                throw;
+            }
+            catch (Exception ex)
+            {
+                SyncEventCounterSource.Log.ConnectionRejected("error");
+                logger.LogError(ex, "OnConnectedAsync failed for connection {ConnectionId}", context.Context.ConnectionId);
+                throw;
+            }
         }
 
         // uncached, since a connection must not write under its generation once a reset has ended it

@@ -45,7 +45,6 @@ namespace Notesnook.API.Models
         [BsonIgnoreIfDefault]
         [BsonRepresentation(BsonType.ObjectId)]
         [JsonIgnore]
-        [MessagePack.IgnoreMember]
         public string Id { get; set; } = string.Empty;
 
         [JsonPropertyName("userId")]

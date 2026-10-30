@@ -27,11 +27,9 @@ using Notesnook.API.Interfaces;
 
 namespace Notesnook.API.Models
 {
-    [MessagePack.MessagePackObject]
     public class SyncItem
     {
         [IgnoreDataMember]
-        [MessagePack.IgnoreMember]
         [JsonPropertyName("dateSynced")]
         public long DateSynced
         {
@@ -40,34 +38,29 @@ namespace Notesnook.API.Models
 
         [DataMember(Name = "userId")]
         [JsonPropertyName("userId")]
-        [MessagePack.Key("userId")]
         public string? UserId
         {
             get; set;
         }
 
         [IgnoreDataMember]
-        [MessagePack.IgnoreMember]
         [JsonIgnore]
         [BsonIgnoreIfDefault]
         public long Generation { get; set; }
 
         [JsonPropertyName("iv")]
         [DataMember(Name = "iv")]
-        [MessagePack.Key("iv")]
         [Required]
         public string IV { get; set; } = string.Empty;
 
 
         [JsonPropertyName("cipher")]
         [DataMember(Name = "cipher")]
-        [MessagePack.Key("cipher")]
         [Required]
         public string Cipher { get; set; } = string.Empty;
 
         [DataMember(Name = "id")]
         [JsonPropertyName("id")]
-        [MessagePack.Key("id")]
         public string? ItemId
         {
             get; set;
@@ -77,7 +70,6 @@ namespace Notesnook.API.Models
         [BsonIgnoreIfDefault]
         [BsonRepresentation(BsonType.ObjectId)]
         [JsonIgnore]
-        [MessagePack.IgnoreMember]
         public ObjectId Id
         {
             get; set;
@@ -85,7 +77,6 @@ namespace Notesnook.API.Models
 
         [JsonPropertyName("length")]
         [DataMember(Name = "length")]
-        [MessagePack.Key("length")]
         [Required]
         public long Length
         {
@@ -94,7 +85,6 @@ namespace Notesnook.API.Models
 
         [JsonPropertyName("v")]
         [DataMember(Name = "v")]
-        [MessagePack.Key("v")]
         [Required]
         public double Version
         {
@@ -103,7 +93,6 @@ namespace Notesnook.API.Models
 
         [JsonPropertyName("keyVersion")]
         [DataMember(Name = "keyVersion")]
-        [MessagePack.Key("keyVersion")]
         public int? KeyVersion
         {
             get; set;
@@ -111,7 +100,6 @@ namespace Notesnook.API.Models
 
         [JsonPropertyName("alg")]
         [DataMember(Name = "alg")]
-        [MessagePack.Key("alg")]
         [Required]
         public string Algorithm { get; set; } = string.Empty;
     }

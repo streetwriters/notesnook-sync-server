@@ -58,19 +58,32 @@ namespace Notesnook.API.Repositories
             return ALGORITHMS.Contains(algorithm);
         }
 
-        public async Task<IAsyncCursor<SyncItem>> FindItemsById(string userId, IEnumerable<string> ids, bool all, int batchSize)
+        public async Task<IAsyncCursor<SyncItemSize>> FindItemSizes(string userId, IEnumerable<string> ids, bool all)
         {
             var filters = new List<FilterDefinition<SyncItem>>(new[] { Builders<SyncItem>.Filter.Eq("UserId", userId), UserGenerations.Filter(await generations.GetAsync(userId)) });
 
             if (!all) filters.Add(Builders<SyncItem>.Filter.In("ItemId", ids));
 
-            return await Collection.FindAsync(Builders<SyncItem>.Filter.And(filters), new FindOptions<SyncItem>
+            // the size is computed by the server, so it can't be faked by the client's Length
+            return await Collection.FindAsync(Builders<SyncItem>.Filter.And(filters), new FindOptions<SyncItem, SyncItemSize>
             {
-                BatchSize = batchSize,
+                Projection = new BsonDocument { { "_id", 1 }, { "Size", new BsonDocument("$bsonSize", "$$ROOT") } },
+                // less than a chunk ahead, so the second read of each item (to send it) is still in cache:
+                // 10k read every item from storage twice under cache pressure, 250 about 1.2x, smaller no better
+                BatchSize = 250,
                 AllowDiskUse = true,
                 AllowPartialResults = false,
                 NoCursorTimeout = true
             });
+        }
+
+        public async Task<List<RawSyncItem>> FindItemsByObjectIds(string userId, IReadOnlyCollection<ObjectId> ids)
+        {
+            var filter = Builders<SyncItem>.Filter.Eq("UserId", userId) & UserGenerations.Filter(await generations.GetAsync(userId)) & Builders<SyncItem>.Filter.In("_id", ids);
+            // one more than can match, so the server returns every item and closes the cursor in a single round-trip
+            return await Collection.Find(filter, new FindOptions { BatchSize = ids.Count + 1 })
+                .As<RawSyncItem>()
+                .ToListAsync();
         }
 
         public Task DeleteOlderGenerationsAsync(string userId, long generation)
