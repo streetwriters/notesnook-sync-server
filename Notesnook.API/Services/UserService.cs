@@ -44,7 +44,7 @@ namespace Notesnook.API.Services
 {
     public class UserService(IHttpContextAccessor accessor,
         ISyncItemsRepositoryAccessor syncItemsRepositoryAccessor,
-        IUnitOfWork unitOfWork, IS3Service s3Service, SyncDeviceService syncDeviceService, WampServiceAccessor serviceAccessor, ILogger<UserService> logger) : IUserService
+        IUnitOfWork unitOfWork, IS3Service s3Service, IDbContext dbContext, WampServiceAccessor serviceAccessor, ILogger<UserService> logger) : IUserService
     {
         private static readonly System.Security.Cryptography.RandomNumberGenerator Rng = System.Security.Cryptography.RandomNumberGenerator.Create();
         private IHttpContextAccessor HttpContextAccessor { get; } = accessor;
@@ -227,14 +227,7 @@ namespace Notesnook.API.Services
 
         public async Task ResetUserAsync(string userId, bool removeAttachments)
         {
-            // small enough to delete right away, and before the generation changes, so a failure leaves nothing reset
-            Repositories.Monographs.DeleteMany((m) => m.UserId == userId);
-            Repositories.InboxApiKey.DeleteMany((t) => t.UserId == userId);
-            Repositories.InboxItems.DeleteMany((i) => i.UserId == userId);
-            await unit.Commit();
-            await syncDeviceService.ResetDevicesAsync(userId);
-
-            var result = await Repositories.UsersSettings.Collection.UpdateOneAsync(Builders<UserSettings>.Filter.Eq((s) => s.UserId, userId), Builders<UserSettings>.Update
+            var update = Builders<UserSettings>.Update
                 .Set((s) => s.AttachmentsKey, null)
                 .Set((s) => s.MonographPasswordsKey, null)
                 .Set((s) => s.DataEncryptionKey, null)
@@ -246,8 +239,19 @@ namespace Notesnook.API.Services
                 .Set((s) => s.LastSynced, 0)
                 .Inc((s) => s.Revision, 1)
                 .Inc((s) => s.Generation, 1)
-                .Set((s) => s.PurgePendingSince, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()));
-            if (result.MatchedCount == 0) throw new NotFoundException("User not found.");
+                .Set((s) => s.PurgePendingSince, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+            // one transaction with the deletes of everything small enough, so a failure leaves nothing reset; the sync items are purged later
+            dbContext.AddCommand(async (handle, ct) =>
+            {
+                var result = await Repositories.UsersSettings.Collection.UpdateOneAsync(handle, Builders<UserSettings>.Filter.Eq((s) => s.UserId, userId), update, cancellationToken: ct);
+                if (result.MatchedCount == 0) throw new NotFoundException("User not found.");
+            });
+            Repositories.Monographs.DeleteMany((m) => m.UserId == userId);
+            Repositories.InboxApiKey.DeleteMany((t) => t.UserId == userId);
+            Repositories.InboxItems.DeleteMany((i) => i.UserId == userId);
+            Repositories.SyncDevices.DeleteMany((d) => d.UserId == userId);
+            Repositories.DeviceIdsChunks.DeleteMany((c) => c.UserId == userId);
+            await unit.Commit();
 
             if (removeAttachments)
                 await DeleteAttachmentsAsync(userId);

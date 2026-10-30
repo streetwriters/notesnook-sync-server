@@ -45,7 +45,7 @@ public class UserResetTests(TestDatabase db) : IClassFixture<TestDatabase>
     {
         var scope = db.CreateScope();
         return new UserService(Stub<IHttpContextAccessor>.Create(), scope.Repositories, scope.Unit,
-            Stub<IS3Service>.Create(), scope.Devices, new WampServiceAccessor(Servers.NotesnookAPI), NullLogger<UserService>.Instance);
+            Stub<IS3Service>.Create(), scope.DbContext, new WampServiceAccessor(Servers.NotesnookAPI), NullLogger<UserService>.Instance);
     }
 
     private Task ResetAsync(string userId) => Users().ResetUserAsync(userId, removeAttachments: false);
@@ -86,14 +86,14 @@ public class UserResetTests(TestDatabase db) : IClassFixture<TestDatabase>
 
     private sealed record Fetched(List<string> Items, List<string> Monographs, List<string> InboxItems);
 
-    private async Task<Fetched> FetchAsync(string userId, string? deviceId = null)
+    private async Task<Fetched> FetchAsync(string userId, string? deviceId = null, TestDatabase.Scope? scope = null)
     {
         var fetched = new Fetched([], [], []);
         var client = Stub<ISyncV2HubClient>.Create(
             ("SendItems", (args) => { fetched.Items.AddRange(((SyncTransferItemV2)args[0]!).Items.Select((i) => i.ItemId!)); return Task.FromResult(true); }),
             ("SendMonographs", (args) => { fetched.Monographs.AddRange(((IEnumerable<MonographMetadata>)args[0]!).Select((m) => m.ItemId!)); return Task.FromResult(true); }),
             ("SendInboxItems", (args) => { fetched.InboxItems.AddRange(((IEnumerable<InboxSyncItem>)args[0]!).Select((i) => i.ItemId!)); return Task.FromResult(true); }));
-        var hub = Hub(db.CreateScope(), new HubCaller(userId));
+        var hub = Hub(scope ?? db.CreateScope(), new HubCaller(userId));
         hub.Clients = Stub<IHubCallerClients<ISyncV2HubClient>>.Create(("get_Caller", (_) => client));
         await hub.RequestFetchV4(deviceId ?? Guid.NewGuid().ToString("N"));
         return fetched;
@@ -184,6 +184,19 @@ public class UserResetTests(TestDatabase db) : IClassFixture<TestDatabase>
     }
 
     [Fact]
+    public async Task A_fetch_across_the_reset_leaves_its_device_to_sync_in_full()
+    {
+        var userId = await CreateUserAsync();
+        var scope = db.CreateScope();
+        scope.Repositories.Generations.Pin(userId, 0);
+
+        await ResetAsync(userId);
+        await FetchAsync(userId, "device", scope);
+
+        Assert.True((await db.CreateScope().Devices.GetDeviceAsync(userId, "device"))!.IsSyncReset);
+    }
+
+    [Fact]
     public async Task Items_pushed_after_a_reset_survive_the_purge()
     {
         var userId = await CreateUserAsync();
@@ -213,9 +226,14 @@ public class UserResetTests(TestDatabase db) : IClassFixture<TestDatabase>
     }
 
     [Fact]
-    public async Task Resetting_a_user_without_settings_fails()
+    public async Task Resetting_a_user_without_settings_fails_and_deletes_nothing()
     {
-        await Assert.ThrowsAsync<Streetwriters.Common.Exceptions.NotFoundException>(() => Users().ResetUserAsync(Guid.NewGuid().ToString("N"), removeAttachments: false));
+        var userId = Guid.NewGuid().ToString("N");
+        await AddOtherDataAsync(userId);
+
+        await Assert.ThrowsAsync<Streetwriters.Common.Exceptions.NotFoundException>(() => Users().ResetUserAsync(userId, removeAttachments: false));
+
+        Assert.Equal(1, await db.CreateScope().Repositories.Monographs.Collection.CountDocumentsAsync((m) => m.UserId == userId));
     }
 
     private static (UsersController Controller, List<string> Calls) ResetController(string userId, Func<string, object?[], object?>? fail = null)

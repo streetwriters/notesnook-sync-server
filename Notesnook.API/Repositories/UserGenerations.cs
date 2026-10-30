@@ -38,11 +38,17 @@ namespace Notesnook.API.Repositories
         public async Task<long> GetAsync(string userId)
         {
             if (!pinned.TryGetValue(userId, out var generation))
-                pinned[userId] = generation = await settings.Find((s) => s.UserId == userId).Project((s) => s.Generation).FirstOrDefaultAsync();
+                pinned[userId] = generation = await ReadAsync(userId);
             return generation;
         }
 
         public void Pin(string userId, long generation) => pinned[userId] = generation;
+
+        // read again, for work that may have outlasted a reset
+        public async Task<bool> IsCurrentAsync(string userId) => await GetAsync(userId) == await ReadAsync(userId);
+
+        private Task<long> ReadAsync(string userId) =>
+            settings.Find((s) => s.UserId == userId).Project((s) => s.Generation).FirstOrDefaultAsync();
 
         // items stored before generations existed have no Generation, so they belong to generation 0
         public static FilterDefinition<SyncItem> Filter(long generation) => generation == 0
