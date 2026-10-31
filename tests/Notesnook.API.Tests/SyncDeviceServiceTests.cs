@@ -180,7 +180,7 @@ public class SyncDeviceServiceTests(TestDatabase db) : IClassFixture<TestDatabas
         await RegisterSyncedDeviceAsync(userId, "B");
 
         var scope = db.CreateScope();
-        scope.Repositories.Notes.UpsertMany([TestItems.Note("1")], userId);
+        scope.Repositories.Notes.UpsertMany([TestItems.PushedNote("1")], userId);
         scope.Devices.QueueAddIdsToOtherDevices(userId, "A", [Note("1")]);
 
         Assert.Empty(await scope.Devices.GetIdsAsync(userId, "B", "unsynced"));
@@ -199,7 +199,7 @@ public class SyncDeviceServiceTests(TestDatabase db) : IClassFixture<TestDatabas
         await RegisterSyncedDeviceAsync(userId, "B");
 
         var scope = db.CreateScope();
-        scope.Repositories.Notes.UpsertMany([TestItems.Note("1")], userId);
+        scope.Repositories.Notes.UpsertMany([TestItems.PushedNote("1")], userId);
         scope.Devices.QueueAddIdsToOtherDevices(userId, "A", [Note("1")]);
         scope.DbContext.AddCommand((_, _) => throw new InvalidOperationException("push failed"));
 
@@ -222,7 +222,7 @@ public class SyncDeviceServiceTests(TestDatabase db) : IClassFixture<TestDatabas
             for (var i = 0; i < pushes; i++)
             {
                 var scope = db.CreateScope();
-                scope.Repositories.Notes.UpsertMany([TestItems.Note($"{i}")], userId);
+                scope.Repositories.Notes.UpsertMany([TestItems.PushedNote($"{i}")], userId);
                 scope.Devices.QueueAddIdsToOtherDevices(userId, "A", [Note($"{i}")]);
                 await scope.Unit.Commit();
             }

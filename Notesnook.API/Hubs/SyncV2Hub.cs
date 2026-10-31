@@ -95,7 +95,7 @@ namespace Notesnook.API.Hubs
         }
 
 
-        public async Task<int> PushItems(string deviceId, SyncTransferItemV2 pushItem)
+        public async Task<int> PushItems(string deviceId, SyncTransferPushItemV2 pushItem)
         {
             var userId = Context.User?.FindFirstValue("sub") ?? throw new HubException("Please login to sync.");
             if (string.IsNullOrEmpty(deviceId)) throw new HubException("Missing device ID.");
@@ -137,6 +137,8 @@ namespace Notesnook.API.Hubs
             }
             finally
             {
+                // the unit of work is done with the ciphers, so their pooled buffers can go back
+                foreach (var item in pushItem.Items) item.Dispose();
                 SyncEventCounterSource.Log.RecordPushDuration(stopwatch.ElapsedMilliseconds);
             }
         }
@@ -362,6 +364,18 @@ namespace Notesnook.API.Hubs
     {
         [JsonPropertyName("synced")]
         public bool Synced { get; set; }
+    }
+
+    // SyncTransferItemV2 as clients push it, with the ciphers kept as UTF-8
+    public struct SyncTransferPushItemV2
+    {
+        [JsonPropertyName("items")]
+        public List<PushedSyncItem> Items { get; set; }
+
+        [JsonPropertyName("type")]
+        public string Type { get; set; }
+        [JsonPropertyName("count")]
+        public int Count { get; set; }
     }
 
     public struct SyncTransferItemV2

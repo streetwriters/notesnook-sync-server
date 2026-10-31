@@ -13,4 +13,17 @@ public static class TestItems
         Length = 16,
         Version = 5.9
     };
+
+    public static PushedSyncItem Pushed(SyncItem item) => new()
+    {
+        ItemId = item.ItemId,
+        Algorithm = item.Algorithm,
+        Cipher = PooledUtf8String.FromString(item.Cipher),
+        IV = item.IV,
+        Length = item.Length,
+        Version = item.Version,
+        KeyVersion = item.KeyVersion
+    };
+
+    public static PushedSyncItem PushedNote(string itemId) => Pushed(Note(itemId));
 }

@@ -76,7 +76,7 @@ public class SyncV2HubTests(TestDatabase db) : IClassFixture<TestDatabase>
         var userId = Guid.NewGuid().ToString("N");
 
         var fetch = await Assert.ThrowsAsync<HubException>(() => Hub(userId).RequestFetchV4(deviceId!));
-        var push = await Assert.ThrowsAsync<HubException>(() => Hub(userId).PushItems(deviceId!, new SyncTransferItemV2 { Type = "note", Items = [], Count = 0 }));
+        var push = await Assert.ThrowsAsync<HubException>(() => Hub(userId).PushItems(deviceId!, new SyncTransferPushItemV2 { Type = "note", Items = [], Count = 0 }));
 
         Assert.Equal("Missing device ID.", fetch.Message);
         Assert.Equal("Missing device ID.", push.Message);
