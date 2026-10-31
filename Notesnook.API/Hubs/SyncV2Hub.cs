@@ -95,8 +95,10 @@ namespace Notesnook.API.Hubs
         }
 
 
-        public async Task<int> PushItems(string deviceId, SyncTransferItemV2 pushItem)
+        public async Task<int> PushItems(string deviceId, SyncTransferPushItemV2 pushItem)
         {
+            // the unit of work is done with the ciphers by the time this returns, so their pooled buffers can go back
+            using var _ = pushItem;
             var userId = Context.User?.FindFirstValue("sub") ?? throw new HubException("Please login to sync.");
             if (string.IsNullOrEmpty(deviceId)) throw new HubException("Missing device ID.");
 
@@ -362,6 +364,21 @@ namespace Notesnook.API.Hubs
     {
         [JsonPropertyName("synced")]
         public bool Synced { get; set; }
+    }
+
+    // SyncTransferItemV2 as clients push it, with the ciphers kept as UTF-8
+    public struct SyncTransferPushItemV2 : IDisposable
+    {
+        [JsonPropertyName("items")]
+        public List<PushedSyncItem> Items { get; set; }
+
+        [JsonPropertyName("type")]
+        public string Type { get; set; }
+        [JsonPropertyName("count")]
+        public int Count { get; set; }
+
+        // clients never send null items, but a message can, and cleanup must not throw over the real error
+        public readonly void Dispose() => Items?.ForEach((item) => item?.Dispose());
     }
 
     public struct SyncTransferItemV2

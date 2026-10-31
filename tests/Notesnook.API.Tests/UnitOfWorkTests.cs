@@ -77,7 +77,7 @@ public class UnitOfWorkTests(TestDatabase db) : IClassFixture<TestDatabase>
     {
         var userId = NewUserId();
         var scope = db.CreateScope();
-        scope.Repositories.Notes.UpsertMany([TestItems.Note("1"), TestItems.Note("2")], userId);
+        scope.Repositories.Notes.UpsertMany([TestItems.PushedNote("1"), TestItems.PushedNote("2")], userId);
         scope.DbContext.AddCommand((_, _) => throw new InvalidOperationException("boom"));
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => scope.Unit.Commit());

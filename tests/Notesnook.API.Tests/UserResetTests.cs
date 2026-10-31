@@ -81,8 +81,8 @@ public class UserResetTests(TestDatabase db) : IClassFixture<TestDatabase>
         Assert.Equal(1, await Hub(db.CreateScope(), new HubCaller(userId)).PushItems("device", Notes(itemIds)));
     }
 
-    private static SyncTransferItemV2 Notes(params string[] itemIds) =>
-        new() { Type = "note", Items = [.. itemIds.Select(TestItems.Note)], Count = itemIds.Length };
+    private static SyncTransferPushItemV2 Notes(params string[] itemIds) =>
+        new() { Type = "note", Items = [.. itemIds.Select(TestItems.PushedNote)], Count = itemIds.Length };
 
     private sealed record Fetched(List<string> Items, List<string> Monographs, List<string> InboxItems);
 
@@ -155,12 +155,14 @@ public class UserResetTests(TestDatabase db) : IClassFixture<TestDatabase>
 
         await ResetAsync(userId);
 
+        var push = Notes("old");
         var error = await Assert.ThrowsAsync<HubException>(async () => await filter.InvokeMethodAsync(
-            new HubInvocationContext(caller, services, Hub(scope, caller), typeof(SyncV2Hub).GetMethod(nameof(SyncV2Hub.PushItems))!, ["device", Notes("old")]),
+            new HubInvocationContext(caller, services, Hub(scope, caller), typeof(SyncV2Hub).GetMethod(nameof(SyncV2Hub.PushItems))!, ["device", push]),
             (_) => throw new Exception("invoked")));
 
         Assert.Equal("Your account was reset. Please sync again.", error.Message);
         Assert.True(caller.Aborted);
+        Assert.Throws<ObjectDisposedException>(() => push.Items[0].Cipher!.Span.Length);
     }
 
     [Fact]
@@ -219,7 +221,7 @@ public class UserResetTests(TestDatabase db) : IClassFixture<TestDatabase>
         await ResetAsync(userId);
 
         var scope = db.CreateScope();
-        scope.Repositories.Notes.UpsertMany(new[] { "lazy" }.Select(TestItems.Note), userId);
+        scope.Repositories.Notes.UpsertMany(new[] { "lazy" }.Select(TestItems.PushedNote), userId);
         await scope.Unit.Commit();
 
         Assert.Equal(["lazy"], (await FetchAsync(userId)).Items);

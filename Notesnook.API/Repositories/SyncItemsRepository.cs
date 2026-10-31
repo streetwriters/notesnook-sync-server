@@ -29,6 +29,7 @@ using Microsoft.VisualBasic;
 using Microsoft.Extensions.Logging;
 using MongoDB.Bson;
 using MongoDB.Driver;
+using Notesnook.API.Helpers;
 using Notesnook.API.Hubs;
 using Notesnook.API.Interfaces;
 using Notesnook.API.Models;
@@ -50,12 +51,6 @@ namespace Notesnook.API.Repositories
             this.collectionName = collection.CollectionNamespace.CollectionName;
             this.logger = logger;
             this.generations = generations;
-        }
-
-        private readonly List<string> ALGORITHMS = [Algorithms.Default];
-        private bool IsValidAlgorithm(string algorithm)
-        {
-            return ALGORITHMS.Contains(algorithm);
         }
 
         public async Task<IAsyncCursor<SyncItemSize>> FindItemSizes(string userId, IEnumerable<string> ids, bool all)
@@ -91,85 +86,38 @@ namespace Notesnook.API.Repositories
             return Collection.DeleteManyAsync(Builders<SyncItem>.Filter.And(Builders<SyncItem>.Filter.Eq("UserId", userId), UserGenerations.OlderThan(generation)));
         }
 
-        public void UpsertMany(IEnumerable<SyncItem> items, string userId)
+        // pushed items are written as the BSON the server builds itself, so their ciphers never become strings
+        private IMongoCollection<RawBsonDocument>? rawCollection;
+        private IMongoCollection<RawBsonDocument> RawCollection => rawCollection ??=
+            Collection.Database.GetCollection<RawBsonDocument>(Collection.CollectionNamespace.CollectionName, Collection.Settings);
+
+        // the items must stay undisposed until the unit of work commits
+        public void UpsertMany(IEnumerable<PushedSyncItem> items, string userId)
         {
-            var userIdFilter = Builders<SyncItem>.Filter.Eq("UserId", userId);
-            var writes = new List<ReplaceOneModel<SyncItem>>();
-            foreach (var item in items)
-            {
-                if (item.Length > 15 * 1024 * 1024)
-                {
-                    throw new Exception($"Size of item \"{item.ItemId}\" is too large. Maximum allowed size is 15 MB.");
-                }
+            var pushed = items.ToList();
+            foreach (var item in pushed) SyncItemValidator.Validate(item, collectionName, logger);
+            if (pushed.Count == 0) return;
 
-                if (!IsValidAlgorithm(item.Algorithm))
-                {
-                    throw new Exception($"Invalid alg identifier {item.Algorithm}");
-                }
-
-                // Handle case where the cipher is corrupted.
-                if (!IsBase64String(item.Cipher))
-                {
-                    logger.LogError("Corrupted item {ItemId} in collection {CollectionName}. Length: {Length}, Cipher: {Cipher}",
-                        item.ItemId, this.collectionName, item.Length, item.Cipher);
-                    throw new Exception($"Corrupted item \"{item.ItemId}\" in collection \"{this.collectionName}\". Please report this error to support@streetwriters.co.");
-                }
-
-                if (item.ItemId == null)
-                    throw new Exception($"Item does not have an ItemId.");
-
-                var filter = Builders<SyncItem>.Filter.And(
-                    userIdFilter,
-                    Builders<SyncItem>.Filter.Eq("ItemId", item.ItemId)
-                );
-
-                item.DateSynced = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                item.UserId = userId;
-
-                writes.Add(new ReplaceOneModel<SyncItem>(filter, item)
-                {
-                    IsUpsert = true
-                });
-            }
-            if (writes.Count == 0) return;
-
+            var dateSynced = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             dbContext.AddCommand(async (handle, ct) =>
             {
                 var generation = await generations.GetAsync(userId);
-                foreach (var write in writes) write.Replacement.Generation = generation;
-                await Collection.BulkWriteAsync(handle, writes, options: new BulkWriteOptions { IsOrdered = false }, ct);
+                // rebuilt on every attempt, since a retried transaction can see a newer generation
+                var buffers = new List<byte[]>(pushed.Count);
+                try
+                {
+                    // raw filters: typed ones would convert their values through the documents' serializer
+                    var writes = pushed.Select((item) => new ReplaceOneModel<RawBsonDocument>(
+                        new BsonDocument { { "UserId", userId }, { "ItemId", item.ItemId } },
+                        item.ToRawBson(userId, generation, dateSynced, buffers))
+                    { IsUpsert = true }).ToList();
+                    await RawCollection.BulkWriteAsync(handle, writes, options: new BulkWriteOptions { IsOrdered = false }, ct);
+                }
+                finally
+                {
+                    foreach (var buffer in buffers) LargeBuffers.Return(buffer);
+                }
             });
-        }
-
-        private static bool IsBase64String(string value)
-        {
-            if (value == null || value.Length == 0 || value.Contains(' ') || value.Contains('\t') || value.Contains('\r') || value.Contains('\n'))
-                return false;
-            var index = value.Length - 1;
-            if (value[index] == '=')
-                index--;
-            if (value[index] == '=')
-                index--;
-            for (var i = 0; i <= index; i++)
-                if (IsInvalidBase64Char(value[i]))
-                    return false;
-            return true;
-        }
-
-        private static bool IsInvalidBase64Char(char value)
-        {
-            var code = (int)value;
-            // 1 - 9
-            if (code >= 48 && code <= 57)
-                return false;
-            // A - Z
-            if (code >= 65 && code <= 90)
-                return false;
-            // a - z
-            if (code >= 97 && code <= 122)
-                return false;
-            // - & _
-            return code != 45 && code != 95;
         }
     }
 }
