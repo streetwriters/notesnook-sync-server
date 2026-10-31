@@ -155,12 +155,14 @@ public class UserResetTests(TestDatabase db) : IClassFixture<TestDatabase>
 
         await ResetAsync(userId);
 
+        var push = Notes("old");
         var error = await Assert.ThrowsAsync<HubException>(async () => await filter.InvokeMethodAsync(
-            new HubInvocationContext(caller, services, Hub(scope, caller), typeof(SyncV2Hub).GetMethod(nameof(SyncV2Hub.PushItems))!, ["device", Notes("old")]),
+            new HubInvocationContext(caller, services, Hub(scope, caller), typeof(SyncV2Hub).GetMethod(nameof(SyncV2Hub.PushItems))!, ["device", push]),
             (_) => throw new Exception("invoked")));
 
         Assert.Equal("Your account was reset. Please sync again.", error.Message);
         Assert.True(caller.Aborted);
+        Assert.Throws<ObjectDisposedException>(() => push.Items[0].Cipher!.Span.Length);
     }
 
     [Fact]

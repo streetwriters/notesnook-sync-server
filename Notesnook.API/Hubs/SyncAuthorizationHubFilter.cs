@@ -21,7 +21,16 @@ namespace Notesnook.API.Hubs
 
         public async ValueTask<object?> InvokeMethodAsync(HubInvocationContext invocationContext, Func<HubInvocationContext, ValueTask<object?>> next)
         {
-            await EnsureCurrentAsync(invocationContext.Context, invocationContext.ServiceProvider);
+            try
+            {
+                await EnsureCurrentAsync(invocationContext.Context, invocationContext.ServiceProvider);
+            }
+            catch
+            {
+                // arguments are bound before filters run, so a rejected call must release the pooled buffers they hold
+                foreach (var argument in invocationContext.HubMethodArguments) (argument as IDisposable)?.Dispose();
+                throw;
+            }
             return await next(invocationContext);
         }
 

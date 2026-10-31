@@ -209,6 +209,39 @@ public class PushedSyncItemTests(TestDatabase db) : IClassFixture<TestDatabase>
         Assert.All(push.Items, (i) => Assert.Throws<ObjectDisposedException>(() => i.Cipher!.Span.Length));
     }
 
+    public static TheoryData<string, string?, bool> RejectedPushes => new()
+    {
+        { "", "note", false },
+        { "device", "unknown", false },
+        { "device", "unknown", true },
+        { "device", "note", true },
+    };
+
+    [Theory]
+    [MemberData(nameof(RejectedPushes))]
+    public async Task A_rejected_push_hands_the_buffers_back(string deviceId, string? type, bool withNull)
+    {
+        var scope = db.CreateScope();
+        var item = TestItems.Pushed(Item());
+        var push = new SyncTransferPushItemV2 { Type = type!, Items = withNull ? [null!, item] : [item], Count = 1 };
+        var hub = new SyncV2Hub(scope.Repositories, scope.Unit, scope.Devices, NullLogger<SyncV2Hub>.Instance) { Context = new HubCaller(Guid.NewGuid().ToString("N")) };
+
+        await Assert.ThrowsAnyAsync<Exception>(() => hub.PushItems(deviceId, push));
+
+        Assert.Throws<ObjectDisposedException>(() => item.Cipher!.Span.Length);
+    }
+
+    [Fact]
+    public async Task A_push_without_items_reports_its_own_error()
+    {
+        var scope = db.CreateScope();
+        var hub = new SyncV2Hub(scope.Repositories, scope.Unit, scope.Devices, NullLogger<SyncV2Hub>.Instance) { Context = new HubCaller(Guid.NewGuid().ToString("N")) };
+
+        var error = await Assert.ThrowsAsync<HubException>(() => hub.PushItems("device", new SyncTransferPushItemV2 { Type = "unknown", Items = null! }));
+
+        Assert.Equal("Invalid item type: unknown.", error.Message);
+    }
+
     private sealed class PushBinder : IInvocationBinder
     {
         public IReadOnlyList<Type> GetParameterTypes(string methodName) =>
