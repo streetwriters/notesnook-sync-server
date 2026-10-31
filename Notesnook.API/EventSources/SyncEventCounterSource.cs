@@ -16,6 +16,8 @@ public sealed class SyncEventCounterSource : EventSource
     private readonly Counter<int> fetchV2Failures;
     private readonly Counter<int> connectionRejections;
     private readonly Histogram<long> fetchV2Duration;
+    private readonly Histogram<long> fetchV2ServerDuration;
+    private readonly Histogram<long> fetchV2ClientDuration;
     private readonly Histogram<long> pushV2Duration;
     private readonly Counter<int> purgeFailures;
     private SyncEventCounterSource()
@@ -27,6 +29,8 @@ public sealed class SyncEventCounterSource : EventSource
         fetchV2Failures = meter.CreateCounter<int>("sync.v2.fetch_failures", "fetches", "Fetches that threw, by reason: disconnected, timeout, client_error or server_error");
         connectionRejections = meter.CreateCounter<int>("sync.v2.connection_rejections", "connections", "Connections refused, by reason: unauthorized, account, hub or error");
         fetchV2Duration = meter.CreateHistogram<long>("sync.v2.fetch_duration");
+        fetchV2ServerDuration = meter.CreateHistogram<long>("sync.v2.fetch_server_duration");
+        fetchV2ClientDuration = meter.CreateHistogram<long>("sync.v2.fetch_client_duration");
         pushV2Duration = meter.CreateHistogram<long>("sync.v2.push_duration");
         // no unit, which the Prometheus exporter would append to the name the alert rule uses
         purgeFailures = meter.CreateCounter<int>("users.purge_failures", null, "Deleted or reset users whose data failed to purge");
@@ -38,7 +42,13 @@ public sealed class SyncEventCounterSource : EventSource
     public void ConnectionRejected(string reason) => connectionRejections.Add(1, new KeyValuePair<string, object?>("reason", reason));
     public void PushV2() => pushV2Counter.Add(1);
     public void Push() => pushCounter.Add(1);
-    public void RecordFetchDuration(long durationMs) => fetchV2Duration.Record(durationMs);
+    public void RecordFetchDuration(long durationMs, long clientDurationMs, bool fullSync)
+    {
+        var kind = new KeyValuePair<string, object?>("kind", fullSync ? "full" : "incremental");
+        fetchV2Duration.Record(durationMs, kind);
+        fetchV2ServerDuration.Record(durationMs - clientDurationMs, kind);
+        fetchV2ClientDuration.Record(clientDurationMs, kind);
+    }
     public void RecordPushDuration(long durationMs) => pushV2Duration.Record(durationMs);
     public void PurgeFailed() => purgeFailures.Add(1);
     // a counter is only exported once it has a value, and increase() can't count the failure that creates it

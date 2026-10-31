@@ -108,7 +108,12 @@ namespace Notesnook.API.Services
         public async Task<HashSet<ItemKey>> FetchUnsyncedIdsAsync(string userId, string deviceId)
         {
             var device = await GetDeviceAsync(userId, deviceId);
-            if (device == null) return [];
+            return device == null ? [] : await FetchUnsyncedIdsAsync(device);
+        }
+
+        public async Task<HashSet<ItemKey>> FetchUnsyncedIdsAsync(SyncDevice device)
+        {
+            var (userId, deviceId) = (device.UserId, device.DeviceId);
             if (device.IsSyncReset)
             {
                 // starting a full sync: it will send every item as it is now, so ids recorded
@@ -138,10 +143,11 @@ namespace Notesnook.API.Services
             ]);
         }
 
-        public async Task ResetAsync(string userId, string deviceId)
+        public async Task ResetAsync(string userId, string deviceId, bool isSyncReset = true)
         {
-            await repositories.SyncDevices.Collection.UpdateOneAsync(DeviceFilter(userId, deviceId), Builders<SyncDevice>.Update
-                .Set(x => x.IsSyncReset, false));
+            if (isSyncReset)
+                await repositories.SyncDevices.Collection.UpdateOneAsync(DeviceFilter(userId, deviceId), Builders<SyncDevice>.Update
+                    .Set(x => x.IsSyncReset, false));
             await repositories.DeviceIdsChunks.Collection.DeleteManyAsync(DeviceIdsChunkFilter(userId, deviceId, "pending"));
         }
 
@@ -156,11 +162,22 @@ namespace Notesnook.API.Services
             await repositories.DeviceIdsChunks.Collection.DeleteManyAsync(DeviceIdsChunkFilter(userId));
         }
 
+        // devices are only pruned after months without a sync, and writing on every push and fetch
+        // made a device's concurrent calls conflict on its document and retry for up to seconds
+        private static readonly long LastAccessTimeResolution = (long)TimeSpan.FromMinutes(5).TotalMilliseconds;
+
         public async Task UpdateLastAccessTimeAsync(string userId, string deviceId)
         {
-            await repositories.SyncDevices.Collection.UpdateOneAsync(DeviceFilter(userId, deviceId), Builders<SyncDevice>.Update
-                .Set(x => x.LastAccessTime, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()));
+            var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            await repositories.SyncDevices.Collection.UpdateOneAsync(
+                DeviceFilter(userId, deviceId) & Builders<SyncDevice>.Filter.Lt(x => x.LastAccessTime, now - LastAccessTimeResolution),
+                Builders<SyncDevice>.Update.Set(x => x.LastAccessTime, now));
         }
+
+        public Task UpdateLastAccessTimeAsync(SyncDevice device) =>
+            device.LastAccessTime < DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - LastAccessTimeResolution
+                ? UpdateLastAccessTimeAsync(device.UserId, device.DeviceId)
+                : Task.CompletedTask;
 
         public async Task AddIdsToOtherDevicesAsync(string userId, string deviceId, IEnumerable<ItemKey> ids)
         {

@@ -158,60 +158,6 @@ namespace Notesnook.API.Hubs
             return true;
         }
 
-        /// <summary>
-        /// Groups the items to send into chunks by their stored size, reading only ids and sizes, so a fetch
-        /// holds one chunk of items at a time instead of a whole cursor batch.
-        /// </summary>
-        private static async IAsyncEnumerable<(CollectionDef Def, List<ObjectId> Ids)> PrepareChunks(string userId, HashSet<ItemKey> ids, bool resetSync, long maxBytes, int maxItems, CollectionDef[] collectionDefs)
-        {
-            foreach (var def in collectionDefs)
-            {
-                var filteredIds = ids.Where((id) => id.Type == def.Key).Select((id) => id.ItemId).ToArray();
-                if (!resetSync && filteredIds.Length == 0) continue;
-
-                using var cursor = await def.Repository.FindItemSizes(userId, filteredIds, resetSync);
-
-                var chunk = new List<ObjectId>();
-                long totalBytes = 0;
-
-                while (await cursor.MoveNextAsync())
-                {
-                    foreach (var item in cursor.Current)
-                    {
-                        chunk.Add(item.Id);
-                        totalBytes += item.Size;
-                        if (totalBytes >= maxBytes || chunk.Count >= maxItems)
-                        {
-                            yield return (def, chunk);
-                            totalBytes = 0;
-                            chunk = [];
-                        }
-                    }
-                }
-                if (chunk.Count > 0) yield return (def, chunk);
-            }
-        }
-
-        /// <summary>
-        /// Loads and sends one chunk, and returns without awaiting the client's ack so that the items
-        /// aren't kept alive while the client applies them.
-        /// </summary>
-        private async Task<(Task<bool> Ack, List<ItemKey> SentIds)> SendChunkAsync(string userId, CollectionDef def, List<ObjectId> objectIds, int itemsProcessed)
-        {
-            var items = await def.Repository.FindItemsByObjectIds(userId, objectIds);
-            var sentIds = items.Select((i) => new ItemKey(i.ItemId, def.Key)).ToList();
-            // items deleted since their sizes were read
-            if (items.Count == 0) return (Task.FromResult(true), sentIds);
-
-            var ack = Clients.Caller.SendItems(new SyncTransferRawItemV2
-            {
-                Items = items,
-                Type = def.Key,
-                Count = itemsProcessed + items.Count
-            });
-            return (ack, sentIds);
-        }
-
         public async Task<SyncV2Metadata> RequestFetch(string deviceId)
         {
             return await HandleRequestFetch(deviceId, false, false, CollectionDefs(includeV4: false));
@@ -243,92 +189,29 @@ namespace Notesnook.API.Hubs
             if (device == null)
                 device = await SyncDeviceService.RegisterDeviceAsync(userId, deviceId);
             else
-                await SyncDeviceService.UpdateLastAccessTimeAsync(userId, deviceId);
+                await SyncDeviceService.UpdateLastAccessTimeAsync(device);
 
             var stopwatch = Stopwatch.StartNew();
+            var sender = new FetchSender(userId, collectionDefs, Clients.Caller);
             try
             {
-                var ids = await SyncDeviceService.FetchUnsyncedIdsAsync(userId, deviceId);
+                var ids = await SyncDeviceService.FetchUnsyncedIdsAsync(device);
                 if (!device.IsSyncReset && ids.Count == 0)
                     return new SyncV2Metadata { Synced = true };
 
-                var chunks = PrepareChunks(
-                    userId,
-                    ids,
-                    resetSync: device.IsSyncReset,
-                    maxBytes: 3 * 1024 * 1024,
-                    // clients apply each chunk as one batch, so small items must not pack thousands into one
-                    maxItems: 500,
-                    collectionDefs
-                );
-
-                var itemsProcessed = 0;
-                await foreach (var (def, objectIds) in chunks)
+                await foreach (var sentIds in sender.SendItemsAsync(ids, device.IsSyncReset))
                 {
-                    var (ack, sentIds) = await SendChunkAsync(userId, def, objectIds, itemsProcessed);
-                    if (!await ack.WaitAsync(TimeSpan.FromMinutes(10))) throw new HubException("Client rejected sent items.");
-                    itemsProcessed += sentIds.Count;
-
-                    if (!device.IsSyncReset && sentIds.Count > 0)
-                    {
-                        ids.ExceptWith(sentIds);
-                        await SyncDeviceService.RemovePendingIdsAsync(userId, deviceId, sentIds);
-                    }
+                    if (!device.IsSyncReset) await SyncDeviceService.RemovePendingIdsAsync(userId, deviceId, sentIds);
                 }
 
                 if (includeMonographs)
-                {
-                    var unsyncedMonographIds = ids.Where(k => k.Type == "monograph").Select(k => k.ItemId).ToList();
-                    // _id is stored as an ObjectId, so string IDs would never match it
-                    var unsyncedMonographObjectIds = unsyncedMonographIds.Where(id => ObjectId.TryParse(id, out _)).Select(ObjectId.Parse);
-                    FilterDefinition<Monograph> filter = device.IsSyncReset
-                        ? Builders<Monograph>.Filter.Eq(m => m.UserId, userId)
-                        : Builders<Monograph>.Filter.And(
-                            Builders<Monograph>.Filter.Eq(m => m.UserId, userId),
-                            Builders<Monograph>.Filter.Or(
-                                Builders<Monograph>.Filter.In(m => m.ItemId, unsyncedMonographIds),
-                                Builders<Monograph>.Filter.In("_id", unsyncedMonographObjectIds)
-                            )
-                        );
-                    var userMonographs = await Repositories.Monographs.Collection
-                        .Find(filter)
-                        .Project((m) => new MonographMetadata
-                        {
-                            DatePublished = m.DatePublished,
-                            Deleted = m.Deleted,
-                            Password = m.Password,
-                            SelfDestruct = m.SelfDestruct,
-                            Title = m.Title,
-                            ItemId = m.ItemId ?? m.Id.ToString(),
-                            PublishUrl = m.Slug // this will be converted to full url in the end, but we only need slug for now
-                        })
-                        .ToListAsync();
-
-                    userMonographs = userMonographs.Select((p) =>
-                    {
-                        p.PublishUrl = UrlHelper.ConstructPublishUrl(p);
-                        return p;
-                    }).ToList();
-
-                    if (userMonographs.Count > 0 && !await Clients.Caller.SendMonographs(userMonographs).WaitAsync(TimeSpan.FromMinutes(10)))
-                        throw new HubException("Client rejected monographs.");
-                }
-
+                    await sender.SendMonographsAsync(await FindMonographsAsync(userId, IdsOfType(ids, "monograph"), device.IsSyncReset));
                 if (includeInboxItems)
-                {
-                    var unsyncedInboxItemIds = ids.Where(k => k.Type == "inbox_item").Select(k => k.ItemId);
-                    var userInboxItems = device.IsSyncReset
-                        ? await Repositories.InboxItems.FindAsync(m => m.UserId == userId)
-                        : await Repositories.InboxItems.FindAsync(m => m.UserId == userId && unsyncedInboxItemIds.Contains(m.ItemId));
-                    if (userInboxItems.Any() && !await Clients.Caller.SendInboxItems(userInboxItems).WaitAsync(TimeSpan.FromMinutes(10)))
-                    {
-                        throw new HubException("Client rejected inbox items.");
-                    }
-                }
+                    await sender.SendInboxItemsAsync(await FindInboxItemsAsync(userId, IdsOfType(ids, "inbox_item"), device.IsSyncReset));
 
                 // a device that fetched across a reset re-registered after its deletion, and must still do a full sync after logging in again
                 if (await Repositories.Generations.IsCurrentAsync(userId))
-                    await SyncDeviceService.ResetAsync(userId, deviceId);
+                    await SyncDeviceService.ResetAsync(userId, deviceId, device.IsSyncReset);
 
                 return new SyncV2Metadata
                 {
@@ -350,14 +233,53 @@ namespace Notesnook.API.Hubs
             }
             finally
             {
-                SyncEventCounterSource.Log.RecordFetchDuration(stopwatch.ElapsedMilliseconds);
+                SyncEventCounterSource.Log.RecordFetchDuration(stopwatch.ElapsedMilliseconds, sender.ClientMilliseconds, device.IsSyncReset);
             }
+        }
+
+        private static List<string> IdsOfType(IEnumerable<ItemKey> ids, string type) => [.. ids.Where((k) => k.Type == type).Select((k) => k.ItemId)];
+
+        private async Task<List<MonographMetadata>> FindMonographsAsync(string userId, List<string> ids, bool fullSync)
+        {
+            if (!fullSync && ids.Count == 0) return [];
+            // _id is stored as an ObjectId, so string IDs would never match it
+            var objectIds = ids.Where(id => ObjectId.TryParse(id, out _)).Select(ObjectId.Parse);
+            FilterDefinition<Monograph> filter = fullSync
+                ? Builders<Monograph>.Filter.Eq(m => m.UserId, userId)
+                : Builders<Monograph>.Filter.And(
+                    Builders<Monograph>.Filter.Eq(m => m.UserId, userId),
+                    Builders<Monograph>.Filter.Or(
+                        Builders<Monograph>.Filter.In(m => m.ItemId, ids),
+                        Builders<Monograph>.Filter.In("_id", objectIds)
+                    )
+                );
+            var monographs = await Repositories.Monographs.Collection
+                .Find(filter)
+                .Project((m) => new MonographMetadata
+                {
+                    DatePublished = m.DatePublished,
+                    Deleted = m.Deleted,
+                    Password = m.Password,
+                    SelfDestruct = m.SelfDestruct,
+                    Title = m.Title,
+                    ItemId = m.ItemId ?? m.Id.ToString(),
+                    PublishUrl = m.Slug // this will be converted to full url in the end, but we only need slug for now
+                })
+                .ToListAsync();
+            foreach (var monograph in monographs) monograph.PublishUrl = UrlHelper.ConstructPublishUrl(monograph);
+            return monographs;
+        }
+
+        private async Task<List<InboxSyncItem>> FindInboxItemsAsync(string userId, List<string> ids, bool fullSync)
+        {
+            if (fullSync) return [.. await Repositories.InboxItems.FindAsync(m => m.UserId == userId)];
+            if (ids.Count == 0) return [];
+            return [.. await Repositories.InboxItems.FindAsync(m => m.UserId == userId && ids.Contains(m.ItemId))];
         }
 
         private CollectionDef[] CollectionDefs(bool includeV4) =>
             [.. Repositories.SyncItemCollections.Where((c) => c.Type != null && (includeV4 || !c.RequiresV4)).Select((c) => new CollectionDef(c.Type!, c.Repository))];
 
-        private record CollectionDef(string Key, SyncItemsRepository Repository);
     }
 
     public struct SyncV2Metadata

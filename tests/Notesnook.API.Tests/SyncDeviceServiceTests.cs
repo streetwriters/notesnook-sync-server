@@ -35,6 +35,24 @@ public class SyncDeviceServiceTests(TestDatabase db) : IClassFixture<TestDatabas
         Assert.True(Assert.Single(stored).IsSyncReset);
     }
 
+    [Theory]
+    [InlineData(1, false)]
+    [InlineData(10, true)]
+    public async Task The_last_access_time_is_only_written_once_it_is_minutes_old(int minutesAgo, bool written)
+    {
+        var userId = NewUserId();
+        var devices = db.CreateScope().Devices;
+        await devices.RegisterDeviceAsync(userId, "A");
+        var before = DateTimeOffset.UtcNow.AddMinutes(-minutesAgo).ToUnixTimeMilliseconds();
+        var collection = db.CreateScope().Repositories.SyncDevices.Collection;
+        await collection.UpdateOneAsync((d) => d.UserId == userId, Builders<SyncDevice>.Update.Set((d) => d.LastAccessTime, before));
+
+        await devices.UpdateLastAccessTimeAsync(userId, "A");
+
+        var stored = (await collection.Find((d) => d.UserId == userId).SingleAsync()).LastAccessTime;
+        Assert.Equal(written, stored != before);
+    }
+
     [Fact]
     public async Task Fetch_merges_unsynced_into_pending()
     {
