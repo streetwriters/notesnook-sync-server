@@ -80,6 +80,27 @@ public class S3ServiceTests(TestDatabase db, MinioFixture minio) : IClassFixture
         Assert.Equal(0, await s3.GetObjectSizeAsync(userId, "missing"));
     }
 
+    private sealed class StatusHandler(System.Net.HttpStatusCode status) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            Task.FromResult(new HttpResponseMessage(status));
+    }
+
+    private sealed class StatusHttpClients(System.Net.HttpStatusCode status) : IHttpClientFactory
+    {
+        public HttpClient CreateClient(string name) => new(new StatusHandler(status));
+    }
+
+    [Fact]
+    public async Task Deleted_objects_in_a_versioned_bucket_report_no_size()
+    {
+        _ = minio;
+        var accessor = new WampServiceAccessor(Servers.NotesnookAPI);
+        var s3 = new S3Service(new S3Clients(NullLogger<S3Service>.Instance), new StatusHttpClients(System.Net.HttpStatusCode.MethodNotAllowed), db.CreateScope().Repositories, accessor, NullLogger<S3Service>.Instance);
+
+        Assert.Equal(0, await s3.GetObjectSizeAsync(NewUserId(), "deleted"));
+    }
+
     [Fact]
     public async Task Deleting_an_object_removes_it()
     {

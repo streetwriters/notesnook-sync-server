@@ -225,7 +225,8 @@ namespace Notesnook.API.Services
 
             using var request = new HttpRequestMessage(HttpMethod.Head, url);
             using var response = await httpClientFactory.CreateClient().SendAsync(request);
-            if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return 0;
+            // a versioned bucket answers HEAD with 405 when the latest version is a delete marker
+            if (response.StatusCode is System.Net.HttpStatusCode.NotFound or System.Net.HttpStatusCode.MethodNotAllowed) return 0;
             if (!response.IsSuccessStatusCode)
                 throw new Exception($"Could not get object size: {response.StatusCode}.");
             return response.Content.Headers.ContentLength ?? 0;
