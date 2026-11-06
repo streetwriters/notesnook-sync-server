@@ -32,6 +32,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Connections;
@@ -363,7 +364,9 @@ namespace Notesnook.API
             app.UseEndpoints(endpoints =>
             {
                 endpoints.MapControllers();
-                endpoints.MapHealthChecks("/health");
+                // haproxy and docker probe /health; a Redis blip must not mark every replica down or restart them
+                endpoints.MapHealthChecks("/health", new HealthCheckOptions { Predicate = (check) => !check.Tags.Contains("ready") });
+                endpoints.MapHealthChecks("/ready");
                 endpoints.MapHub<SyncV2Hub>("/hubs/sync/v2", options =>
                 {
                     options.CloseOnAuthenticationExpiration = false;
