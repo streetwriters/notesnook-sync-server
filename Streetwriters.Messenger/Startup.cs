@@ -33,6 +33,7 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Streetwriters.Common;
 using Streetwriters.Common.Extensions;
 using Streetwriters.Common.Messages;
@@ -128,7 +129,7 @@ namespace Streetwriters.Messenger
                     {
                         await SSEHelper.SendEventToUserAsync(message, service, ev.UserId, ev.OriginTokenId);
                     }
-                });
+                }, app.GetService<ILogger<Startup>>());
 
                 IDistributedCache cache = app.GetService<IDistributedCache>();
                 realm.Subscribe<ClearCacheMessage>(IdentityServerTopics.ClearCacheTopic, (ev) => ev.Keys.ForEach((key) => cache.Remove(key)));

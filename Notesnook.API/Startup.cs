@@ -342,15 +342,16 @@ namespace Notesnook.API
 
             app.UseWamp(WampServers.NotesnookServer, (realm, server) =>
             {
+                var logger = app.GetService<ILogger<Startup>>();
                 realm.Subscribe<DeleteUserMessage>(IdentityServerTopics.DeleteUserTopic, async (ev) =>
                 {
                     await using var scope = app.ApplicationServices.CreateAsyncScope();
                     await scope.ServiceProvider.GetRequiredService<IUserService>().DeleteUserAsync(ev.UserId);
-                });
+                }, logger);
 
                 realm.Services.RegisterCallee(app.GetService<TokenCacheService>());
                 // sent by Identity instances that predate the token cache call
-                realm.Subscribe<ClearCacheMessage>(IdentityServerTopics.ClearCacheTopic, (ev) => app.GetService<TokenCacheService>().ClearAsync([.. ev.Keys]));
+                realm.Subscribe<ClearCacheMessage>(IdentityServerTopics.ClearCacheTopic, (ev) => app.GetService<TokenCacheService>().ClearAsync([.. ev.Keys]), logger);
             });
 
             app.UseRouting();

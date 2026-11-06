@@ -20,7 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 using System;
 using System.Reactive.Disposables;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.Logging;
 using Streetwriters.Common.Interfaces;
 using WampSharp.AspNetCore.WebSockets.Server;
 using WampSharp.Binding;
@@ -34,6 +36,22 @@ namespace Streetwriters.Common.Extensions
         public static IDisposable Subscribe<T>(this IWampHostedRealm realm, string topicName, Action<T> onNext)
         {
             return realm.Services.GetSubject<T>(topicName).Subscribe<T>(onNext);
+        }
+
+        // the subject runs handlers as async void, so an exception escaping one would crash the process
+        public static IDisposable Subscribe<T>(this IWampHostedRealm realm, string topicName, Func<T, Task> onNext, ILogger logger)
+        {
+            return realm.Services.GetSubject<T>(topicName).Subscribe<T>(async (message) =>
+            {
+                try
+                {
+                    await onNext(message);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Handling a message on {Topic} failed", topicName);
+                }
+            });
         }
 
         public static IDisposable Subscribe<T>(this IWampHostedRealm realm, string topicName, IMessageHandler<T> handler)
