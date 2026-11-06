@@ -21,6 +21,7 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -164,6 +165,13 @@ namespace Streetwriters.Identity.OpenIddictEngine
             services.AddSingleton((_) => new TokenRecords(database));
             services.AddSingleton((services) => new LegacyGrants(database, services.GetRequiredService<TimeProvider>()));
             services.AddSingleton((_) => new RollbackBridge(database));
+            services.AddDataProtection()
+                .SetApplicationName("Streetwriters.Identity")
+                .AddKeyManagementOptions((options) =>
+                {
+                    options.XmlRepository = new DataProtectionKeys(database);
+                    options.XmlEncryptor = new DataProtectionKeyEncryptor();
+                });
             services.AddTransient<StepTokens>();
             services.AddTransient<SessionPrincipals>();
             services.AddTransient<AccessTokens>();
