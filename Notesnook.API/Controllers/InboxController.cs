@@ -44,7 +44,7 @@ namespace Notesnook.API.Controllers
     {
 
         [HttpGet("api-keys")]
-        [Authorize(Policy = "Notesnook")]
+        [Authorize(Policy = "Sync")]
         public async Task<IActionResult> GetApiKeysAsync()
         {
             var userId = User.GetUserId();
@@ -53,7 +53,7 @@ namespace Notesnook.API.Controllers
         }
 
         [HttpPost("api-keys")]
-        [Authorize(Policy = "Notesnook")]
+        [Authorize(Policy = "Sync")]
         public async Task<IActionResult> CreateApiKeyAsync([FromBody] CreateInboxApiKeyRequest request)
         {
             var userId = User.GetUserId();
@@ -90,7 +90,7 @@ namespace Notesnook.API.Controllers
         }
 
         [HttpDelete("api-keys/{apiKey}")]
-        [Authorize(Policy = "Notesnook")]
+        [Authorize(Policy = "Sync")]
         public async Task<IActionResult> DeleteApiKeyAsync(string apiKey)
         {
             var userId = User.GetUserId();

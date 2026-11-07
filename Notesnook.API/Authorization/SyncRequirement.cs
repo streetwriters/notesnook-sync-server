@@ -35,7 +35,8 @@ namespace Notesnook.API.Authorization
             ["/sync"] = "sync your notes",
             ["/hubs/sync"] = "sync your notes",
             ["/hubs/sync/v2"] = "sync your notes",
-            ["/monographs"] = "publish monographs"
+            ["/monographs"] = "publish monographs",
+            ["/inbox"] = "use the inbox"
         };
 
         protected override Task HandleRequirementAsync(AuthorizationHandlerContext context, SyncRequirement requirement)
