@@ -736,6 +736,53 @@ public abstract class TokenContractTests(IdentityHost host) : IdentityTestBase(h
     }
 
     [Fact]
+    public async Task Password_reset_refuses_a_suspended_account()
+    {
+        var (signup, email, resetCode, authorizationCode) = await PasswordResetCodesAsync();
+        var user = await UserAsync(email);
+        await host.WithServicesAsync((services) => services.GetRequiredService<UserManager<User>>().SetLockoutEndDateAsync(user, DateTimeOffset.UtcNow.AddYears(100)));
+        host.Emails.Calls.Clear();
+
+        var recover = await AccountAsync(HttpMethod.Post, "/account/recover", null, new() { ["email"] = email, ["client_id"] = ClientId });
+        Assert.Equal(HttpStatusCode.OK, recover.StatusCode);
+        Assert.Empty(await recover.Content.ReadAsStringAsync());
+        Assert.DoesNotContain(host.Emails.Calls, (c) => c.Method == nameof(ITemplatedEmailSender.SendPasswordResetEmailAsync));
+        Assert.Equal(HttpStatusCode.BadRequest, (await ConfirmResetAsync(signup.UserId, resetCode)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await ResetTokenAsync(signup.UserId, authorizationCode)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Password_reset_works_during_a_failed_sign_in_lockout()
+    {
+        var (signup, email, resetCode, authorizationCode) = await PasswordResetCodesAsync();
+        await LockOutAsync(email);
+
+        var recover = await AccountAsync(HttpMethod.Post, "/account/recover", null, new() { ["email"] = email, ["client_id"] = ClientId });
+        Assert.Equal(HttpStatusCode.OK, recover.StatusCode);
+#if DEBUG
+        Assert.NotEmpty(await recover.Content.ReadAsStringAsync());
+#endif
+        Assert.NotEqual(HttpStatusCode.BadRequest, (await ConfirmResetAsync(signup.UserId, resetCode)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await ResetTokenAsync(signup.UserId, authorizationCode)).StatusCode);
+    }
+
+    private async Task<(SignupResponse Signup, string Email, string ResetCode, string AuthorizationCode)> PasswordResetCodesAsync()
+    {
+        var email = NewEmail();
+        var signup = await SignupAsync(email);
+        var user = await UserAsync(email);
+        var resetCode = await host.WithServicesAsync((services) => services.GetRequiredService<UserManager<User>>().GenerateUserTokenAsync(user, TokenOptions.DefaultProvider, "ResetPassword"));
+        var authorizationCode = await host.WithServicesAsync((services) => services.GetRequiredService<UserManager<User>>().GenerateUserTokenAsync(user, TokenOptions.DefaultProvider, "PasswordResetAuthorizationCode"));
+        return (signup, email, resetCode, authorizationCode);
+    }
+
+    private Task<HttpResponseMessage> ConfirmResetAsync(string userId, string code) =>
+        AccountAsync(HttpMethod.Get, $"/account/confirm?userId={userId}&code={Uri.EscapeDataString(code)}&clientId={ClientId}&type=RESET_PASSWORD", null);
+
+    private Task<HttpResponseMessage> ResetTokenAsync(string userId, string code) =>
+        AccountAsync(HttpMethod.Post, "/account/token", null, new() { ["authorization_code"] = code, ["user_id"] = userId, ["client_id"] = ClientId });
+
+    [Fact]
     public async Task Logout_ends_a_password_reset_token()
     {
         var email = NewEmail();

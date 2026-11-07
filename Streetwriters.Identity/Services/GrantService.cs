@@ -195,6 +195,11 @@ namespace Streetwriters.Identity.Services
             };
         }
 
+        // failed sign-ins and account resets lock an account briefly; a suspension sets the lockout years ahead
+        public static bool IsSuspended(User user) => user.LockoutEnd > DateTimeOffset.UtcNow.AddYears(1);
+
+        public const string SuspendedMessage = "This account has been suspended.";
+
         public static string LockedOutMessage(User user)
         {
             // a later lockout, e.g. for failed attempts, ends at a different time

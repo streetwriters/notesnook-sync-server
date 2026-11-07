@@ -126,6 +126,7 @@ namespace Streetwriters.Identity.Controllers
                     }
                 case TokenType.RESET_PASSWORD:
                     {
+                        if (GrantService.IsSuspended(user)) return BadRequest(GrantService.SuspendedMessage);
                         if (!await UserManager.VerifyUserTokenAsync(user, TokenOptions.DefaultProvider, "ResetPassword", code))
                             return BadRequest("Invalid token.");
 
@@ -188,6 +189,8 @@ namespace Streetwriters.Identity.Controllers
 
             var user = await UserManager.FindByEmailAsync(form.Email);
             if (user == null || !await UserService.IsUserValidAsync(UserManager, user, form.ClientId)) return Ok();
+            // a reset would end in a session for an account that mustn't have one; answered like an unknown email
+            if (GrantService.IsSuspended(user)) return Ok();
 
             var code = await UserManager.GenerateUserTokenAsync(user, TokenOptions.DefaultProvider, "ResetPassword");
             var callbackUrl = UrlExtensions.TokenLink(user.Id.ToString(), code, client.Id, TokenType.RESET_PASSWORD);
@@ -225,6 +228,7 @@ namespace Streetwriters.Identity.Controllers
             var user = await UserManager.FindByIdAsync(form.UserId) ?? throw new NotFoundException("User not found.");
             if (!await UserService.IsUserValidAsync(UserManager, user, form.ClientId))
                 return BadRequest($"Unable to find user with ID '{form.UserId}'.");
+            if (GrantService.IsSuspended(user)) return BadRequest(GrantService.SuspendedMessage);
 
             if (!await UserManager.VerifyUserTokenAsync(user, TokenOptions.DefaultProvider, "PasswordResetAuthorizationCode", form.Code))
                 return BadRequest("Invalid authorization_code.");
