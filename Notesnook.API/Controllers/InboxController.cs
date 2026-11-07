@@ -65,6 +65,11 @@ namespace Notesnook.API.Controllers
             {
                 return BadRequest(new { error = "Expiry date is required." });
             }
+            // -1 is the apps' "never expires"
+            if (request.ExpiryDate != -1 && request.ExpiryDate <= DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+            {
+                return BadRequest(new { error = "Expiry date must be in the future, or -1 for a key that never expires." });
+            }
 
             var count = await inboxApiKeysRepository.CountAsync(t => t.UserId == userId);
             if (count >= 10)
@@ -77,7 +82,7 @@ namespace Notesnook.API.Controllers
                 UserId = userId,
                 Name = request.Name,
                 DateCreated = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                ExpiryDate = request.ExpiryDate,
+                ExpiryDate = request.ExpiryDate.Value,
                 LastUsedAt = 0
             };
             await inboxApiKeysRepository.InsertAsync(inboxApiKey);

@@ -30,7 +30,7 @@ namespace Notesnook.API.Models
         public required string Name { get; set; }
 
         [JsonPropertyName("expiryDate")]
-        public long ExpiryDate { get; set; }
+        public long? ExpiryDate { get; set; }
     }
 
     public class InboxApiKey
