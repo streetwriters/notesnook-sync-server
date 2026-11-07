@@ -149,6 +149,20 @@ public class EmailAddressValidatorTests
         await check.ReleaseAsync("s1");
     }
 
+    [Theory]
+    [InlineData("10.0.1.5", "203.0.113.9", "203.0.113.9")]
+    [InlineData("172.20.0.3", "2001:db8::1", "2001:db8::1")]
+    [InlineData("127.0.0.1", "203.0.113.9", "203.0.113.9")]
+    [InlineData("198.51.100.4", "203.0.113.9", "198.51.100.4")]
+    [InlineData("2001:db8::7", "203.0.113.9", "2001:db8::7")]
+    public void TrustsForwardedAddressesOnlyFromAProxy(string connection, string forwarded, string expected)
+    {
+        var context = new Microsoft.AspNetCore.Http.DefaultHttpContext();
+        context.Connection.RemoteIpAddress = IPAddress.Parse(connection);
+        context.Request.Headers["CF-Connecting-IP"] = forwarded;
+        Assert.Equal(IPAddress.Parse(expected), Microsoft.AspNetCore.Http.HttpContextExtensions.GetRemoteIPAddress(context));
+    }
+
     private static HttpEmailRiskCheck Http(Func<CancellationToken, Task<HttpResponseMessage>> respond) =>
         new(new HttpClient(new Handler((_, ct) => respond(ct))) { BaseAddress = new Uri("http://email-validator.test/") }, NullLogger<HttpEmailRiskCheck>.Instance);
 

@@ -35,17 +35,26 @@ namespace Microsoft.AspNetCore.Http
         /// <returns>IPAddress</returns>
         public static IPAddress? GetRemoteIPAddress(this HttpContext context, bool allowForwarded = true)
         {
-            if (allowForwarded)
+            var remote = context.Connection.RemoteIpAddress;
+            // only a proxy in front of the server may say who the client is; a client reaching it directly could put any address here
+            if (allowForwarded && remote != null && IsPrivateOrLoopback(remote))
             {
-                // if you are allowing these forward headers, please ensure you are restricting context.Connection.RemoteIpAddress
-                // to cloud flare ips: https://www.cloudflare.com/ips/
-                string? header = context.Request.Headers["CF-Connecting-IP"].FirstOrDefault() ?? context.Request.Headers["X-Forwarded-For"].FirstOrDefault();
+                string? header = context.Request.Headers["CF-Connecting-IP"].FirstOrDefault() ?? context.Request.Headers["X-Forwarded-For"].FirstOrDefault()?.Split(',')[0].Trim();
                 if (IPAddress.TryParse(header, out IPAddress? ip))
                 {
                     return ip;
                 }
             }
-            return context.Connection.RemoteIpAddress;
+            return remote;
+        }
+
+        private static bool IsPrivateOrLoopback(IPAddress address)
+        {
+            if (address.IsIPv4MappedToIPv6) address = address.MapToIPv4();
+            if (IPAddress.IsLoopback(address)) return true;
+            if (address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6) return address.IsIPv6UniqueLocal || address.IsIPv6LinkLocal;
+            var b = address.GetAddressBytes();
+            return b[0] == 10 || (b[0] == 172 && b[1] >= 16 && b[1] <= 31) || (b[0] == 192 && b[1] == 168) || (b[0] == 169 && b[1] == 254);
         }
 
         static readonly UserAgentService userAgentService = new();
