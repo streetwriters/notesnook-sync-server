@@ -127,25 +127,28 @@ namespace Streetwriters.Identity
             services.AddRateLimiter(options =>
             {
                 options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-                options.AddSlidingWindowLimiter("strict", options =>
-                {
-                    options.PermitLimit = 30;
-                    options.Window = TimeSpan.FromSeconds(60);
-                    options.SegmentsPerWindow = 10;
-                    options.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
-                    options.QueueLimit = 0;
-                });
+                // per client: one shared window let a single client block account recovery for everyone
+                options.AddPolicy("strict", (context) =>
+                    RateLimitPartition.GetSlidingWindowLimiter(context.GetRemoteIPAddress()?.ToString() ?? "unknown", (_) => new SlidingWindowRateLimiterOptions
+                    {
+                        PermitLimit = 30,
+                        Window = TimeSpan.FromSeconds(60),
+                        SegmentsPerWindow = 10,
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                        QueueLimit = 0
+                    }));
 
                 options.AddPolicy("super_strict", (context) =>
                 {
-                    var key = context.User?.FindFirstValue("sub") ?? "default";
+                    // never one bucket shared by everyone, which would let one client stall all MFA
+                    var key = context.User?.FindFirstValue("sub") ?? context.GetRemoteIPAddress()?.ToString() ?? "unknown";
                     return RateLimitPartition.GetSlidingWindowLimiter(key, (key) => new SlidingWindowRateLimiterOptions
                     {
                         PermitLimit = 6,
                         Window = TimeSpan.FromMinutes(1),
                         SegmentsPerWindow = 2,
                         QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-                        QueueLimit = int.MaxValue,
+                        QueueLimit = 0,
                         AutoReplenishment = true
                     });
                 });
@@ -266,9 +269,31 @@ namespace Streetwriters.Identity
 
             if (UseOpenIddict) app.UseOpenIddictEngine();
             else app.UseIdentityServer();
-            app.UseRateLimiter();
-
             app.UseAuthentication();
+            // MFA tokens use their policies' schemes, not the default one, so the per-user rate limit only sees the user if they're authenticated here
+            app.Use(async (context, next) =>
+            {
+                if (context.User.Identity?.IsAuthenticated != true && context.Request.Path.StartsWithSegments("/mfa"))
+                {
+                    var policies = context.RequestServices.GetRequiredService<Microsoft.AspNetCore.Authorization.IAuthorizationPolicyProvider>();
+                    foreach (var name in new[] { "mfa", Config.ACCOUNT_API_POLICY })
+                    {
+                        var policy = await policies.GetPolicyAsync(name);
+                        foreach (var scheme in policy?.AuthenticationSchemes ?? [])
+                        {
+                            var result = await Microsoft.AspNetCore.Authentication.AuthenticationHttpContextExtensions.AuthenticateAsync(context, scheme);
+                            if (result.Succeeded && result.Principal != null)
+                            {
+                                context.User = result.Principal;
+                                break;
+                            }
+                        }
+                        if (context.User.Identity?.IsAuthenticated == true) break;
+                    }
+                }
+                await next();
+            });
+            app.UseRateLimiter();
             app.UseAuthorization();
 
             app.UseWamp(WampServers.IdentityServer, (realm, server) =>

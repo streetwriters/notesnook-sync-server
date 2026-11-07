@@ -47,6 +47,8 @@ namespace Streetwriters.Identity.Controllers
         SignInManager<User> _signInManager, RoleManager<MongoRole> _roleManager, IMFAService _mfaService) : base(_userManager, _emailSender, _signInManager, _roleManager, _mfaService) { }
 
         [HttpPost]
+        // can send an SMS to any number the caller gives
+        [EnableRateLimiting("super_strict")]
         public async Task<IActionResult> SetupAuthenticator([FromForm] MultiFactorSetupForm form)
         {
             var client = Clients.FindClientById(User.FindFirstValue("client_id"));
