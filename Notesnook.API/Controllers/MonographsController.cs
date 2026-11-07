@@ -87,13 +87,18 @@ namespace Notesnook.API.Controllers
             return await result.FirstOrDefaultAsync();
         }
 
+        private Task<Monograph> FindOwnMonographAsync(string userId, string itemId)
+        {
+            return FindMonographAsync(userId, new Monograph { ItemId = itemId });
+        }
+
         private async Task<Monograph> FindMonographAsync(string itemId)
         {
-            var result = await monographs.Collection.FindAsync(CreateMonographFilter(itemId), new FindOptions<Monograph>
-            {
-                Limit = 1
-            });
-            return await result.FirstOrDefaultAsync();
+            // ItemIds aren't unique across users: a live copy, then the first published, so a later copy can't take over a link
+            var oldestFirst = new FindOptions<Monograph> { Sort = Builders<Monograph>.Sort.Ascending("_id"), Limit = 1 };
+            var live = Builders<Monograph>.Filter.And(CreateMonographFilter(itemId), Builders<Monograph>.Filter.Ne(m => m.Deleted, true));
+            var result = await (await monographs.Collection.FindAsync(live, oldestFirst)).FirstOrDefaultAsync();
+            return result ?? await (await monographs.Collection.FindAsync(CreateMonographFilter(itemId), oldestFirst)).FirstOrDefaultAsync();
         }
 
         private async Task<Monograph> FindMonographBySlugAsync(string slug)
@@ -316,8 +321,8 @@ namespace Notesnook.API.Controllers
                 return BadRequest(new { error = "Monograph analytics are only available on the Pro & Believer plans." });
 
             var userId = this.User.GetUserId();
-            var monograph = await FindMonographAsync(id);
-            if (monograph == null || monograph.Deleted || monograph.UserId != userId)
+            var monograph = await FindOwnMonographAsync(userId, id);
+            if (monograph == null || monograph.Deleted)
             {
                 return NotFound();
             }
@@ -330,7 +335,7 @@ namespace Notesnook.API.Controllers
         {
             var userId = this.User.GetUserId();
 
-            var monograph = await FindMonographAsync(id);
+            var monograph = await FindOwnMonographAsync(userId, id);
             if (monograph == null || monograph.Deleted)
                 return Ok();
 
@@ -357,8 +362,8 @@ namespace Notesnook.API.Controllers
         public async Task<IActionResult> GetMetadataAsync([FromRoute] string id)
         {
             var userId = this.User.GetUserId();
-            var monograph = await FindMonographAsync(id);
-            if (monograph == null || monograph.Deleted || monograph.UserId != userId)
+            var monograph = await FindOwnMonographAsync(userId, id);
+            if (monograph == null || monograph.Deleted)
             {
                 return NotFound();
             }
