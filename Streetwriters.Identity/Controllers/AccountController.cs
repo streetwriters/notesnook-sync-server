@@ -130,7 +130,8 @@ namespace Streetwriters.Identity.Controllers
 
                         var authorizationCode = await UserManager.GenerateUserTokenAsync(user, TokenOptions.DefaultProvider, "PasswordResetAuthorizationCode");
                         var redirectUrl = $"{client.AccountRecoveryRedirectURL}?userId={userId}&code={authorizationCode}";
-                        return RedirectPermanent(redirectUrl);
+                        // not a 301: browsers may cache a permanent redirect, and this one carries a code
+                        return Redirect(redirectUrl);
                     }
                 default:
                     return BadRequest("Invalid type.");
@@ -194,7 +195,8 @@ namespace Streetwriters.Identity.Controllers
 #if (DEBUG || STAGING)
             return Ok(callbackUrl);
 #else
-                        logger.LogInformation("Password reset email sent to: {Email}, callback URL: {CallbackUrl}", user.Email, callbackUrl);
+                        // never log the callback URL: it carries the reset token
+                        logger.LogInformation("Password reset email sent to user {UserId}", user.Id);
                         await EmailSender.SendPasswordResetEmailAsync(user.Email, callbackUrl, client);
                         return Ok();
 #endif
