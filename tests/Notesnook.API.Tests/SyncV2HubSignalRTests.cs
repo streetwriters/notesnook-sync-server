@@ -97,6 +97,8 @@ public class SyncV2HubSignalRTests(TestDatabase db) : IClassFixture<TestDatabase
         builder.Services.AddSignalR().AddJsonProtocol()
             .AddHubOptions<SyncV2Hub>((hub) => hub.AddFilter<SyncAuthorizationHubFilter>());
         builder.Services.AddSingleton<SyncAuthorizationHubFilter>();
+        builder.Services.AddSingleton<PushNotifier>();
+        builder.Services.AddHostedService((provider) => provider.GetRequiredService<PushNotifier>());
         var inner = builder.Services.BuildServiceProvider().GetServices<IHubProtocol>().Single();
         var protocol = new TrackingProtocol(inner);
         builder.Services.RemoveAll<IHubProtocol>();

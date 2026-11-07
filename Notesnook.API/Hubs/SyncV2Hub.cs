@@ -57,10 +57,12 @@ namespace Notesnook.API.Hubs
         private SyncDeviceService SyncDeviceService { get; }
         private readonly IUnitOfWork unit;
         ILogger<SyncV2Hub> Logger { get; }
+        private readonly PushNotifier pushNotifier;
 
-        public SyncV2Hub(ISyncItemsRepositoryAccessor syncItemsRepositoryAccessor, IUnitOfWork unitOfWork, SyncDeviceService syncDeviceService, ILogger<SyncV2Hub> logger)
+        public SyncV2Hub(ISyncItemsRepositoryAccessor syncItemsRepositoryAccessor, IUnitOfWork unitOfWork, SyncDeviceService syncDeviceService, PushNotifier pushNotifier, ILogger<SyncV2Hub> logger)
         {
             Logger = logger;
+            this.pushNotifier = pushNotifier;
             Repositories = syncItemsRepositoryAccessor;
             unit = unitOfWork;
             SyncDeviceService = syncDeviceService;
@@ -143,18 +145,17 @@ namespace Notesnook.API.Hubs
             }
         }
 
-        public async Task<bool> PushCompleted()
+        public bool PushCompleted()
         {
             var userId = Context.User?.FindFirstValue("sub") ?? throw new HubException("User not found.");
-            await Clients.OthersInGroup(userId).PushCompleted();
+            pushNotifier.Notify(userId, Context.ConnectionId, deviceId: null);
             return true;
         }
 
-        public async Task<bool> PushCompletedV2(string deviceId)
+        public bool PushCompletedV2(string deviceId)
         {
             var userId = Context.User?.FindFirstValue("sub") ?? throw new HubException("User not found.");
-            await Clients.OthersInGroup(userId).PushCompleted();
-            await Clients.OthersInGroup(userId).PushCompletedV2(deviceId);
+            pushNotifier.Notify(userId, Context.ConnectionId, deviceId);
             return true;
         }
 

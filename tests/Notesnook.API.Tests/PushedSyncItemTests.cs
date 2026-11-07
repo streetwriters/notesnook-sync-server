@@ -12,11 +12,15 @@ using MongoDB.Bson;
 using MongoDB.Driver;
 using Notesnook.API.Hubs;
 using Notesnook.API.Models;
+using Notesnook.API.Services;
 
 namespace Notesnook.API.Tests;
 
 public class PushedSyncItemTests(TestDatabase db) : IClassFixture<TestDatabase>
 {
+    // never started: these tests don't notify other devices
+    private static readonly PushNotifier UnstartedNotifier = new(null!, NullLogger<PushNotifier>.Instance);
+
     private sealed class HubCaller(string userId) : HubCallerContext
     {
         public override string ConnectionId => "connection";
@@ -185,7 +189,7 @@ public class PushedSyncItemTests(TestDatabase db) : IClassFixture<TestDatabase>
         await scope.Repositories.UsersSettings.Collection.InsertOneAsync(new UserSettings { UserId = userId, Salt = "salt", Generation = 4 });
         var typed = new[] { Item(), Item((i) => i.Cipher = new string('a', 400_000)), Item((i) => i.KeyVersion = 3) };
         var push = new SyncTransferPushItemV2 { Type = "note", Items = [.. typed.Select(TestItems.Pushed)], Count = typed.Length };
-        var hub = new SyncV2Hub(scope.Repositories, scope.Unit, scope.Devices, NullLogger<SyncV2Hub>.Instance) { Context = new HubCaller(userId) };
+        var hub = new SyncV2Hub(scope.Repositories, scope.Unit, scope.Devices, UnstartedNotifier, NullLogger<SyncV2Hub>.Instance) { Context = new HubCaller(userId) };
         // an upsert over an item stored before keeps its _id
         var existing = Item((i) => { i.ItemId = typed[0].ItemId; i.UserId = userId; i.Cipher = "b2xk"; });
         await scope.Repositories.Notes.Collection.InsertOneAsync(existing);
@@ -224,7 +228,7 @@ public class PushedSyncItemTests(TestDatabase db) : IClassFixture<TestDatabase>
         var scope = db.CreateScope();
         var item = TestItems.Pushed(Item());
         var push = new SyncTransferPushItemV2 { Type = type!, Items = withNull ? [null!, item] : [item], Count = 1 };
-        var hub = new SyncV2Hub(scope.Repositories, scope.Unit, scope.Devices, NullLogger<SyncV2Hub>.Instance) { Context = new HubCaller(Guid.NewGuid().ToString("N")) };
+        var hub = new SyncV2Hub(scope.Repositories, scope.Unit, scope.Devices, UnstartedNotifier, NullLogger<SyncV2Hub>.Instance) { Context = new HubCaller(Guid.NewGuid().ToString("N")) };
 
         await Assert.ThrowsAnyAsync<Exception>(() => hub.PushItems(deviceId, push));
 
@@ -235,7 +239,7 @@ public class PushedSyncItemTests(TestDatabase db) : IClassFixture<TestDatabase>
     public async Task A_push_without_items_reports_its_own_error()
     {
         var scope = db.CreateScope();
-        var hub = new SyncV2Hub(scope.Repositories, scope.Unit, scope.Devices, NullLogger<SyncV2Hub>.Instance) { Context = new HubCaller(Guid.NewGuid().ToString("N")) };
+        var hub = new SyncV2Hub(scope.Repositories, scope.Unit, scope.Devices, UnstartedNotifier, NullLogger<SyncV2Hub>.Instance) { Context = new HubCaller(Guid.NewGuid().ToString("N")) };
 
         var error = await Assert.ThrowsAsync<HubException>(() => hub.PushItems("device", new SyncTransferPushItemV2 { Type = "unknown", Items = null! }));
 
@@ -263,7 +267,7 @@ public class PushedSyncItemTests(TestDatabase db) : IClassFixture<TestDatabase>
         Assert.True(protocol.TryParseMessage(ref message, new PushBinder(), out var parsed));
         var arguments = ((InvocationMessage)parsed!).Arguments;
         var scope = db.CreateScope();
-        var hub = new SyncV2Hub(scope.Repositories, scope.Unit, scope.Devices, NullLogger<SyncV2Hub>.Instance) { Context = new HubCaller(userId) };
+        var hub = new SyncV2Hub(scope.Repositories, scope.Unit, scope.Devices, UnstartedNotifier, NullLogger<SyncV2Hub>.Instance) { Context = new HubCaller(userId) };
         Assert.Equal(1, await hub.PushItems((string)arguments[0]!, (SyncTransferPushItemV2)arguments[1]!));
 
         var stored = await db.CreateScope().Repositories.Notes.Collection.Find((n) => n.UserId == userId).ToListAsync();

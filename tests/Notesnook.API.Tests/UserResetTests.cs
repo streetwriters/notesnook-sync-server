@@ -26,6 +26,9 @@ namespace Notesnook.API.Tests;
 
 public class UserResetTests(TestDatabase db) : IClassFixture<TestDatabase>
 {
+    // never started: these tests don't notify other devices
+    private static readonly PushNotifier UnstartedNotifier = new(null!, NullLogger<PushNotifier>.Instance);
+
     private sealed class HubCaller(string userId) : HubCallerContext
     {
         public override string ConnectionId => "connection";
@@ -74,7 +77,7 @@ public class UserResetTests(TestDatabase db) : IClassFixture<TestDatabase>
     }
 
     private SyncV2Hub Hub(TestDatabase.Scope scope, HubCallerContext caller) =>
-        new(scope.Repositories, scope.Unit, scope.Devices, NullLogger<SyncV2Hub>.Instance) { Context = caller };
+        new(scope.Repositories, scope.Unit, scope.Devices, UnstartedNotifier, NullLogger<SyncV2Hub>.Instance) { Context = caller };
 
     private async Task PushAsync(string userId, params string[] itemIds)
     {

@@ -255,6 +255,8 @@ namespace Notesnook.API
               .AddHubOptions<SyncV2Hub>((hub) => hub.AddFilter<SyncAuthorizationHubFilter>());
             services.AddMemoryCache();
             services.AddSingleton<SyncAuthorizationHubFilter>();
+            services.AddSingleton<PushNotifier>();
+            services.AddHostedService((provider) => provider.GetRequiredService<PushNotifier>());
 
             if (!string.IsNullOrEmpty(Constants.SIGNALR_REDIS_CONNECTION_STRING))
             {
