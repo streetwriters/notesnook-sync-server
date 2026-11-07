@@ -68,12 +68,6 @@ public sealed class SignupTests : IDisposable
         services.Dispose();
     }
 
-    private sealed class FailingHandler : HttpMessageHandler
-    {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-            => throw new HttpRequestException("offline");
-    }
-
     public class Stub<T> : DispatchProxy where T : class
     {
         private Dictionary<string, Func<object?[], object?>> handlers = [];
@@ -99,7 +93,7 @@ public sealed class SignupTests : IDisposable
             Stub<IMFAService>.Create(),
             Stub<ISessionStore>.Create(),
             scope.ServiceProvider.GetRequiredService<RoleManager<MongoRole>>(),
-            new EmailAddressValidator(new HttpClient(new FailingHandler()), NullLogger<EmailAddressValidator>.Instance),
+            new EmailAddressValidator(new NoEmailRiskCheck()),
             Stub<ITemplatedEmailSender>.Create(),
             tokens,
             NullLogger<UserAccountService>.Instance);

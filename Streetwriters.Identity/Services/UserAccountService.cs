@@ -238,13 +238,13 @@ namespace Streetwriters.Identity.Services
                 await roleManager.CreateAsync(new MongoRole(clientId));
 
             // email addresses must be case-insensitive
-            email = email.ToLowerInvariant();
-
-            if (!await emailValidator.IsEmailAddressValidAsync(email))
+            var validation = await emailValidator.ValidateAsync(email.ToLowerInvariant(), EmailCheckPurpose.Signup);
+            if (!validation.IsValid || validation.Email == null)
                 return new SignupResponse
                 {
-                    Errors = ["Invalid email address."]
+                    Errors = [validation.Error ?? EmailAddressValidator.INVALID]
                 };
+            email = validation.Email;
 
             IdentityResult result;
             try
@@ -265,7 +265,12 @@ namespace Streetwriters.Identity.Services
             if (result.Succeeded)
             {
                 var user = await userManager.FindByEmailAsync(email);
-                if (user == null) return SignupResponse.Error(["User not found after creation."]);
+                if (user == null)
+                {
+                    await emailValidator.ReleaseAsync(validation.Slot);
+                    return SignupResponse.Error(["User not found after creation."]);
+                }
+                await emailValidator.ConfirmAsync(validation.Slot, user.Id.ToString());
 
                 await userManager.AddToRoleAsync(user, client.Id);
                 if (Constants.IS_SELF_HOSTED)
@@ -297,6 +302,7 @@ namespace Streetwriters.Identity.Services
                 };
             }
 
+            await emailValidator.ReleaseAsync(validation.Slot);
             var otherErrors = result.Errors
                 .Where(e => e.Code != "DuplicateUserName" && e.Code != "DuplicateEmail")
                 .ToErrors();

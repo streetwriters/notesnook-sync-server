@@ -192,8 +192,6 @@ public abstract class IdentityHost : IAsyncLifetime
                     services.AddSingleton(sms);
                     services.AddSingleton<ISystemClock>(Clock);
                     services.AddSingleton<TimeProvider>(Clock);
-                    // the disposable domains list is fetched from GitHub; tests must not need the network
-                    services.AddHttpClient<EmailAddressValidator>().ConfigurePrimaryHttpMessageHandler(() => new OfflineHandler());
                     // the MFA step tokens are validated through discovery, which must reach the test server
                     services.Configure<JwtBearerOptions>("Bearer+jwt", (options) => options.BackchannelHttpHandler = new TestServerHandler(() => Host!));
                 }))
@@ -230,12 +228,6 @@ public abstract class IdentityHost : IAsyncLifetime
         Host.Dispose();
         if (!KeepDatabase) await new MongoClient(Mongo.ConnectionString).DropDatabaseAsync(DatabaseName);
         Directory.Delete(contentRoot, true);
-    }
-
-    private sealed class OfflineHandler : HttpMessageHandler
-    {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-            => throw new HttpRequestException("offline");
     }
 
     private sealed class TestServerHandler(Func<IHost> host) : DelegatingHandler

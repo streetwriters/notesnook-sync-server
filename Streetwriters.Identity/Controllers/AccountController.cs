@@ -26,6 +26,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using AspNetCore.Identity.Mongo.Model;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -158,13 +159,11 @@ namespace Streetwriters.Identity.Controllers
             }
             else
             {
-                if (!await EmailValidator.IsEmailAddressValidAsync(newEmail.ToLowerInvariant()))
-                {
-                    return BadRequest("Invalid email address.");
-                }
+                var validation = await EmailValidator.ValidateAsync(newEmail.ToLowerInvariant(), EmailCheckPurpose.ChangeEmail, HttpContext.GetRemoteIPAddress()?.ToString());
+                if (!validation.IsValid || validation.Email == null) return BadRequest(validation.Error ?? EmailAddressValidator.INVALID);
 
-                var code = await UserManager.GenerateChangeEmailTokenAsync(user, newEmail);
-                await EmailSender.SendChangeEmailConfirmationAsync(newEmail, code, client);
+                var code = await UserManager.GenerateChangeEmailTokenAsync(user, validation.Email);
+                await EmailSender.SendChangeEmailConfirmationAsync(validation.Email, code, client);
             }
             return Ok();
         }
@@ -255,6 +254,9 @@ namespace Streetwriters.Identity.Controllers
                         ArgumentNullException.ThrowIfNull(form.NewEmail);
                         ArgumentNullException.ThrowIfNull(form.Password);
                         ArgumentNullException.ThrowIfNull(form.VerificationCode);
+                        // the same form the code was issued for in SendVerificationEmail
+                        if (!EmailCanonicalizer.TryCanonicalize(form.NewEmail.ToLowerInvariant(), out var newEmail, out _))
+                            return BadRequest(EmailAddressValidator.INVALID);
                         foreach (var validator in UserManager.PasswordValidators)
                         {
                             var validation = await validator.ValidateAsync(UserManager, user, form.Password);
@@ -264,9 +266,9 @@ namespace Streetwriters.Identity.Controllers
                         // the password is derived from the email, so the new email, username and
                         // password must be saved together. ChangeEmailAsync persists all of them.
                         user.PasswordHash = UserManager.PasswordHasher.HashPassword(user, form.Password);
-                        user.UserName = form.NewEmail;
+                        user.UserName = newEmail;
                         await UserManager.UpdateNormalizedUserNameAsync(user);
-                        var result = await UserManager.ChangeEmailAsync(user, form.NewEmail, form.VerificationCode);
+                        var result = await UserManager.ChangeEmailAsync(user, newEmail, form.VerificationCode);
                         if (!result.Succeeded) return BadRequest(result.Errors.ToErrors());
 
                         await SendLogoutMessageAsync(user.Id.ToString(), "Email changed.");

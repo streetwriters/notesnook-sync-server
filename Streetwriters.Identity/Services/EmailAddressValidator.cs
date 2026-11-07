@@ -1,46 +1,22 @@
-using System;
-using System.Collections.Generic;
-using System.Net.Http;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
-using Streetwriters.Common;
-using System.Linq;
 
 namespace Streetwriters.Identity.Services
 {
-    public class EmailAddressValidator
+    public record EmailValidationResult(bool IsValid, string? Email, string? Error, string? Slot = null);
+
+    public class EmailAddressValidator(IEmailRiskCheck riskCheck)
     {
-        private static DateTimeOffset LAST_FETCH_TIME = DateTimeOffset.MinValue;
-        private static HashSet<string> BLACKLISTED_DOMAINS = new();
-        private readonly HttpClient httpClient;
-        private readonly ILogger<EmailAddressValidator> logger;
+        public const string INVALID = "Invalid email address.";
 
-        public EmailAddressValidator(HttpClient httpClient, ILogger<EmailAddressValidator> logger)
+        public async Task<EmailValidationResult> ValidateAsync(string? email, EmailCheckPurpose purpose, string? clientIp = null)
         {
-            this.httpClient = httpClient;
-            this.logger = logger;
+            if (!EmailCanonicalizer.TryCanonicalize(email, out var canonical, out _)) return new(false, null, INVALID);
+            var decision = await riskCheck.CheckAsync(canonical, purpose, clientIp);
+            return decision.Allow ? new(true, canonical, null, decision.Slot) : new(false, null, decision.Message ?? INVALID);
         }
 
-        public async Task<bool> IsEmailAddressValidAsync(string email)
-        {
-            var domain = email.ToLowerInvariant().Split("@")[1];
-            try
-            {
-                if (LAST_FETCH_TIME.AddDays(1) < DateTimeOffset.UtcNow)
-                {
-                    var domainsList = await httpClient.GetStringAsync("https://raw.githubusercontent.com/disposable-email-domains/disposable-email-domains/master/disposable_email_blocklist.conf");
-                    var domains = domainsList.Split('\n').Where(line => !string.IsNullOrWhiteSpace(line) && !line.TrimStart().StartsWith("//"));
-                    BLACKLISTED_DOMAINS = new HashSet<string>(domains, StringComparer.OrdinalIgnoreCase);
-                    LAST_FETCH_TIME = DateTimeOffset.UtcNow;
-                }
+        public Task ConfirmAsync(string? slot, string userId) => slot == null ? Task.CompletedTask : riskCheck.ConfirmAsync(slot, userId);
 
-                return !BLACKLISTED_DOMAINS.Contains(domain);
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Failed to validate email address: {Email}", email);
-                return BLACKLISTED_DOMAINS.Count > 0 ? !BLACKLISTED_DOMAINS.Contains(domain) : true;
-            }
-        }
+        public Task ReleaseAsync(string? slot) => slot == null ? Task.CompletedTask : riskCheck.ReleaseAsync(slot);
     }
 }

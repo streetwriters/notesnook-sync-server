@@ -77,6 +77,8 @@ namespace Streetwriters.Common
 
         // internal
         public static string? WEBRISK_API_URI => ReadSecret("WEBRISK_API_URI");
+        public static string? EMAIL_VALIDATOR_URL => ReadSecret("EMAIL_VALIDATOR_URL");
+        public static string? EMAIL_VALIDATOR_SECRET => ReadSecret("EMAIL_VALIDATOR_SECRET");
         public static string MONGODB_CONNECTION_STRING => ReadSecret("MONGODB_CONNECTION_STRING") ?? throw new ArgumentNullException("MONGODB_CONNECTION_STRING environment variable is not set");
         public static string MONGODB_DATABASE_NAME => ReadSecret("MONGODB_DATABASE_NAME") ?? throw new ArgumentNullException("MONGODB_DATABASE_NAME environment variable is not set");
         public static int SUBSCRIPTIONS_SERVER_PORT => int.Parse(ReadSecret("SUBSCRIPTIONS_SERVER_PORT") ?? "80");

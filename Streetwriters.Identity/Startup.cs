@@ -37,6 +37,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using OpenTelemetry.Metrics;
@@ -115,6 +116,8 @@ namespace Streetwriters.Identity
                 // options.MigrationCollection = "migration";
                 options.ConnectionString = connectionString;
             }).AddDefaultTokenProviders();
+            // every lookup and uniqueness check, not just sign-up, must treat look-alike forms of an address as one
+            services.Replace(ServiceDescriptor.Scoped<ILookupNormalizer, EmailLookupNormalizer>());
 
             services.Configure<DataProtectionTokenProviderOptions>(options =>
             {
@@ -171,7 +174,21 @@ namespace Streetwriters.Identity
                 };
             });
 
-            services.AddHttpClient<EmailAddressValidator>();
+            if (Constants.EMAIL_VALIDATOR_URL?.Trim() is { Length: > 0 } emailValidatorUrl)
+            {
+                // a missing secret would only show up as every check failing open
+                var emailValidatorSecret = Constants.EMAIL_VALIDATOR_SECRET?.Trim() is { Length: > 0 } secret
+                    ? secret
+                    : throw new InvalidOperationException("EMAIL_VALIDATOR_SECRET is required when EMAIL_VALIDATOR_URL is set.");
+                var emailValidatorBase = new Uri(emailValidatorUrl.TrimEnd('/') + "/", UriKind.Absolute);
+                services.AddHttpClient<IEmailRiskCheck, HttpEmailRiskCheck>((client) =>
+                {
+                    client.BaseAddress = emailValidatorBase;
+                    client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", emailValidatorSecret);
+                });
+            }
+            else services.AddSingleton<IEmailRiskCheck, NoEmailRiskCheck>();
+            services.AddScoped<EmailAddressValidator>();
             services.AddScoped<IUserAccountService, UserAccountService>();
             services.AddTransient<IMFAService, MFAService>();
             services.AddTransient<GrantService>();
