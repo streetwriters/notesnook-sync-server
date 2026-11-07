@@ -17,8 +17,14 @@ You should have received a copy of the Affero GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+using System;
+using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Caching.StackExchangeRedis;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+using StackExchange.Redis;
 using Streetwriters.Common.Accessors;
 using Streetwriters.Common.Helpers;
 using Streetwriters.Common.Services;
@@ -40,12 +46,25 @@ namespace Streetwriters.Common.Extensions
         public static IServiceCollection AddTokenCache(this IServiceCollection services, Server server)
         {
             if (!string.IsNullOrEmpty(Constants.CACHE_REDIS_CONNECTION_STRING))
-                services.AddStackExchangeRedisCache((options) =>
+            {
+                services.AddOptions<RedisCacheOptions>().Configure((options) =>
                 {
-                    options.Configuration = Constants.CACHE_REDIS_CONNECTION_STRING;
+                    options.ConfigurationOptions = ConfigurationOptions.Parse(Constants.CACHE_REDIS_CONNECTION_STRING);
+                    options.ConfigurationOptions.AbortOnConnectFail = false;
+                    // every authenticated request waits on a read, and a miss only costs an introspection
+                    options.ConfigurationOptions.ConnectTimeout = 1000;
+                    options.ConfigurationOptions.SyncTimeout = 1000;
+                    options.ConfigurationOptions.AsyncTimeout = 1000;
+                    // fail at once while disconnected instead of queueing until the timeout
+                    options.ConfigurationOptions.BacklogPolicy = BacklogPolicy.FailFast;
                     // servers that share the Redis keep their introspections apart
                     options.InstanceName = $"{server.Id}:";
                 });
+                services.AddSingleton<IDistributedCache>((provider) => new FailOpenDistributedCache(
+                    new RedisCache(provider.GetRequiredService<IOptions<RedisCacheOptions>>()),
+                    provider.GetService<ILogger<FailOpenDistributedCache>>() ?? NullLogger<FailOpenDistributedCache>.Instance,
+                    provider.GetService<TimeProvider>() ?? TimeProvider.System));
+            }
             else
                 services.AddDistributedMemoryCache((options) => options.SizeLimit = 262144000L);
             services.AddSingleton<TokenCacheService>();

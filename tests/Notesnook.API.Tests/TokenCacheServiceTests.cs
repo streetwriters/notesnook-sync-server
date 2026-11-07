@@ -62,4 +62,30 @@ public sealed class TokenCacheServiceTests : IAsyncLifetime
 
         await Assert.ThrowsAnyAsync<Exception>(() => new TokenCacheService(cache).ClearAsync(["token"]));
     }
+
+    [Fact]
+    public async Task While_redis_is_down_the_server_introspects_promptly_but_still_fails_a_clear()
+    {
+        Environment.SetEnvironmentVariable("CACHE_REDIS_CONNECTION_STRING", redis.GetConnectionString());
+        try
+        {
+            using var server = new ServiceCollection().AddTokenCache(Servers.NotesnookAPI).BuildServiceProvider();
+            var cache = server.GetRequiredService<IDistributedCache>();
+            await cache.SetStringAsync("token", "introspection");
+            await redis.StopAsync();
+
+            var started = DateTime.UtcNow;
+            Assert.Null(await cache.GetStringAsync("token"));
+            Assert.True(DateTime.UtcNow - started < TimeSpan.FromSeconds(3));
+            started = DateTime.UtcNow;
+            Assert.Null(await cache.GetStringAsync("token"));
+            Assert.True(DateTime.UtcNow - started < TimeSpan.FromMilliseconds(500));
+
+            await Assert.ThrowsAnyAsync<Exception>(() => server.GetRequiredService<TokenCacheService>().ClearAsync(["token"]));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("CACHE_REDIS_CONNECTION_STRING", null);
+        }
+    }
 }
