@@ -267,7 +267,7 @@ namespace Notesnook.API.Services
 
             if (string.IsNullOrEmpty(uploadId))
             {
-                var response = await S3InternalClient.ExecuteWithFailoverAsync((client) => client.InitiateMultipartUploadAsync(INTERNAL_BUCKET_NAME, objectName), operationName: "InitiateMultipartUpload", isWriteOperation: true);
+                var response = await S3InternalClient.ExecuteWithFailoverAsync((client) => client.InitiateMultipartUploadAsync(new InitiateMultipartUploadRequest { BucketName = INTERNAL_BUCKET_NAME, Key = objectName, ContentType = "application/octet-stream" }), operationName: "InitiateMultipartUpload", isWriteOperation: true);
                 if (!IsSuccessStatusCode((int)response.HttpStatusCode)) throw new Exception("Failed to initiate multipart upload.");
 
                 uploadId = response.UploadId;
@@ -473,6 +473,12 @@ namespace Notesnook.API.Services
                     Key = objectName,
                     Protocol = client.Config.ServiceURL.StartsWith("http://") ? Protocol.HTTP : Protocol.HTTPS,
                 };
+                // storage is served from notesnook.com subdomains, so a stored file must never render in the browser
+                if (httpVerb == HttpVerb.GET)
+                {
+                    request.ResponseHeaderOverrides.ContentType = "application/octet-stream";
+                    request.ResponseHeaderOverrides.ContentDisposition = "attachment";
+                }
                 return client.GetPreSignedURLAsync(request);
             }, operationName: "GetPreSignedURL");
         }
@@ -499,7 +505,7 @@ namespace Notesnook.API.Services
         {
             // the whole name must be made of S3's safe characters (no "/") so it
             // can't escape the user's directory
-            if (userId == null || name == null || !Regex.IsMatch(name, @"^[0-9a-zA-Z!\-_.*'()]+$") || name == "." || name == "..") return null;
+            if (userId == null || name == null || !Regex.IsMatch(name, @"^[0-9a-zA-Z!\-_.*'()]+\z") || name == "." || name == "..") return null;
             return $"{userId}/{name}";
         }
 

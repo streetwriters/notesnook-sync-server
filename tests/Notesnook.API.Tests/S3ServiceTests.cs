@@ -1,3 +1,4 @@
+using Amazon.S3;
 using Amazon.S3.Model;
 using Microsoft.Extensions.Logging.Abstractions;
 using MongoDB.Bson;
@@ -66,6 +67,41 @@ public class S3ServiceTests(TestDatabase db, MinioFixture minio) : IClassFixture
             UploadId = meta.UploadId,
             PartETags = [new PartETag(1, response.Headers.ETag!.Tag)]
         };
+    }
+
+    [Fact]
+    public async Task Downloads_are_never_rendered_by_the_browser()
+    {
+        var s3 = CreateService();
+        var userId = NewUserId();
+        var url = await s3.GetInternalUploadObjectUrlAsync(userId, "page.html");
+        using var upload = await Http.PutAsync(url, new StringContent("<script>alert(1)</script>", System.Text.Encoding.UTF8, "text/html"));
+        upload.EnsureSuccessStatusCode();
+
+        using var download = await Http.GetAsync(await s3.GetDownloadObjectUrlAsync(userId, "page.html"));
+
+        download.EnsureSuccessStatusCode();
+        Assert.Equal("application/octet-stream", download.Content.Headers.ContentType?.MediaType);
+        Assert.Equal("attachment", download.Content.Headers.ContentDisposition?.DispositionType);
+    }
+
+    [Fact]
+    public async Task Multipart_uploads_are_stored_as_binary_whatever_their_name()
+    {
+        var userId = NewUserId();
+        await CreateSettingsAsync(userId, 0);
+        var s3 = CreateService(FreePlan(userId));
+
+        await s3.CompleteMultipartUploadAsync(userId, await UploadPartAsync(s3, userId, "page.html", new byte[5]));
+
+        using var client = new AmazonS3Client(Environment.GetEnvironmentVariable("S3_ACCESS_KEY_ID"), Environment.GetEnvironmentVariable("S3_ACCESS_KEY"), new AmazonS3Config
+        {
+            ServiceURL = Environment.GetEnvironmentVariable("S3_SERVICE_URL"),
+            AuthenticationRegion = "us-east-1",
+            ForcePathStyle = true
+        });
+        var metadata = await client.GetObjectMetadataAsync(MinioFixture.Bucket, $"{userId}/page.html");
+        Assert.Equal("application/octet-stream", metadata.Headers.ContentType);
     }
 
     [Fact]

@@ -19,7 +19,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Security.Claims;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
@@ -48,6 +50,7 @@ namespace Notesnook.API.Controllers
         [EnableRateLimiting("s3-direct")]
         public async Task<IActionResult> Upload([FromQuery] string name)
         {
+            EnsureAttachmentName(name);
             var userId = this.User.GetUserId();
 
             var fileSize = HttpContext.Request.ContentLength ?? 0;
@@ -92,6 +95,7 @@ namespace Notesnook.API.Controllers
             var httpClient = httpClientFactory.CreateClient("S3Upload");
             var content = new StreamContent(HttpContext.Request.BodyReader.AsStream());
             content.Headers.ContentLength = fileSize;
+            content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
             using var request = new HttpRequestMessage(HttpMethod.Put, url)
             {
                 Content = content
@@ -121,9 +125,18 @@ namespace Notesnook.API.Controllers
         [EnableRateLimiting("s3-multipart-control")]
         public async Task<IActionResult> MultipartUpload([FromQuery] string name, [FromQuery] int parts, [FromQuery] string? uploadId)
         {
+            EnsureAttachmentName(name);
             var userId = this.User.GetUserId();
             var meta = await s3Service.StartMultipartUploadAsync(userId, name, parts, uploadId);
             return Ok(meta);
+        }
+
+        // only uploads are checked; older objects keep the looser rule so they stay reachable
+        private static readonly Regex AttachmentName = new(@"^[0-9A-Za-z]{1,64}\z", RegexOptions.Compiled);
+
+        private static void EnsureAttachmentName(string? name)
+        {
+            if (name == null || !AttachmentName.IsMatch(name)) throw new ClientException("Invalid attachment name.");
         }
 
         [HttpDelete("multipart")]

@@ -135,10 +135,27 @@ public class ApiErrorResponseTests(TestDatabase db) : IClassFixture<TestDatabase
         var s3 = Stub<IS3Service>.Create(("TryReserveStorageAsync", (_) => Task.FromResult(false)));
         await using var api = new Api(db, Stub<IUserAccountService>.Create(), subscriptions, s3);
 
-        var response = await api.Client.PutAsync("/s3?name=file", new ByteArrayContent(new byte[16]));
+        var response = await api.Client.PutAsync("/s3?name=0123456789abcdef", new ByteArrayContent(new byte[16]));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("Storage limit exceeded.", await ErrorAsync(response));
+    }
+
+    [Theory]
+    [InlineData("page.html")]
+    [InlineData("image.svg")]
+    [InlineData("0123456789abcdef%0A")]
+    [InlineData("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0")]
+    public async Task Uploads_must_be_named_by_their_hash(string name)
+    {
+        await using var api = new Api(db, Stub<IUserAccountService>.Create());
+
+        var direct = await api.Client.PutAsync($"/s3?name={name}", new ByteArrayContent(new byte[16]));
+        var multipart = await api.Client.GetAsync($"/s3/multipart?name={name}&parts=1");
+
+        Assert.Equal(HttpStatusCode.BadRequest, direct.StatusCode);
+        Assert.Equal("Invalid attachment name.", await ErrorAsync(direct));
+        Assert.Equal(HttpStatusCode.BadRequest, multipart.StatusCode);
     }
 
     [Fact]
