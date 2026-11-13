@@ -172,7 +172,10 @@ public class SyncV2HubTests(TestDatabase db) : IClassFixture<TestDatabase>
         Assert.Equal(monograph.Id, Assert.Single(sent).ItemId);
     }
 
-    private async Task<List<SyncItem>> InsertNotesAsync(string userId, int count, int cipherLength, long length)
+    private Task<List<SyncItem>> InsertNotesAsync(string userId, int count, int cipherLength, long length) =>
+        InsertItemsAsync(userId, count, cipherLength, length, (r) => r.Notes);
+
+    private async Task<List<SyncItem>> InsertItemsAsync(string userId, int count, int cipherLength, long length, Func<ISyncItemsRepositoryAccessor, Repositories.SyncItemsRepository> collection)
     {
         var notes = Enumerable.Range(0, count).Select((_) => new SyncItem
         {
@@ -184,7 +187,7 @@ public class SyncV2HubTests(TestDatabase db) : IClassFixture<TestDatabase>
             Version = 5.9,
             Algorithm = Algorithms.Default
         }).ToList();
-        await db.CreateScope().Repositories.Notes.Collection.InsertManyAsync(notes);
+        await collection(db.CreateScope().Repositories).Collection.InsertManyAsync(notes);
         return notes;
     }
 
@@ -251,6 +254,71 @@ public class SyncV2HubTests(TestDatabase db) : IClassFixture<TestDatabase>
         Assert.Equal(changed.Select((n) => n.ItemId).Order(), sent.SelectMany((c) => c.Items).Select((i) => i.ItemId).Order());
         Assert.Empty(await devices.GetIdsAsync(userId, "device", "pending"));
         Assert.Empty(await devices.GetIdsAsync(userId, "device", "unsynced"));
+    }
+
+    private SyncV2Hub HubWithSlowClient(string userId, List<SyncTransferRawItemV2> sent, TimeSpan delay)
+    {
+        var client = Stub<ISyncV2HubClient>.Create(
+            ("SendItems", (args) =>
+            {
+                lock (sent) sent.Add((SyncTransferRawItemV2)args[0]!);
+                return Task.Delay(delay).ContinueWith((_) => true);
+            }),
+            ("SendMonographs", (_) => Task.FromResult(true)),
+            ("SendInboxItems", (_) => Task.FromResult(true)));
+        var hub = Hub(userId);
+        hub.Clients = Stub<IHubCallerClients<ISyncV2HubClient>>.Create(("get_Caller", (_) => client));
+        return hub;
+    }
+
+    [Fact]
+    public async Task An_incremental_fetch_across_collections_sends_every_pending_item_once()
+    {
+        var userId = Guid.NewGuid().ToString("N");
+        var notes = await InsertNotesAsync(userId, 8, 1024 * 1024, length: 1024 * 1024);
+        var relations = await InsertItemsAsync(userId, 3, 100, 100, (r) => r.Relations);
+        var devices = db.CreateScope().Devices;
+        await devices.RegisterDeviceAsync(userId, "device");
+        await devices.ResetAsync(userId, "device");
+        await devices.AddIdsToAllDevicesAsync(userId, [.. notes.Select((n) => new ItemKey(n.ItemId!, "note")), .. relations.Select((r) => new ItemKey(r.ItemId!, "relation"))]);
+        var sent = new List<SyncTransferRawItemV2>();
+
+        await HubWithSlowClient(userId, sent, TimeSpan.FromMilliseconds(20)).RequestFetchV4("device");
+
+        Assert.Equal(["note", "note", "note", "relation"], sent.Select((c) => c.Type));
+        Assert.Equal(notes.Concat(relations).Select((n) => n.ItemId).Order(), sent.SelectMany((c) => c.Items).Select((i) => i.ItemId).Order());
+        Assert.Empty(await devices.GetIdsAsync(userId, "device", "pending"));
+    }
+
+    [Fact]
+    public async Task A_fetch_records_how_long_it_waited_for_the_client()
+    {
+        var userId = Guid.NewGuid().ToString("N");
+        await InsertNotesAsync(userId, 8, 1024 * 1024, length: 1024 * 1024);
+        await db.CreateScope().Devices.RegisterDeviceAsync(userId, "new");
+        var recorded = new List<(string Instrument, long Value, string? Kind)>();
+        using var listener = new MeterListener();
+        listener.InstrumentPublished = (i, l) =>
+        {
+            if (i.Meter.Name == "Notesnook.API.Metrics.Sync" && i.Name.StartsWith("sync.v2.fetch_")) l.EnableMeasurementEvents(i);
+        };
+        listener.SetMeasurementEventCallback<long>((i, value, tags, _) =>
+        {
+            string? kind = null;
+            foreach (var tag in tags) if (tag.Key == "kind") kind = (string?)tag.Value;
+            lock (recorded) recorded.Add((i.Name, value, kind));
+        });
+        listener.Start();
+
+        await HubWithSlowClient(userId, [], TimeSpan.FromMilliseconds(400)).RequestFetchV4("new");
+
+        // other tests' fetches show up too, but none of them waits anywhere near 3 x 400ms for its client
+        List<(string Instrument, long Value, string? Kind)> measurements;
+        lock (recorded) measurements = [.. recorded];
+        var client = Assert.Single(measurements, (m) => m.Instrument == "sync.v2.fetch_client_duration" && m.Value >= 1000);
+        Assert.Equal("full", client.Kind);
+        Assert.Contains(measurements, (total) => total.Instrument == "sync.v2.fetch_duration" && measurements.Any((server) =>
+            server.Instrument == "sync.v2.fetch_server_duration" && server.Kind == "full" && server.Value == total.Value - client.Value));
     }
 
     [Fact]
